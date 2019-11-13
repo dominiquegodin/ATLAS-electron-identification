@@ -4,7 +4,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 # Getting Started at LPS
 1) ssh -Y atlas16  
 (login to atlas16 for GPU's avaibility)	  
-2) cd /lcg/storage16/atlas/$USER
+2) cd /lcg/storage16/atlas/$USER  
 (change to user directory)											  
 3) ln -s /lcg/storage16/atlas/godin/el_data .  
 (link datasets to user directory)  
