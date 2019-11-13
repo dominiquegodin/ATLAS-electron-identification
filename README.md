@@ -24,7 +24,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --plotting=ON  (enables plotting of accuracy history, distributions separations ans ROC curve; default=OFF)
 
---symmetries (provides 3-fold data augmentation with vertical and horizontal images inversions; default=OFF)
+--symmetries=ON (provides 3-fold data augmentation with vertical and horizontal images inversions; default=OFF)
 
 --cal_images=ON  (peforms no training and plots random calorimeter images for each layer; default=OFF)  
 
