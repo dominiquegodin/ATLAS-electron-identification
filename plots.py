@@ -124,6 +124,7 @@ def plot_image(cal_image, n_classes, e_class, images, image):
     n_images = len(images)
     plot_number = n_classes*( e_image ) + e_class + 1
     plt.subplot(n_images, n_classes, plot_number)
+    #print(n_images, n_classes, plot_number)
     title='Class '+str(e_class)+' - Layer '+ image
     x_label, y_label = '' ,'' #None, None
     x_ticks, y_ticks = [], []
@@ -139,19 +140,19 @@ def plot_image(cal_image, n_classes, e_class, images, image):
     plt.xticks(x_ticks)
     plt.yticks(y_ticks)
     plt.imshow(cal_image.transpose(), cmap='Reds', extent=limits, norm=norm_type)
-    plt.colorbar()
+    plt.colorbar(pad=0.02)
     return
 
 
 def cal_images(files, images, file_name='outputs/cal_images.png'):
     print('\nCLASSIFIER: saving calorimeter images in:', file_name,'\n')
-    fig = plt.figure(figsize=(12,12))
+    fig = plt.figure(figsize=(8,12))
     for e_class in np.arange( 0, len(files) ):
         input_file = h5py.File( files[e_class], 'r' )
         e_number   = np.random.randint( 0, len(input_file['data']), size=1 )[0]
         for image in images: plot_image( input_file['data/table_'+str(e_number)][image][0],
                                          len(files), e_class, images, image )
-    hspace, wspace = 0.4, -0.4
-    fig.subplots_adjust(hspace=hspace, wspace=wspace)
+    hspace, wspace = 0.4, -0.6
+    fig.subplots_adjust(left=-0.4, top=0.95, bottom=0.05, right=0.95, hspace=hspace, wspace=wspace)
     fig.savefig(file_name)
     plt.show() ; sys.exit()
