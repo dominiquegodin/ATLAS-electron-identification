@@ -21,8 +21,8 @@ def plot_accuracy(history, key='accuracy', file_name='outputs/accuracy.png'):
     plt.xlim([1,max(history.epoch)+1])
     plt.xticks( np.append(1,np.arange(5,max(history.epoch)+2,step=5)) )
     plt.xlabel('Epochs',fontsize=20)
-    plt.ylim(min_acc,max_acc)
-    plt.yticks(np.arange(min_acc,max_acc+1,step=1))
+    plt.ylim( max(80,min_acc),max_acc )
+    plt.yticks( np.arange(max(80,min_acc),max_acc+1,step=1) )
     plt.ylabel(key.title()+' (%)',fontsize=20)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
     plt.savefig(file_name)
@@ -52,11 +52,11 @@ def plot_distributions(y_true, y_prob, file_name='outputs/distributions.png'):
 
 def get_LLH(files, indices):
     from utils import load_files
-    sample  = load_files(files, indices, indices.size, index=0)
-    y_true  = sample['truthmode']
+    sample = load_files(files, indices, indices.size, index=0)
+    y_true = sample['truthmode']
     eff_class0, rej_class1 = [],[]
     for wp in ['llh_tight', 'llh_medium', 'llh_loose']:
-        y_LLH   = sample[wp]
+        y_LLH    = sample[wp]
         y_class0 = y_LLH[y_true == 0]
         y_class1 = y_LLH[y_true == 1]
         eff_class0.append( len(y_class0[y_class0==0])/len(y_class0) )
@@ -98,7 +98,8 @@ def plot_ROC2_curve(files, indices, y_true, y_prob, file_name='outputs/ROC2_curv
     plt.figure(figsize=(12,8))
     pylab.grid(True)
     plt.xlim([0, 100])
-    plt.ylim([0, 1.1*max(1/fpr)])
+    plt.ylim([0, 1.1*1/fpr[len(fpr[fpr==0])+1] ])
+    fpr[0:len(fpr[fpr==0])] = fpr[len(fpr[fpr==0])+1]/2
     axes = plt.gca()
     axes.xaxis.set_ticks(np.arange(0, 101, 10))
     plt.xlabel('Signal Efficiency (%)',fontsize=20)
