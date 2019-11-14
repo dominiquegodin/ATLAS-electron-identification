@@ -85,7 +85,7 @@ def plot_ROC1_curve(files, indices, y_true, y_prob, file_name='outputs/ROC1_curv
     labels = [ 'LLH tight:       ', 'LLH medium: ', 'LLH loose:      ' ]
     for LLH in zip( eff_class0, rej_class1, colors, labels ):
         plt.scatter( 100*LLH[0], 100*LLH[1], s=40, marker='o', c=LLH[2],
-        label=llh[3]+'('+str( format(100*LLH[0],'.1f') )+', '+str( format(100*LLH[1],'.1f') )+')' )
+        label=LLH[3]+'('+str( format(100*LLH[0],'.1f') )+', '+str( format(100*LLH[1],'.1f') )+')' )
     plt.legend(loc='lower left', fontsize=17, numpoints=3)
     plt.savefig(file_name)
 
