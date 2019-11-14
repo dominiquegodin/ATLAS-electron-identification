@@ -85,7 +85,7 @@ def plot_ROC1_curve(files, indices, y_true, y_prob, file_name='outputs/ROC1_curv
     labels = [ 'LLH tight:       ', 'LLH medium: ', 'LLH loose:      ' ]
     for LLH in zip( eff_class0, rej_class1, colors, labels ):
         plt.scatter( 100*LLH[0], 100*LLH[1], s=40, marker='o', c=LLH[2],
-        label=LLH[3]+'('+str(format(LLH[0],'.3f'))+', '+str(format(LLH[1],'.3f'))+')' )
+        label=llh[3]+'('+str( format(100*LLH[0],'.1f') )+', '+str( format(100*LLH[1],'.1f') )+')' )
     plt.legend(loc='lower left', fontsize=17, numpoints=3)
     plt.savefig(file_name)
 
@@ -112,7 +112,7 @@ def plot_ROC2_curve(files, indices, y_true, y_prob, file_name='outputs/ROC2_curv
     labels = [ 'LLH tight:       ', 'LLH medium: ', 'LLH loose:      ' ]
     for LLH in zip( eff_class0, rej_class1, colors, labels ):
         plt.scatter( 100*LLH[0], 1/(1-LLH[1]), s=40, marker='o', c=LLH[2],
-        label=LLH[3]+'('+str(format(LLH[0],'.3f'))+', '+str(format(1/(1-LLH[1]),'.0f'))+')' )
+        label=LLH[3]+'('+str(format(100*LLH[0],'.1f'))+', '+str(format(1/(1-LLH[1]),'.0f'))+')' )
     plt.legend(loc='upper right', fontsize=17, numpoints=3)
     plt.savefig(file_name)
 
@@ -124,7 +124,6 @@ def plot_image(cal_image, n_classes, e_class, images, image):
     n_images = len(images)
     plot_number = n_classes*( e_image ) + e_class + 1
     plt.subplot(n_images, n_classes, plot_number)
-    #print(n_images, n_classes, plot_number)
     title='Class '+str(e_class)+' - Layer '+ image
     x_label, y_label = '' ,'' #None, None
     x_ticks, y_ticks = [], []
