@@ -1,5 +1,6 @@
 import tensorflow as tf, numpy as np, h5py
 from sklearn.model_selection import train_test_split
+from skimage                 import data, transform
 
 
 def make_indices(h5_files, test_size=0.1, random_state=0):
@@ -46,11 +47,27 @@ def pad_images(data, images_list, padding=False):
 
 
 def inverse_images(images, tracks, scalars, labels):
-    images  = [np.vstack([image, image[:,::-1,:], image[:,:,::-1]]) for image in images]
-    tracks  = [np.concatenate(3*[track])  for track  in tracks ]
-    scalars = [np.concatenate(3*[scalar]) for scalar in scalars]
-    labels  =  np.concatenate(3*[labels])
+    images  = [np.vstack([image, image[:,::-1,:], image[:,:,::-1], image[:,::-1,::-1]]) for image in images]
+    tracks  = [np.concatenate(4*[track])  for track  in tracks ]
+    scalars = [np.concatenate(4*[scalar]) for scalar in scalars]
+    labels  =  np.concatenate(4*[labels])
     return images + tracks + scalars, labels
+
+
+def normalize_sample(images_sample):
+    return [ np.vstack([np.expand_dims(normalize_image(image),axis=0) for image in images_set])
+             for images_set in images_sample ]
+
+
+def normalize_image(image):
+    old_min, old_max = np.min(image), np.max(image)
+    return 0*image if old_min == old_max else (image-old_min)/(old_max-old_min)
+
+
+def process_images(data, images_list, normalize=False):
+    images = [ data[image] if image not in ['s4', 's5', 's6', 'tracks']
+               else transform.resize(data[image], (len(data[image]),11, 56)) for image in images_list ]
+    return normalize_sample(images) if normalize else images
 
 
 class Batch_Generator(tf.keras.utils.Sequence):
@@ -63,7 +80,8 @@ class Batch_Generator(tf.keras.utils.Sequence):
         return int(self.indices.size/self.batch_size)
     def __getitem__(self, index):
         data    = load_files(self.file_names, self.indices, self.batch_size, index)
-        images  = pad_images(data, self.images, padding=True)
+        #images  = pad_images(data, self.images, padding=True)
+        images  = process_images(data, self.images, normalize=False)
         tracks  = [data[track]  for track  in self.tracks ]
         scalars = [data[scalar] for scalar in self.scalars]
         return images + tracks + scalars, data['truthmode']

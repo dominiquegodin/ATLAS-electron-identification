@@ -1,5 +1,6 @@
 import numpy as np, h5py, sys
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 from   matplotlib import pylab
 
 
@@ -102,6 +103,7 @@ def plot_ROC2_curve(files, indices, y_true, y_prob, file_name='outputs/ROC2_curv
     fpr[0:len(fpr[fpr==0])] = fpr[len(fpr[fpr==0])+1]/2
     axes = plt.gca()
     axes.xaxis.set_ticks(np.arange(0, 101, 10))
+    axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
     plt.xlabel('Signal Efficiency (%)',fontsize=20)
     plt.ylabel('1/(Background Efficiency)',fontsize=20)
     plt.text(15, 750, 'AUC: '+str(format(auc(tpr,1/fpr),'.0f')),
@@ -118,7 +120,8 @@ def plot_ROC2_curve(files, indices, y_true, y_prob, file_name='outputs/ROC2_curv
 
 
 def plot_image(cal_image, n_classes, e_class, images, image):
-    norm_type = None #norm_type = LogNorm(0.0001, 1)
+    #norm_type = None
+    norm_type = colors.LogNorm(0.0001,1)
     limits = [-0.13499031, 0.1349903, -0.088, 0.088]
     e_image  = images.index(image)
     n_images = len(images)
