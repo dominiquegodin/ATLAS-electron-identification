@@ -4,7 +4,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 # Getting Started at LPS
 1) ssh -Y atlas16  
 (login to atlas16 for GPU's avaibility)	  
-2) cd /lcg/storage16/atlas/$USER  
+2) cd /opt/tmp/$USER  
 (change to user directory)											  
 3) ln -s /opt/tmp/godin/el_data .  
 (link datasets to user directory)  
@@ -12,7 +12,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (clone framework from GitHub)  
 5) cd el_classifier  
 (enter framework directory)
-6) singularity shell --nv --bind /lcg,/opt /lcg/opt/godin/sing_images/tf_2.0.0-gpu-py3.sif  
+6) singularity shell --nv --bind /opt /opt/tmp/godin/sing_images/tf_2.0.0-gpu-py3.sif  
 (activate the virtual environment of TensorFlow2.0.0+Python3.6.8 Singularity image)  
 (use the flag --nv or not to wether run on GPUs or CPUs)
 7) python classifier.py [OPTIONS]  
