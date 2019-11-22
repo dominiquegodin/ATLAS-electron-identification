@@ -118,10 +118,8 @@ def plot_ROC_curves(files, data, indices, y_true, y_prob, ROC_type):
         plt.xlabel('Discrimination Threshold (%)',fontsize=20)
         plt.ylabel('Accuracy (%)',fontsize=20)
         val = plt.plot( 100*threshold[1:], 100*accuracy[1:], color='#1f77b4')
-
-        plt.plot( 100*threshold[1:], 100*tpr[1:], color='r')
-        plt.plot( 100*threshold[1:], 100*(1-fpr[1:]), color='g')
-
+        #plt.plot( 100*threshold[1:], 100*tpr[1:], color='r')
+        #plt.plot( 100*threshold[1:], 100*(1-fpr[1:]), color='g')
         std_accuracy  = val_accuracy(y_true, y_prob)
         std_threshold = np.argwhere(np.diff(np.sign(accuracy-std_accuracy))).flatten()
         plt.scatter( [ 50 ], #100*threshold[std_threshold[-1]] ],
