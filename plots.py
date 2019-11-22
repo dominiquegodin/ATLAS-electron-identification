@@ -1,15 +1,28 @@
-import numpy as np, h5py, sys
+import numpy as np, h5py, sys, time
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from   matplotlib import pylab
+from   sklearn    import metrics
 
 
-def accuracy( y_true, y_prob ):
+def val_accuracy( y_true, y_prob ):
     y_pred = np.argmax(y_prob, axis=1)
     return sum(y_pred==y_true)/len(y_true)
 
 
-def plot_accuracy(history, key='accuracy', file_name='outputs/accuracy.png'):
+def get_LLH(files, indices, data):
+    y_true = data['truthmode']
+    eff_class0, rej_class1 = [],[]
+    for wp in ['llh_tight', 'llh_medium', 'llh_loose']:
+        y_LLH    = data[wp]
+        y_class0 = y_LLH[y_true == 0]
+        y_class1 = y_LLH[y_true == 1]
+        eff_class0.append( len(y_class0[y_class0==0])/len(y_class0) )
+        rej_class1.append( len(y_class1[y_class1!=0])/len(y_class1) )
+    return eff_class0, rej_class1
+
+
+def plot_history(history, key='accuracy', file_name='outputs/history.png'):
     if len(history.epoch) < 2: return
     print('CLASSIFIER: saving training accuracy history in:', file_name)
     plt.figure(figsize=(12,8))
@@ -51,72 +64,74 @@ def plot_distributions(y_true, y_prob, file_name='outputs/distributions.png'):
     plt.savefig(file_name)
 
 
-def get_LLH(files, indices):
-    from utils import load_files
-    sample = load_files(files, indices, indices.size, index=0)
-    y_true = sample['truthmode']
-    eff_class0, rej_class1 = [],[]
-    for wp in ['llh_tight', 'llh_medium', 'llh_loose']:
-        y_LLH    = sample[wp]
-        y_class0 = y_LLH[y_true == 0]
-        y_class1 = y_LLH[y_true == 1]
-        eff_class0.append( len(y_class0[y_class0==0])/len(y_class0) )
-        rej_class1.append( len(y_class1[y_class1!=0])/len(y_class1) )
-    return eff_class0, rej_class1
-
-
-def plot_ROC1_curve(files, indices, y_true, y_prob, file_name='outputs/ROC1_curve.png'):
-    from sklearn.metrics import roc_curve, auc
-    print('CLASSIFIER: saving test sample ROC curve in:    ', file_name)
-    fpr, tpr, _ = roc_curve(y_true, y_prob[:,0], pos_label=0)
-    plt.figure(figsize=(12,8))
-    pylab.grid(True)
-    plt.xlim([0, 100.5])
-    plt.ylim([0, 100.5])
-    axes = plt.gca()
-    axes.xaxis.set_ticks(np.arange(0, 101, 10))
-    axes.yaxis.set_ticks(np.arange(0, 101, 10))
-    plt.xlabel('Signal Efficiency (%)',fontsize=20)
-    plt.ylabel('Background Rejection (%)',fontsize=20)
-    plt.text(24, 34, 'AUC: '+str(format(auc(fpr,tpr),'.4f')),
-             {'color': 'black', 'fontsize': 24}, va="center", ha="center")
-    plt.plot(100*tpr, 100*(1-fpr), label='Signal vs Fake+Bkg', color='#1f77b4')
-    eff_class0, rej_class1 = get_LLH( files, indices )
+def plot_ROC_curves(files, data, indices, y_true, y_prob, ROC_type):
+    file_name = 'outputs/ROC'+str(ROC_type)+'_curve.png'
+    print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
+    fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
+    eff_class0, rej_class1 = get_LLH(files, indices, data)
+    signal_ratio           = len(y_true[y_true==0])/len(y_true)
+    accuracy               = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
+    best_tpr, best_fpr     = tpr[np.argmax(accuracy)], fpr[np.argmax(accuracy)]
     colors = [ 'green', 'blue', 'red' ]
     labels = [ 'LLH tight:       ', 'LLH medium: ', 'LLH loose:      ' ]
-    for LLH in zip( eff_class0, rej_class1, colors, labels ):
-        plt.scatter( 100*LLH[0], 100*LLH[1], s=40, marker='o', c=LLH[2],
-        label=LLH[3]+'('+str( format(100*LLH[0],'.1f') )+', '+str( format(100*LLH[1],'.1f') )+')' )
-    plt.legend(loc='lower left', fontsize=17, numpoints=3)
-    plt.savefig(file_name)
-
-
-def plot_ROC2_curve(files, indices, y_true, y_prob, file_name='outputs/ROC2_curve.png'):
-    from sklearn.metrics import roc_curve, auc
-    print('CLASSIFIER: saving test sample ROC curve in:    ', file_name,'\n')
-    fpr, tpr, _ = roc_curve(y_true, y_prob[:,0], pos_label=0)#, drop_intermediate=False)
-    fpr[0:len(fpr[fpr==0])] = fpr[len(fpr[fpr==0])+1]
     plt.figure(figsize=(12,8))
     pylab.grid(True)
-    plt.xlim([0, 100])
-    plt.ylim([0, 1.1*1/fpr[len(fpr[fpr==0])+1] ])
-    fpr[0:len(fpr[fpr==0])] = fpr[len(fpr[fpr==0])+1]/2
     axes = plt.gca()
     axes.xaxis.set_ticks(np.arange(0, 101, 10))
-    axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
     plt.xlabel('Signal Efficiency (%)',fontsize=20)
-    plt.ylabel('1/(Background Efficiency)',fontsize=20)
-    plt.text(15, 750, 'AUC: '+str(format(auc(tpr,1/fpr),'.0f')),
-             {'color': 'black', 'fontsize': 24}, va="center", ha="center")
-    plt.plot(100*tpr, 1/fpr, label='Signal vs Fake+Bkg', color='#1f77b4')
-    eff_class0, rej_class1 = get_LLH( files, indices )
-    colors = [ 'green', 'blue', 'red' ]
-    labels = [ 'LLH tight:       ', 'LLH medium: ', 'LLH loose:      ' ]
-    for LLH in zip( eff_class0, rej_class1, colors, labels ):
-        plt.scatter( 100*LLH[0], 1/(1-LLH[1]), s=40, marker='o', c=LLH[2],
-        label=LLH[3]+'('+str(format(100*LLH[0],'.1f'))+', '+str(format(1/(1-LLH[1]),'.0f'))+')' )
-    plt.legend(loc='upper right', fontsize=17, numpoints=3)
-    plt.savefig(file_name)
+    if ROC_type == 1:
+        plt.xlim([0, 100])
+        plt.ylim([0, 100.5])
+        axes.yaxis.set_ticks(np.arange(0, 101, 10))
+        plt.ylabel('Background Rejection (%)',fontsize=20)
+        plt.text(22, 34, 'AUC: '+str(format(metrics.auc(fpr,tpr),'.4f')),
+                {'color': 'black', 'fontsize': 22}, va="center", ha="center")
+        val = plt.plot(100*tpr, 100*(1-fpr), label='Signal vs Fake+Bkg', color='#1f77b4')
+        plt.scatter( 100*best_tpr, 100*(1-best_fpr), s=20, marker='D', c=val[0].get_color(),
+                     label="{0:<16s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
+        for LLH in zip( eff_class0, rej_class1, colors, labels ):
+            plt.scatter( 100*LLH[0], 100*LLH[1], s=40, marker='o', c=LLH[2],
+            label=LLH[3]+'('+str( format(100*LLH[0],'.1f') )+', '+str( format(100*LLH[1],'.1f') )+')' )
+        plt.legend(loc='lower left', fontsize=16, numpoints=3)
+        plt.savefig(file_name)
+    if ROC_type == 2:
+        fpr[0:len(fpr[fpr==0])] = fpr[len(fpr[fpr==0])+1]
+        plt.xlim([0, 100])
+        plt.ylim([0, 1.1*1/fpr[len(fpr[fpr==0])+1] ])
+        fpr[0:len(fpr[fpr==0])] = fpr[len(fpr[fpr==0])+1]/2
+        axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
+        plt.ylabel('1/(Background Efficiency)',fontsize=20)
+        plt.text(10, plt.yticks()[0][1]/2, 'AUC: '+str(format(metrics.auc(tpr,1/fpr),'.0f')),
+                {'color': 'black', 'fontsize': 22}, va="center", ha="center")
+        val = plt.plot(100*tpr, 1/fpr, label='Signal vs Fake+Bkg', color='#1f77b4')
+        plt.scatter( 100*best_tpr, 1/best_fpr, s=20, marker='D', c=val[0].get_color(),
+                     label="{0:<15s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
+        for LLH in zip( eff_class0, rej_class1, colors, labels ):
+            plt.scatter( 100*LLH[0], 1/(1-LLH[1]), s=40, marker='o', c=LLH[2],
+            label=LLH[3]+'('+str(format(100*LLH[0],'.1f'))+', '+str(format(1/(1-LLH[1]),'.0f'))+')' )
+        plt.legend(loc='upper right', fontsize=16, numpoints=3)
+        plt.savefig(file_name)
+    if ROC_type == 3:
+        best_threshold = threshold[np.argmax(accuracy)]
+        plt.xlim([0, 100])
+        plt.ylim([10*np.round(min(10*accuracy)),10*np.ceil(10*max(accuracy))])
+        plt.xlabel('Discrimination Threshold (%)',fontsize=20)
+        plt.ylabel('Accuracy (%)',fontsize=20)
+        val = plt.plot( 100*threshold[1:], 100*accuracy[1:], color='#1f77b4')
+
+        plt.plot( 100*threshold[1:], 100*tpr[1:], color='r')
+        plt.plot( 100*threshold[1:], 100*(1-fpr[1:]), color='g')
+
+        std_accuracy  = val_accuracy(y_true, y_prob)
+        std_threshold = np.argwhere(np.diff(np.sign(accuracy-std_accuracy))).flatten()
+        plt.scatter( [ 50 ], #100*threshold[std_threshold[-1]] ],
+                     [ 100*accuracy [std_threshold[-1]] ],
+                     s=40, marker='o', c=val[0].get_color(),
+                     label="{0:<17s} {1:>2.2f}%".format('Accuracy at 50%:',100*accuracy[std_threshold[-1]]) )
+        plt.scatter( 100*best_threshold, 100*max(accuracy), s=40, marker='D', c=val[0].get_color(),
+                     label="{0:<16s} {1:>8.2f}%".format('Best Accuracy:',100*max(accuracy)) )
+        plt.legend(loc='lower center', fontsize=16, numpoints=3)
+        plt.savefig(file_name) ; print()
 
 
 def plot_image(cal_image, n_classes, e_class, images, image):
@@ -128,7 +143,7 @@ def plot_image(cal_image, n_classes, e_class, images, image):
     plot_number = n_classes*( e_image ) + e_class + 1
     plt.subplot(n_images, n_classes, plot_number)
     title='Class '+str(e_class)+' - Layer '+ image
-    x_label, y_label = '' ,'' #None, None
+    x_label, y_label = '' ,''
     x_ticks, y_ticks = [], []
     if e_image == n_images-1:
         x_label = '$\phi$'
