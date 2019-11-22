@@ -6,14 +6,15 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (login to atlas16 for GPU's avaibility)	  
 2) cd /lcg/storage16/atlas/$USER  
 (change to user directory)											  
-3) ln -s /lcg/storage16/atlas/godin/el_data .  
+3) ln -s /opt/tmp/godin/el_data .  
 (link datasets to user directory)  
 4) git clone https://github.com/dominiquegodin/el_classifier.git  
 (clone framework from GitHub)  
 5) cd el_classifier  
 (enter framework directory)
-6) singularity shell --nv --bind /lcg /lcg/storage16/atlas/godin/sing_images/tf_2.0.0-gpu-py3.sif  
-(activate the virtual environment of TensorFlow2.0.0+Python3.6.8 Singularity image)
+6) singularity shell --nv --bind /lcg,/opt /lcg/opt/godin/sing_images/tf_2.0.0-gpu-py3.sif  
+(activate the virtual environment of TensorFlow2.0.0+Python3.6.8 Singularity image)  
+(use the flag --nv or not to wether run on GPUs or CPUs)
 7) python classifier.py [OPTIONS]  
 (start training; see options below)
 8) nvidia-smi  
@@ -23,8 +24,6 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 --generator=ON  (enables batches generator; default=OFF)
 
 --plotting=ON  (enables plotting of accuracy history, distributions separations ans ROC curve; default=OFF)
-
---symmetries=ON (provides 3-fold data augmentation with vertical and horizontal images inversions; default=OFF)
 
 --cal_images=ON  (peforms no training and plots random calorimeter images for each layer; default=OFF)  
 
@@ -46,4 +45,4 @@ h5 file checkpoints (see --load_weights option).
 5) All plots, weights and models are saved by default in the "outputs" directory.
 5) Data augmentation (with images inversions) can for the moment only be provided when the generator is not in use. 
 7) Multi-GPU is enabled by default when the batches generator is OFF. Due to relatively slow hard disks transfer rates, GPU multi-processing will not result in any training speed improvements while using the generator.
-8) In order to optimize data transfer rate, datasets should physically be present on the same server of the GPU's. Significant access speed gain is achieved by simply linking to "/lcg/storage16/atlas/godin/el_data" as shown above. 
+8) In order to optimize data transfer rate, datasets should physically be present on the same server of the GPU's. Significant access speed gain is achieved by simply linking to "/opt/tmp/godin/el_data" as shown above. 
