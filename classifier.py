@@ -160,4 +160,4 @@ if args.plotting == 'ON':
     plot_distributions(y_true, y_prob)
     plot_ROC_curves(data_files, test_data, test_indices, y_true, y_prob, ROC_type=1)
     plot_ROC_curves(data_files, test_data, test_indices, y_true, y_prob, ROC_type=2)
-    plot_ROC_curves(data_files, test_data, test_indices, y_true, y_prob, ROC_type=3)
+    #plot_ROC_curves(data_files, test_data, test_indices, y_true, y_prob, ROC_type=3)
