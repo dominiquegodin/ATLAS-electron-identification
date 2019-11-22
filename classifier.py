@@ -1,4 +1,4 @@
-1;5202;0c# PACKAGES IMPORTS
+# PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, multiprocessing, time, os, sys
 from   argparse  import ArgumentParser
 from   functools import partial
