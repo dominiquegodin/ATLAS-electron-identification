@@ -18,12 +18,9 @@ def load_files(files, indices, batch_size, index):
 
 
 def load_tables(h5_file, indices, batch_size, index):
-    data  = h5py.File(h5_file,'r')['data']
-    if index==0:
-        batch = np.arange(0,batch_size)
-    else:
-        batch = np.arange(index*batch_size,(index+1)*batch_size)
-    return np.concatenate([ data['table_'+str(indices[i])] for i in batch ])
+    data  = h5py.File(h5_file,'r')
+    batch = np.arange(index*batch_size,(index+1)*batch_size)
+    return np.hstack([ data['data/table_'+str(indices[i])][:][0] for i in batch ])
 
 
 def call_generator(files, indices, batch_size, transforms, features, index):
