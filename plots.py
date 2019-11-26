@@ -10,9 +10,9 @@ def val_accuracy( y_true, y_prob ):
     return sum(y_pred==y_true)/len(y_true)
 
 
-def get_LLH(files, indices, data):
+def get_LLH(indices, data):
     y_true = data['truthmode']
-    eff_class0, rej_class1 = [],[]
+    eff_class0, rej_class1 = [], []
     for wp in ['llh_tight', 'llh_medium', 'llh_loose']:
         y_LLH    = data[wp]
         y_class0 = y_LLH[y_true == 0]
@@ -64,11 +64,11 @@ def plot_distributions(y_true, y_prob, file_name='outputs/distributions.png'):
     plt.savefig(file_name)
 
 
-def plot_ROC_curves(files, data, indices, y_true, y_prob, ROC_type):
+def plot_ROC_curves(data, indices, y_true, y_prob, ROC_type):
     file_name = 'outputs/ROC'+str(ROC_type)+'_curve.png'
     print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
-    fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
-    eff_class0, rej_class1 = get_LLH(files, indices, data)
+    fpr, tpr, threshold    = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
+    eff_class0, rej_class1 = get_LLH(indices, data)
     signal_ratio           = len(y_true[y_true==0])/len(y_true)
     accuracy               = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
     best_tpr, best_fpr     = tpr[np.argmax(accuracy)], fpr[np.argmax(accuracy)]

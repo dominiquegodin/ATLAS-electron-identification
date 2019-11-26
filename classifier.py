@@ -28,10 +28,10 @@ data_files = [file_path+file for file in os.listdir(file_path) if '.h5' in file]
 
 
 # FEATURES AND ARCHITECTURES
-images       = [ 's0','s1', 's2', 's3','s4','s5','s6' ] #+ [ 'tracks' ]
-tracks       = [ 'tracks' ]
-scalars      = [ 'Eratio', 'Reta', 'Rhad', 'Rphi', 'TRTPID', 'd0', 'd0Sig', 'dPhiRes2',
-                 'dPoverP', 'deltaEta1', 'e', 'eta', 'f1', 'f3', 'mu', 'nSCT', 'weta2']
+images       = ['s0','s1', 's2', 's3','s4','s5','s6'] #+ [ 'tracks' ]
+tracks       = ['tracks' ]
+scalars      = ['Eratio', 'Reta', 'Rhad', 'Rphi', 'TRTPID', 'd0', 'd0Sig', 'dPhiRes2',
+                'dPoverP', 'deltaEta1', 'e', 'eta', 'f1', 'f3', 'mu', 'nSCT', 'weta2']
 #features     = {'images':[], 'tracks':[], 'scalars':['pt','phi']}
 features     = {'images':images, 'tracks':tracks, 'scalars':scalars}
 architecture = 'CNN_multichannel'
@@ -46,7 +46,7 @@ train_indices, test_indices = make_indices(data_files, random_state=args.random_
 
 
 # CPU COUNT FOR MULTIPROCESSING
-for n in np.arange( multiprocessing.cpu_count(),0,-1):
+for n in np.arange(multiprocessing.cpu_count(),0,-1):
     if test_indices[0].shape % n == 0: n_cpus = n ; break
 
 
@@ -86,17 +86,17 @@ if args.generator == 'ON':
     train_generator = Batch_Generator(data_files, train_indices, train_batch_size, transforms, **features)
     test_generator  = Batch_Generator(data_files,  test_indices,  test_batch_size, transforms, **features)
 else:
-    pooler       = multiprocessing.Pool(n_cpus)
+    pool         = multiprocessing.Pool(n_cpus)
     print('\nCLASSIFIER: data generator is OFF')
     print(  'CLASSIFIER: loading data and transforming images')
     print(  'CLASSIFIER: multiprocessing with', n_cpus, 'CPUs')
     start_time   = time.time()
-    train_pool   = partial(call_generator, data_files, train_indices,
+    pool_func    = partial(call_generator, data_files, train_indices,
                            train_indices.size/n_cpus, transforms, features)
-    test_pool    = partial(call_generator, data_files,  test_indices,
+    train_sample = pool.map(pool_func, np.arange(0,n_cpus))
+    pool_func    = partial(call_generator, data_files,  test_indices,
                             test_indices.size/n_cpus, transforms, features)
-    train_sample = pooler.map(train_pool, np.arange(0,n_cpus))
-    test_sample  = pooler.map( test_pool, np.arange(0,n_cpus))
+    test_sample  = pool.map(pool_func, np.arange(0,n_cpus))
     train_data   = [ np.concatenate([n[0][feature] for n in train_sample])
                      for feature in np.arange(0,len(train_sample[0][0])) ]
     test_data    = [ np.concatenate([n[0][feature] for n in  test_sample])
@@ -104,15 +104,16 @@ else:
     train_labels =   np.concatenate([n[1] for n in train_sample])
     test_labels  =   np.concatenate([n[1] for n in  test_sample])
     print('CLASSIFIER: loading and processing time:', format(time.time() - start_time,'.0f'), 's')
+    #sys.exit()
 
 
 # CALLBACKS
 monitored_value  = 'val_accuracy'
 checkpoint_file  = 'outputs/'+args.checkpoint
-Model_Checkpoint = tf.keras.callbacks.ModelCheckpoint( checkpoint_file, save_best_only=True,
-                                                       monitor=monitored_value, verbose=1 )
-Early_Stopping   = tf.keras.callbacks.EarlyStopping  ( patience=20, restore_best_weights=True,
-                                                       monitor=monitored_value, verbose=1 )
+Model_Checkpoint = tf.keras.callbacks.ModelCheckpoint(checkpoint_file, save_best_only=True,
+                                                       monitor=monitored_value, verbose=1)
+Early_Stopping   = tf.keras.callbacks.EarlyStopping  (patience=20, restore_best_weights=True,
+                                                       monitor=monitored_value, verbose=1)
 callbacks_list   = [Model_Checkpoint, Early_Stopping]
 
 
@@ -149,15 +150,15 @@ if args.plotting == 'ON':
                len(generator), 'x', test_batch_size, 'e)')
         y_true = np.concatenate([ generator[i][1] for i in np.arange(0,len(generator)) ])
         y_prob = model.predict_generator(generator, verbose=1, workers=n_cpus, use_multiprocessing=True)
-        pooler = multiprocessing.Pool(n_cpus)
+        pool   = multiprocessing.Pool(n_cpus)
     else:
         y_true = test_labels
         y_prob = model.predict(test_data)
     print('\nCLASSIFIER: last checkpoint validation accuracy:', val_accuracy(y_true,y_prob), '\n')
-    test_pool  = partial(load_files, data_files, test_indices, test_indices.size/n_cpus)
-    test_data  = np.concatenate( pooler.map(test_pool, np.arange(0,n_cpus)) )
+    pool_func = partial(load_files, data_files, test_indices, test_indices.size/n_cpus)
+    test_data = np.concatenate(pool.map(pool_func, np.arange(0,n_cpus)))
     plot_history(training)
     plot_distributions(y_true, y_prob)
-    plot_ROC_curves(data_files, test_data, test_indices, y_true, y_prob, ROC_type=1)
-    plot_ROC_curves(data_files, test_data, test_indices, y_true, y_prob, ROC_type=2)
-    #plot_ROC_curves(data_files, test_data, test_indices, y_true, y_prob, ROC_type=3)
+    plot_ROC_curves(test_data, test_indices, y_true, y_prob, ROC_type=1)
+    plot_ROC_curves(test_data, test_indices, y_true, y_prob, ROC_type=2)
+    #plot_ROC_curves(test_data, test_indices, y_true, y_prob, ROC_type=3)
