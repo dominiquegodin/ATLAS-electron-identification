@@ -6,7 +6,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (login to atlas16 for GPU's avaibility)	  
 2) cd /opt/tmp/$USER  
 (change to user directory)											  
-3) ln -s /opt/tmp/godin/el_data .  
+3) ln -s /opt/tmp/godin/el_data/2019-12-10/el_data.h5 .  
 (link datasets to user directory)  
 4) git clone https://github.com/dominiquegodin/el_classifier.git  
 (clone framework from GitHub)  
@@ -21,7 +21,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (for monitoring NVIDIA GPU devices, e.g. memory and power usage, temperature, fan speed, etc.)
 
 # classifier.py Options
---generator=ON  (enables batches generator; default=OFF)
+--generator=ON  (enables batches generator; default=OFF) NOTE: DISABLED FOR NOW!
 
 --plotting=ON  (enables plotting of accuracy history, distributions separations ans ROC curve; default=OFF)
 
@@ -33,7 +33,13 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --epochs=number_of_training_epochs  (default=100)
 
---batch_size=training_batch_size  (default=500)
+--batch_size=training_batch_size  (default=500) 
+
+--n_gpus=number of gpus for multiprocessing (default=4)
+
+--n_classes=number of classes (default=2)
+
+--n_e=number of electrons (use ALL for full sample; default=100000)
 
 
 # Explanations
