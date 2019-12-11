@@ -7,7 +7,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 2) cd /opt/tmp/$USER  
 (change to user directory)											  
 3) ln -s /opt/tmp/godin/el_data/2019-12-10/el_data.h5 .  
-(link datasets to user directory)  
+(link data file to user directory)  
 4) git clone https://github.com/dominiquegodin/el_classifier.git  
 (clone framework from GitHub)  
 5) cd el_classifier  
@@ -33,7 +33,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --epochs=number_of_training_epochs  (default=100)
 
---batch_size=training_batch_size  (default=500) 
+--batch_size=training_batch_size  (default=1000) 
 
 --n_gpus=number of gpus for multiprocessing (default=4)
 
@@ -44,7 +44,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 # Explanations
 1) For each epoch where the validation performance (either accuracy or loss function) has reached its best so far, the training model will automatically be saved to a h5 file checkpoint. 
-2) An early stopping callback allows the training to stop automatically when the validation performance has stop improving for a pre-determined number of epochs (default=20).  
+2) An early stopping callback allows the training to stop automatically when the validation performance has stop improving for a pre-determined number of epochs (default=10).  
 3) Although trainings with batches generator start without delay, they are unfortunately bottlenecked by hard disks data transfer rate and will therefore incur some slowing down. It is however recommended to use the generator for very big datasets that risk to overload the memory. It could also be used to speed up the start of small trainings for trials and errors or when playing with architectures and hyper-parameters.
 4) Finished or aborted trainings can be resumed from where they were stopped by using previously trained weights of other same-model
 h5 file checkpoints (see --load_weights option).
