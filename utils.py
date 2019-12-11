@@ -38,7 +38,7 @@ def label_sizes(train_labels, test_labels, n_classes):
     train_sizes = [format(100*np.sum(train_labels==n)/len(train_labels),'4.1f')
                    for n in np.arange(n_classes)]
     table = zip(['class '+str(n) for n in np.arange(n_classes)], train_sizes, test_sizes)
-    print('\nCLASSIFIER: labels distributions:')
+    print('\nLABELS DISTRIBUTION:')
     print(tabulate(table, headers=['CLASS', 'TRAIN (%)', 'TEST (%)'], tablefmt='psql'))
 
 

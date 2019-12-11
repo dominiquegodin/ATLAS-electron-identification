@@ -2,7 +2,7 @@
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
 from   argparse  import ArgumentParser
 from   functools import partial
-from   utils     import make_sample, make_labels, label_sizes, check_values, Bath_Generator
+from   utils     import make_sample, make_labels, label_sizes, check_values, Batch_Generator
 from   models    import CNN_multichannel
 from   plots     import val_accuracy,  plot_history, plot_distributions, plot_ROC_curves, cal_images
 from   sklearn.model_selection import train_test_split
@@ -10,17 +10,18 @@ from   sklearn.model_selection import train_test_split
 
 # OPTIONS
 parser = ArgumentParser()
-parser.add_argument( '--generator'   , default='OFF'           )
-parser.add_argument( '--plotting'    , default='OFF'           )
-parser.add_argument( '--cal_images'  , default='OFF'           )
-parser.add_argument( '--checkpoint'  , default='checkpoint.h5' )
-parser.add_argument( '--load_weights', default='OFF'           )
-parser.add_argument( '--epochs'      , default=100,  type=int  )
-parser.add_argument( '--batch_size'  , default=1000, type=int  )
-parser.add_argument( '--random_state', default=0,    type=int  )
-parser.add_argument( '--n_gpus'      , default=4,    type=int  )
-parser.add_argument( '--n_classes'   , default=2,    type=int  )
-parser.add_argument( '--n_cpus'      , default=24,   type=int  )
+parser.add_argument( '--generator'   , default='OFF'             )
+parser.add_argument( '--plotting'    , default='OFF'             )
+#parser.add_argument( '--cal_images'  , default='OFF'             )
+parser.add_argument( '--checkpoint'  , default='checkpoint.h5'   )
+parser.add_argument( '--load_weights', default='OFF'             )
+parser.add_argument( '--epochs'      , default=100   ,  type=int )
+parser.add_argument( '--batch_size'  , default=1000  ,  type=int )
+parser.add_argument( '--random_state', default=0     ,  type=int )
+parser.add_argument( '--n_gpus'      , default=4     ,  type=int )
+parser.add_argument( '--n_classes'   , default=2     ,  type=int )
+parser.add_argument( '--n_cpus'      , default=24    ,  type=int )
+parser.add_argument( '--n_e'         , default=100000,  type=int )
 args = parser.parse_args()
 
 
@@ -42,7 +43,8 @@ data_file  =  '/opt/tmp/godin/el_data/2019-12-10/el_data.h5'
 
 # TRAIN AND TEST INDICES GENERATION
 #n_e = 5000000
-n_e = len(h5py.File(data_file, 'r')['p_TruthType'])
+if args.n_e=='ALL': n_e = len(h5py.File(data_file, 'r')['p_TruthType'])
+else:               n_e = args.n_e
 images_shape = h5py.File(data_file, 'r')['em_barrel_Lr1'].shape[1:]
 tracks_shape = h5py.File(data_file, 'r')['tracks'       ].shape[1:]
 train_indices, test_indices = train_test_split(np.arange(n_e), test_size=0.1,
@@ -117,8 +119,8 @@ callbacks_list   = [Model_Checkpoint, Early_Stopping]
 
 
 # TRAINING AND TESTING
-print('\nCLASSIFIER: training sample:', format(train_indices.size, '8.0f'), 'e')
-print(  'CLASSIFIER: testing sample:' , format( test_indices.size, '8.0f'), 'e')
+print('\nCLASSIFIER: training sample:',  format(train_indices.size, '8.0f'), 'e')
+print(  'CLASSIFIER: testing sample: ' , format( test_indices.size, '8.0f'), 'e')
 label_sizes(train_labels, test_labels, args.n_classes)
 print('\nCLASSIFIER: using TensorFlow', tf.__version__  )
 print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
