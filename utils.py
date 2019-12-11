@@ -1,68 +1,68 @@
 import tensorflow as tf, numpy as np, h5py
 from sklearn.model_selection import train_test_split
-from skimage import transform
+from skimage  import transform
+from tabulate import tabulate
 
 
-def make_indices(h5_files, test_size=0.1, random_state=0):
-    train_indices, test_indices = [], []
-    for h5_file in h5_files:
-        len_file = len(h5py.File(h5_file,'r')['data'])
-        indices  = train_test_split(np.arange(0,len_file), test_size=test_size, random_state=random_state)
-        train_indices.append(indices[0]) ; test_indices.append(indices[1])
-    return np.array(train_indices), np.array(test_indices)
+def make_sample(data_file, images, complete, batch_size, denormalize=False, index=0):
+    data = h5py.File(data_file, 'r')
+    idx_1, idx_2 = index*batch_size, (index+1)*batch_size
+    sample_dict  = dict([key, data[key][idx_1:idx_2]] for key in complete)
+    if denormalize:
+        energy = sample_dict['p_e']
+        for key in images: sample_dict[key] = sample_dict[key] * energy[:, np.newaxis, np.newaxis]
+        sample_dict['tracks'][:,:,0] = sample_dict['tracks'][:,:,0] * energy[:, np.newaxis]
+    return sample_dict
 
 
-def load_files(files, indices, batch_size, index):
-    batch_size = int(batch_size/len(indices))
-    return np.concatenate([ load_tables(f, indices[files.index(f)], batch_size, index) for f in files ])
+def make_labels(data, n_classes):
+    if n_classes == 2:
+        labels = np.where(np.logical_or(data['p_TruthType']==2, data['p_TruthType']==4), 0, 1)
+    if n_classes == 5:
+        iff_truth = data['p_iffTruth']
+        labels    = np.where(iff_truth==2, 0, 4     )
+        labels    = np.where(iff_truth==3, 1, labels)
+        labels    = np.where(np.logical_or (iff_truth==1, iff_truth==10), 2, labels)
+        labels    = np.where(np.logical_and(iff_truth>=7, iff_truth<= 9), 3, labels)
+    return labels
 
 
-def load_tables(h5_file, indices, batch_size, index):
-    data  = h5py.File(h5_file,'r')
-    batch = np.arange(index*batch_size, (index+1)*batch_size)
-    return np.hstack([ data['data/table_'+str(indices[i])][:][0] for i in batch ])
+#def make_samples(data, images, complete, features, batch_size, indices, n_classes):
+#    data   = dict([key, np.take(data[key], indices, axis=0)] for key in complete)
+#    labels = make_labels(data, n_classes)
 
 
-def call_generator(files, indices, batch_size, transforms, features, index):
-    return Batch_Generator(files, indices, batch_size, transforms, **features)[index]
+def label_sizes(train_labels, test_labels, n_classes):
+    test_sizes  = [format(100*np.sum( test_labels==n)/len( test_labels),'4.1f')
+                   for n in np.arange(n_classes)]
+    train_sizes = [format(100*np.sum(train_labels==n)/len(train_labels),'4.1f')
+                   for n in np.arange(n_classes)]
+    table = zip(['class '+str(n) for n in np.arange(n_classes)], train_sizes, test_sizes)
+    print('\nCLASSIFIER: labels distributions:')
+    print(tabulate(table, headers=['CLASS', 'TRAIN (%)', 'TEST (%)'], tablefmt='psql'))
+
+
+def check_values(sample):
+    bad_values = [np.sum(np.isfinite(sample[key])==False) for key in sample.keys()]
+    print('CLASSIFIER:', sum(bad_values), 'found in sample')
 
 
 class Batch_Generator(tf.keras.utils.Sequence):
-    def __init__(self, file_names, indices, batch_size, transforms, images, tracks, scalars):
-        self.file_names = file_names ; self.images  = images
-        self.indices    = indices    ; self.tracks  = tracks
-        self.batch_size = batch_size ; self.scalars = scalars
-        self.transforms = transforms
+    def __init__(self, file_name, n_classes, indices, batch_size, images, complete):
+        self.file_name  = file_name  ; self.images    = images
+        self.indices    = indices    ; self.complete  = complete
+        self.batch_size = batch_size ; self.n_classes = n_classes
     def __len__(self):
         "number of batches per epoch"
         return int(self.indices.size/self.batch_size)
     def __getitem__(self, index):
-        data    = load_files(self.file_names, self.indices, self.batch_size, index)
-        images  = resize_images(data, self.images, **self.transforms)
-        tracks  = [data[track]  for track  in self.tracks ]
-        scalars = [data[scalar] for scalar in self.scalars]
+        data   = make_sample(self.file_name, self.images, self.complete, self.batch_size, index)
+        data   = dict([key, np.take(data[key], self.indices, axis=0)] for key in self.complete)
+        labels = make_labels(data, self.n_classes)
+        data   = [np.float32(data[key]) for key in np.sum(list(features.values()))]
+
+        #data    = load_files(self.file_names, self.indices, self.batch_size, index)
+        #images  = resize_images(data, self.images, **self.transforms)
+        #tracks  = [data[track]  for track  in self.tracks ]
+        #scalars = [data[scalar] for scalar in self.scalars]
         return images + tracks + scalars, data['truthmode']
-
-
-def resize_images(data, images_list, target_shape=(11,56), normalize=False):
-    images_sample = [ transform.resize(data[array], ((len(data[array]),)+target_shape))
-                      if data[array].shape[1:]!=target_shape else data[array] for array in images_list ]
-    return normalize_sample(images_sample) if normalize else images_sample
-
-
-def normalize_sample(images_sample):
-    return [ np.vstack([np.expand_dims(normalize_image(image),axis=0)
-             for image in array]) for array in images_sample ]
-
-
-def normalize_image(image):
-    old_min, old_max = np.min(image), np.max(image)
-    return 0*image if old_min == old_max else (image-old_min)/(old_max-old_min)
-
-
-def inverse_images(images, tracks, scalars, labels):
-    images  = [np.vstack([image, image[:,::-1,:], image[:,:,::-1]]) for image in images]
-    tracks  = [np.concatenate(3*[track])  for track  in tracks ]
-    scalars = [np.concatenate(3*[scalar]) for scalar in scalars]
-    labels  =  np.concatenate(3*[labels])
-    return images + tracks + scalars, labels
