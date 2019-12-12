@@ -15,8 +15,8 @@ def get_LLH(test_LLH, y_true):
     for wp in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']:
         y_class0 = test_LLH[wp][y_true == 0]
         y_class1 = test_LLH[wp][y_true == 1]
-        eff_class0.append(np.sum(y_class0==0)/len(y_class0))
-        eff_class1.append(np.sum(y_class1==0)/len(y_class1))
+        eff_class0.append( np.sum(y_class0 == 0)/len(y_class0) )
+        eff_class1.append( np.sum(y_class1 == 0)/len(y_class1) )
     return eff_class0, eff_class1
 
 
@@ -65,8 +65,10 @@ def plot_distributions(y_true, y_prob, file_name='outputs/distributions.png'):
 def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
     file_name = 'outputs/ROC'+str(ROC_type)+'_curve.png'
     print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
-    fpr, tpr, threshold    = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
     eff_class0, eff_class1 = get_LLH(test_sample, y_true)
+    #y_prob = y_prob[np.logical_or(y_true==0, y_true==1)]
+    #y_true = y_true[np.logical_or(y_true==0, y_true==1)]
+    fpr, tpr, threshold    = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
     signal_ratio           = len(y_true[y_true==0])/len(y_true)
     accuracy               = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
     best_tpr, best_fpr     = tpr[np.argmax(accuracy)], fpr[np.argmax(accuracy)]
@@ -84,9 +86,9 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
         plt.ylabel('Background Rejection (%)',fontsize=20)
         plt.text(22, 34, 'AUC: '+str(format(metrics.auc(fpr,tpr),'.4f')),
                 {'color': 'black', 'fontsize': 22}, va="center", ha="center")
-        val = plt.plot(100*tpr, 100*(1-fpr), label='Signal vs Fake+Bkg', color='#1f77b4')
-        plt.scatter( 100*best_tpr, 100*(1-best_fpr), s=30, marker='D', c=val[0].get_color(),
-                     label="{0:<16s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
+        val = plt.plot(100*tpr, 100*(1-fpr), label='Signal vs Bkg', color='#1f77b4')
+        #plt.scatter( 100*best_tpr, 100*(1-best_fpr), s=30, marker='D', c=val[0].get_color(),
+        #             label="{0:<16s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
         for LLH in zip( eff_class0, eff_class1, colors, labels ):
             plt.scatter( 100*LLH[0], 100*(1-LLH[1]), s=40, marker='o', c=LLH[2], label='('+\
                          str( format(100*LLH[0],'.1f'))+'%, '+str( format(100*(1-LLH[1]),'.1f') )+\
@@ -111,9 +113,9 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
             plt.text(100.2, val, str(int(val)), {'color': '#1f77b4', 'fontsize': 11}, va="center", ha="left")
         axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
         plt.ylabel('1/(Background Efficiency)',fontsize=20)
-        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='Signal vs Fake+Bkg', color='#1f77b4')
-        plt.scatter( 100*best_tpr, 1/best_fpr, s=30, marker='D', c=val[0].get_color(),
-                     label="{0:<15s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
+        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='Signal vs Bkg', color='#1f77b4')
+        #plt.scatter( 100*best_tpr, 1/best_fpr, s=30, marker='D', c=val[0].get_color(),
+        #             label="{0:<15s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
         for LLH in zip( eff_class0, eff_class1, colors, labels ):
             plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker='o', c=LLH[2], label='('+\
                          str(format(100*LLH[0],'.1f'))+'%, '+str(format(1/LLH[1],'.0f'))+\
@@ -138,7 +140,7 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
         plt.scatter( 100*best_threshold, 100*max(accuracy), s=40, marker='D', c=val[0].get_color(),
                      label="{0:<16s} {1:>8.2f}%".format('Best Accuracy:',100*max(accuracy)) )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
-        plt.savefig(file_name) ; print()
+        plt.savefig(file_name)
 
 
 def plot_image(cal_image, n_classes, e_class, images, image):
