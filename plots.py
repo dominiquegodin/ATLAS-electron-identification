@@ -110,7 +110,7 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
             axes.axvline(100*eff_class0[n], ymin=abs(1/eff_class1[n]-1)/(plt.yticks()[0][-1]-1),
             ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='#1f77b4')
         for val in LLH_scores:
-            plt.text(100.2, val, str(int(val)), {'color': '#1f77b4', 'fontsize': 11}, va="center", ha="left")
+            plt.text(100.2, val, str(int(val)), {'color': '#1f77b4', 'fontsize': 10}, va="center", ha="left")
         axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
         plt.ylabel('1/(Background Efficiency)',fontsize=20)
         val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='Signal vs Bkg', color='#1f77b4')

@@ -3,14 +3,23 @@ from sklearn.metrics import confusion_matrix
 from tabulate import tabulate
 
 
-def make_sample(data_file, images, all_features, batch_size, denormalize=False, index=0):
+def make_sample(data_file, batch_size, all_features, images=[], denormalize=False, index=0):
     data = h5py.File(data_file, 'r')
     idx_1, idx_2 = index*batch_size, (index+1)*batch_size
     sample_dict  = dict([key, data[key][idx_1:idx_2]] for key in all_features)
-    if denormalize:
+    if images != [] and denormalize:
         energy = sample_dict['p_e']
         for key in images: sample_dict[key] = sample_dict[key] * energy[:, np.newaxis, np.newaxis]
         sample_dict['tracks'][:,:,0] = sample_dict['tracks'][:,:,0] * energy[:, np.newaxis]
+    return sample_dict
+
+
+def generator_sample(data_file, features, indices, batch_size=None, index=0):
+    data         = h5py.File(data_file, 'r')
+    if batch_size != None:
+        batch    = np.arange(index*batch_size,(index+1)*batch_size)
+        indices  = np.take(indices, batch)
+    sample_dict  = dict([key, np.take(data[key], indices, axis=0)] for key in features)
     return sample_dict
 
 
@@ -29,23 +38,29 @@ def make_labels(data, n_classes):
 def class_matrix(train_labels, test_labels, y_prob=[]):
     if y_prob == []: y_pred = test_labels
     else:            y_pred = np.argmax(y_prob, axis=1)
-    matrix    = confusion_matrix(test_labels, y_pred)
-    matrix    = 100*matrix.T/matrix.sum(axis=1)
-    n_classes = len(matrix)
-    #headers = ['class '+str(n)+' (%)' for n in np.arange(n_classes)]
-    #print('\nCONFUSION MATRIX:')
-    #print(tabulate(matrix, headers=headers, tablefmt='psql', floatfmt=".2f"))
+    matrix      = confusion_matrix(test_labels, y_pred)
+    matrix      = 100*matrix.T/matrix.sum(axis=1)
+    n_classes   = len(matrix)
     test_sizes  = [100*np.sum( test_labels==n)/len( test_labels) for n in np.arange(n_classes)]
     train_sizes = [100*np.sum(train_labels==n)/len(train_labels) for n in np.arange(n_classes)]
-    classes = ['class '+str(n) for n in np.arange(n_classes)]
+    classes = ['CLASS '+str(n) for n in np.arange(n_classes)]
     if y_prob == []:
-        print('\nCLASS DISTRIBUTION:')
-        headers = ['CLASS', 'TRAIN(%)', 'TEST(%)']
+        print('\n+--------------------------------------+')
+        print(  '| CLASS DISTRIBUTIONS                  |')
+        headers = ['CLASS #', 'TRAIN (%)', 'TEST (%)']
         table   = zip(classes, train_sizes, test_sizes)
     else:
-        print('\nCLASS DISTRIBUTION AND ACCURACY:')
-        headers = ['CLASS', 'TRAIN(%)', 'TEST(%)', 'ACC.(%)']
-        table   = zip(classes, train_sizes, test_sizes, matrix.diagonal())
+        if n_classes > 2:
+            headers = ['CLASS #', 'TRAIN', 'TEST'] + classes
+            table   = [classes] + [train_sizes] + [test_sizes] + matrix.T.tolist()
+            table   = list(map(list, zip(*table)))
+            print('\n+'+30*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n', '\b| CLASS DISTRIBUTIONS (%)',
+                  '    ', '| TEST PREDICTIONS (%)              '+12*(n_classes-3)*' '+ '|')
+        else:
+            headers = ['CLASS', 'TRAIN (%)', 'TEST (%)', 'ACC. (%)']
+            table   = zip(classes, train_sizes, test_sizes, matrix.diagonal())
+            print('\n+----------------------------------------------+')
+            print(  '| CLASS DISTRIBUTIONS AND ACCURACY             |')
     print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"), '\n')
 
 
@@ -55,24 +70,15 @@ def check_values(sample):
 
 
 class Batch_Generator(tf.keras.utils.Sequence):
-    def __init__(self, file_name, n_classes, indices, batch_size, images, all_features):
-        self.file_name  = file_name  ; self.images       = images
-        self.indices    = indices    ; self.all_features = all_features
-        self.batch_size = batch_size ; self.n_classes    = n_classes
+    def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):
+        self.file_name  = file_name  ; self.train_features = train_features
+        self.indices    = indices    ; self.all_features   = all_features
+        self.batch_size = batch_size ; self.n_classes      = n_classes
     def __len__(self):
         "number of batches per epoch"
         return int(self.indices.size/self.batch_size)
     def __getitem__(self, index):
-        data   = make_sample(self.file_name, self.images, self.all_features, self.batch_size, index)
-
-        #data  = dict([key, np.take(data[key], self.indices, axis=0)] for key in self.all_features)
-        #data  = dict([  key, np.concatenate[data[key][indices[i]] for i in  ] ] for key in all_features) 
-
+        data   = generator_sample(self.file_name, self.all_features, self.indices, self.batch_size, index)
         labels = make_labels(data, self.n_classes)
-        data   = [np.float32(data[key]) for key in np.sum(list(features.values()))]
+        data   = [np.float32(data[key]) for key in np.sum(list(self.train_features.values()))]
         return data, labels
-        #data    = load_files(self.file_names, self.indices, self.batch_size, index)
-        #images  = resize_images(data, self.images, **self.transforms)
-        #tracks  = [data[track]  for track  in self.tracks ]
-        #scalars = [data[scalar] for scalar in self.scalars]
-        #return images + tracks + scalars, data['truthmode']

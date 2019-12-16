@@ -1,10 +1,10 @@
 # PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
 from   argparse  import ArgumentParser
-from   functools import partial
+#from   functools import partial
 from   utils     import make_sample, make_labels, class_matrix, Batch_Generator
 from   models    import CNN_multichannel
-from   plots     import val_accuracy,  plot_history, plot_distributions, plot_ROC_curves, cal_images
+from   plots     import val_accuracy,  plot_history, plot_distributions, plot_ROC_curves
 from   sklearn.model_selection import train_test_split
 
 
@@ -19,7 +19,7 @@ parser.add_argument( '--batch_size'  , default=1000  ,  type=int   )
 parser.add_argument( '--random_state', default=0     ,  type=int   )
 parser.add_argument( '--n_gpus'      , default=4     ,  type=int   )
 parser.add_argument( '--n_classes'   , default=2     ,  type=int   )
-parser.add_argument( '--n_cpus'      , default=24    ,  type=int   )
+parser.add_argument( '--n_cpus'      , default=12    ,  type=int   )
 parser.add_argument( '--n_e'         , default=100000,  type=float )
 args = parser.parse_args()
 
@@ -80,14 +80,14 @@ else:
 # DATA SAMPLES PREPARATION
 if args.generator == 'ON':
     train_batch_size, test_batch_size = args.batch_size, int(test_indices.size/n_cpus)
-    train_generator = Batch_Generator(data_file, args.n_classes, train_indices, train_batch_size,
-                                      train_features['images'], all_features)
-    test_generator  = Batch_Generator(data_file, args.n_classes,  test_indices, test_batch_size,
-                                      train_features['images'], all_features)
+    train_generator = Batch_Generator(data_file, args.n_classes, train_features,
+                                      all_features, train_indices, train_batch_size)
+    test_generator  = Batch_Generator(data_file, args.n_classes, train_features,
+                                      all_features,  test_indices,  test_batch_size)
 else:
     print('\nCLASSIFIER: data generator is OFF\nCLASSIFIER: loading data', end='    ... ', flush=True)
     start_time   = time.time()
-    train_data   = make_sample(data_file, train_features['images'], all_features, n_e, index=0)
+    train_data   = make_sample(data_file, n_e, all_features, train_features['images'])
     print('(', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
     print('CLASSIFIER: processing data', end=' ... ', flush=True)
     start_time   = time.time()
@@ -99,12 +99,6 @@ else:
     test_data    = [np.float32( test_data[key]) for key in np.sum(list(train_features.values()))]
     train_data   = [np.float32(train_data[key]) for key in np.sum(list(train_features.values()))]
     print('(', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)\n')
-
-#print('Train Data, Test Data:')
-#for i in zip(train_data, test_data): print(i[0].shape,i[1].shape)
-#print('Train Labels, Test Labels:')
-#print(train_labels.shape, test_labels.shape)
-#print(np.sum(list(features.values())))
 
 
 # CALLBACKS
@@ -119,7 +113,7 @@ callbacks_list   = [Model_Checkpoint, Early_Stopping]
 
 # TRAINING AND TESTING
 print('\nCLASSIFIER: training sample:',  format(train_indices.size, '8.0f'), 'e')
-print(  'CLASSIFIER: testing sample: ' , format( test_indices.size, '8.0f'), 'e')
+print(  'CLASSIFIER: testing sample: ',  format( test_indices.size, '8.0f'), 'e')
 if args.generator != 'ON': class_matrix(train_labels, test_labels)
 print(  'CLASSIFIER: using TensorFlow', tf.__version__  )
 print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
@@ -127,8 +121,8 @@ print('\nCLASSIFIER: using'           , architecture    )
 print(  'CLASSIFIER: starting training ...\n'           )
 if args.generator == 'ON':
     print('CLASSIFIER: using batches generator with', n_cpus, 'CPUs'                          )
-    print('CLASSIFIER: training batches:',  len(train_generator), 'x', train_batch_size, 'e'  )
-    print('CLASSIFIER: testing batches:  ', len(test_generator ), 'x',  test_batch_size, 'e\n')
+    print('CLASSIFIER: training batches:' , len(train_generator),  'x', train_batch_size, 'e'  )
+    print('CLASSIFIER: testing batches:  ', len( test_generator ), 'x',  test_batch_size, 'e\n')
     training = model.fit_generator ( generator       = train_generator,
                                      validation_data =  test_generator,
                                      callbacks=callbacks_list,
@@ -142,21 +136,18 @@ else:
                                      batch_size=max(1,n_gpus)*args.batch_size, verbose=1 )
 
 #PLOTTING SECTION
+model.load_weights(checkpoint_file)
+if args.generator == 'ON':
+    print('\nCLASSIFIER: recovering truth labels (generator batches:',
+          len(test_generator), 'x', test_batch_size, 'e)')
+    y_true = np.concatenate([ test_generator[i][1] for i in np.arange(0,len(test_generator)) ])
+    y_prob = model.predict_generator(test_generator, verbose=1, workers=n_cpus, use_multiprocessing=True)
+else:
+    y_true = test_labels
+    y_prob = model.predict(test_data)
+print('\nCLASSIFIER: last checkpoint validation accuracy:', val_accuracy(y_true,y_prob))
+class_matrix(train_labels, y_true, y_prob)
 if args.plotting == 'ON':
-    model.load_weights(checkpoint_file)
-    if args.generator == 'ON':
-        generator = Batch_Generator(data_files, n_classee, test_indices,
-                                    test_batch_size, images, **train_features)
-        print('\nCLASSIFIER: recovering truth labels for plotting functions (generator batches:',
-               len(generator), 'x', test_batch_size, 'e)')
-        y_true = np.concatenate([ generator[i][1] for i in np.arange(0,len(generator)) ])
-        y_prob = model.predict_generator(generator, verbose=1, workers=n_cpus, use_multiprocessing=True)
-        pool   = multiprocessing.Pool(n_cpus)
-    else:
-        y_true = test_labels
-        y_prob = model.predict(test_data)
-    print('\nCLASSIFIER: last checkpoint validation accuracy:', val_accuracy(y_true,y_prob))
-    class_matrix(train_labels, y_true, y_prob)
     plot_history(training)
     plot_distributions(y_true, y_prob)
     plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=1)
