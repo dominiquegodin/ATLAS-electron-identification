@@ -57,10 +57,10 @@ def class_matrix(train_labels, test_labels, y_prob=[]):
             print('\n+'+30*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n', '\b| CLASS DISTRIBUTIONS (%)',
                   '    ', '| TEST PREDICTIONS (%)              '+12*(n_classes-3)*' '+ '|')
         else:
-            headers = ['CLASS', 'TRAIN (%)', 'TEST (%)', 'ACC. (%)']
+            headers = ['CLASS #', 'TRAIN (%)', 'TEST (%)', 'ACC. (%)']
             table   = zip(classes, train_sizes, test_sizes, matrix.diagonal())
-            print('\n+----------------------------------------------+')
-            print(  '| CLASS DISTRIBUTIONS AND ACCURACY             |')
+            print('\n+---------------------------------------------------+')
+            print(  '| CLASS DISTRIBUTIONS AND ACCURACY                  |')
     print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"), '\n')
 
 

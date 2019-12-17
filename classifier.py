@@ -55,7 +55,7 @@ for n in np.arange( min(args.n_cpus, multiprocessing.cpu_count()), 0, -1):
 
 # ARCHITECTURE SELECTION AND MULTI-GPU PROCESSING
 architecture = 'CNN_multichannel'
-if args.generator == 'ON':
+if args.generator == 'ON' or n_e < 1e6:
     n_gpus = min(1,len(tf.config.experimental.list_physical_devices('GPU')))
     model = CNN_multichannel(images_shape, tracks_shape, args.n_classes, **train_features)
     print() ; model.summary()
