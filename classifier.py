@@ -37,6 +37,7 @@ all_features   = np.sum(list(train_features.values())) + others
 
 
 # DATAFILE PATH
+if not os.path.isdir('outputs'): os.mkdir('outputs')
 data_file = '/opt/tmp/godin/el_data/2019-12-10/el_data.h5'
 
 
@@ -44,8 +45,9 @@ data_file = '/opt/tmp/godin/el_data/2019-12-10/el_data.h5'
 n_e = int(max(1e5, min(args.n_e, len(h5py.File(data_file, 'r')['p_TruthType']))))
 train_indices, test_indices = train_test_split(np.arange(n_e), test_size=0.1,
                               random_state=args.random_state, shuffle=True)
-images_shape = h5py.File(data_file, 'r')['em_barrel_Lr1'].shape[1:]
-tracks_shape = h5py.File(data_file, 'r')['tracks'       ].shape[1:]
+#images_shape = h5py.File(data_file, 'r')['em_barrel_Lr1'].shape[1:]
+images_shape = [h5py.File(data_file, 'r')[i       ].shape[1:] for i in train_features['images']]
+tracks_shape =  h5py.File(data_file, 'r')['tracks'].shape[1:]
 
 
 # MULTIPROCESSING

@@ -1,4 +1,4 @@
-import tensorflow as tf, numpy as np, h5py
+import tensorflow as tf, numpy as np, h5py, sys
 from sklearn.metrics import confusion_matrix
 from tabulate import tabulate
 
@@ -24,14 +24,21 @@ def generator_sample(data_file, features, indices, batch_size=None, index=0):
 
 
 def make_labels(data, n_classes):
-    if n_classes == 2:
+    if   n_classes == 2:
         labels = np.where(np.logical_or(data['p_TruthType']==2, data['p_TruthType']==4), 0, 1)
-    if n_classes == 5:
-        iff_truth = data['p_iffTruth']
-        labels    = np.where(iff_truth==2, 0, 4     )
-        labels    = np.where(iff_truth==3, 1, labels)
-        labels    = np.where(np.logical_or (iff_truth==1, iff_truth==10), 2, labels)
-        labels    = np.where(np.logical_and(iff_truth>=7, iff_truth<= 9), 3, labels)
+    elif n_classes == 5:
+        truth  = data['p_iffTruth']
+        labels = np.where(truth==2, 0, 4     )
+        labels = np.where(truth==3, 1, labels)
+        labels = np.where(np.logical_or (truth==1, truth==10), 2, labels)
+        labels = np.where(np.logical_and(truth>=7, truth<= 9), 3, labels)
+    elif n_classes == 9:
+        labels = data['p_iffTruth']
+        labels = np.where(labels== 9, 4, labels)
+        labels = np.where(labels==10, 6, labels)
+    else:
+        print('\nCLASSIFIER:', n_classes, 'classes not supported -> exiting program\n')
+        sys.exit()
     return labels
 
 
@@ -43,7 +50,7 @@ def class_matrix(train_labels, test_labels, y_prob=[]):
     n_classes   = len(matrix)
     test_sizes  = [100*np.sum( test_labels==n)/len( test_labels) for n in np.arange(n_classes)]
     train_sizes = [100*np.sum(train_labels==n)/len(train_labels) for n in np.arange(n_classes)]
-    classes = ['CLASS '+str(n) for n in np.arange(n_classes)]
+    classes     = ['CLASS '+str(n+1) for n in np.arange(n_classes)]
     if y_prob == []:
         print('\n+--------------------------------------+')
         print(  '| CLASS DISTRIBUTIONS                  |')
