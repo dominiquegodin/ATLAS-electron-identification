@@ -1,11 +1,11 @@
 # PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
-from   argparse  import ArgumentParser
-#from   functools import partial
-from   utils     import make_sample, make_labels, class_matrix, Batch_Generator
-from   models    import CNN_multichannel
-from   plots     import val_accuracy,  plot_history, plot_distributions, plot_ROC_curves
-from   sklearn.model_selection import train_test_split
+from argparse  import ArgumentParser
+from utils     import make_sample, make_labels, class_matrix, Batch_Generator
+from models    import multi_CNNs
+from plots     import val_accuracy,  plot_history, plot_distributions, plot_ROC_curves
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing   import StandardScaler
 
 
 # OPTIONS
@@ -14,6 +14,7 @@ parser.add_argument( '--generator'   , default='OFF'               )
 parser.add_argument( '--plotting'    , default='OFF'               )
 parser.add_argument( '--checkpoint'  , default='checkpoint.h5'     )
 parser.add_argument( '--load_weights', default='OFF'               )
+parser.add_argument( '--n_type'      , default='CNN'               )
 parser.add_argument( '--epochs'      , default=100   ,  type=int   )
 parser.add_argument( '--batch_size'  , default=1000  ,  type=int   )
 parser.add_argument( '--random_state', default=0     ,  type=int   )
@@ -25,15 +26,16 @@ args = parser.parse_args()
 
 
 # TRAINING FEATURES
-images    = ['em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2', 'em_barrel_Lr3',
+images    = ['em_barrel_Lr0',  'em_barrel_Lr1_fine', 'em_barrel_Lr2', 'em_barrel_Lr3',
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
 tracks    = ['tracks' ]
 scalars   = ['p_Eratio', 'p_Reta', 'p_Rhad', 'p_Rphi', 'p_TRTPID', 'p_d0', 'p_d0Sig', 'p_dPOverP',
              'p_deltaPhiRescaled2', 'p_deltaEta1', 'p_f1', 'p_f3', 'p_numberOfSCTHits', 'p_weta2']
 others    = ['p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose', 'p_e']
-train_features = {'images':images, 'tracks':tracks, 'scalars':scalars}
-#train_features  = {'images':[], 'tracks':[], 'scalars':scalars}
+#train_features = {'images':images, 'tracks':tracks, 'scalars':scalars}
+train_features = {'images':images, 'tracks':[], 'scalars':[]}
 all_features   = np.sum(list(train_features.values())) + others
+if train_features['images'] == []: args.n_type = 'FCN'
 
 
 # DATAFILE PATH
@@ -45,38 +47,6 @@ data_file = '/opt/tmp/godin/el_data/2019-12-10/el_data.h5'
 n_e = int(max(1e5, min(args.n_e, len(h5py.File(data_file, 'r')['p_TruthType']))))
 train_indices, test_indices = train_test_split(np.arange(n_e), test_size=0.1,
                               random_state=args.random_state, shuffle=True)
-#images_shape = h5py.File(data_file, 'r')['em_barrel_Lr1'].shape[1:]
-images_shape = [h5py.File(data_file, 'r')[i       ].shape[1:] for i in train_features['images']]
-tracks_shape =  h5py.File(data_file, 'r')['tracks'].shape[1:]
-
-
-# MULTIPROCESSING
-for n in np.arange( min(args.n_cpus, multiprocessing.cpu_count()), 0, -1):
-    if n_e % n == 0: n_cpus = n ; break
-
-
-# ARCHITECTURE SELECTION AND MULTI-GPU PROCESSING
-architecture = 'CNN_multichannel'
-if args.generator == 'ON' or n_e < 1e6:
-    n_gpus = min(1,len(tf.config.experimental.list_physical_devices('GPU')))
-    model = CNN_multichannel(images_shape, tracks_shape, args.n_classes, **train_features)
-    print() ; model.summary()
-    if '.h5' in args.load_weights:
-        print('\nCLASSIFIER: loading weights from', args.load_weights)
-        model.load_weights(args.load_weights)
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-else:
-    n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
-    devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
-    tf.debugging.set_log_device_placement(False)
-    mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
-    with mirrored_strategy.scope():
-        model = CNN_multichannel(images_shape, tracks_shape, args.n_classes, **train_features)
-        print() ; model.summary()
-        if '.h5' in args.load_weights:
-            print('\nCLASSIFIER: loading weights from', args.load_weights)
-            model.load_weights(args.load_weights)
-        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
 
 # DATA SAMPLES PREPARATION
@@ -89,8 +59,10 @@ if args.generator == 'ON':
 else:
     print('\nCLASSIFIER: data generator is OFF\nCLASSIFIER: loading data', end='    ... ', flush=True)
     start_time   = time.time()
-    train_data   = make_sample(data_file, n_e, all_features, train_features['images'])
-    print('(', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
+    train_data   = make_sample(data_file, n_e, all_features, train_features['images'], upscale=False)
+    tracks_shape = train_data['tracks'].shape[1:] if train_features['tracks']!=[] else []
+    image_shapes = dict([image, train_data[image].shape[1:]] for image in train_features['images'])
+    print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)')
     print('CLASSIFIER: processing data', end=' ... ', flush=True)
     start_time   = time.time()
     test_data    = dict([key, np.take(train_data[key],  test_indices, axis=0)] for key in all_features)
@@ -100,7 +72,35 @@ else:
     test_LLH     = dict([key,   test_data[key]] for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose'])
     test_data    = [np.float32( test_data[key]) for key in np.sum(list(train_features.values()))]
     train_data   = [np.float32(train_data[key]) for key in np.sum(list(train_features.values()))]
-    print('(', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)\n')
+    print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)\n')
+
+
+# MULTIPROCESSING
+for n in np.arange( min(args.n_cpus, multiprocessing.cpu_count()), 0, -1):
+    if n_e % n == 0: n_cpus = n ; break
+
+
+# ARCHITECTURE SELECTION AND MULTI-GPU PROCESSING
+if args.generator == 'ON' or n_e < 1e6:
+    n_gpus = min(1,len(tf.config.experimental.list_physical_devices('GPU')))
+    model = multi_CNNs(image_shapes, tracks_shape, args.n_classes, **train_features, n_type=args.n_type)
+    print() ; model.summary()
+    if '.h5' in args.load_weights:
+        print('\nCLASSIFIER: loading weights from', args.load_weights)
+        model.load_weights(args.load_weights)
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+else:
+    n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
+    devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
+    tf.debugging.set_log_device_placement(False)
+    mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
+    with mirrored_strategy.scope():
+        model = multi_CNNs(image_shapes, tracks_shape, args.n_classes, **train_features, n_type=args.n_type)
+        print() ; model.summary()
+        if '.h5' in args.load_weights:
+            print('\nCLASSIFIER: loading weights from', args.load_weights)
+            model.load_weights(args.load_weights)
+        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
 
 # CALLBACKS
@@ -114,15 +114,16 @@ callbacks_list   = [Model_Checkpoint, Early_Stopping]
 
 
 # TRAINING AND TESTING
-print('\nCLASSIFIER: training sample:',  format(train_indices.size, '8.0f'), 'e')
-print(  'CLASSIFIER: testing sample: ',  format( test_indices.size, '8.0f'), 'e')
+print('\nCLASSIFIER: training sample:', format(train_indices.size, '8.0f'), 'e')
+print(  'CLASSIFIER: testing sample: ', format( test_indices.size, '8.0f'), 'e')
 if args.generator != 'ON': class_matrix(train_labels, test_labels)
 print(  'CLASSIFIER: using TensorFlow', tf.__version__  )
 print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
-print('\nCLASSIFIER: using'           , architecture    )
-print(  'CLASSIFIER: starting training ...\n'           )
+print('\nCLASSIFIER: using', args.n_type, 'architecture with',
+      [group for group in train_features.keys() if train_features[group] != []])
+print(  'CLASSIFIER: starting training ...\n')
 if args.generator == 'ON':
-    print('CLASSIFIER: using batches generator with', n_cpus, 'CPUs'                          )
+    print('CLASSIFIER: using batches generator with', n_cpus, 'CPUs'                           )
     print('CLASSIFIER: training batches:' , len(train_generator),  'x', train_batch_size, 'e'  )
     print('CLASSIFIER: testing batches:  ', len( test_generator ), 'x',  test_batch_size, 'e\n')
     training = model.fit_generator ( generator       = train_generator,
@@ -137,7 +138,8 @@ else:
                                      workers=n_cpus, use_multiprocessing=True,
                                      batch_size=max(1,n_gpus)*args.batch_size, verbose=1 )
 
-#PLOTTING SECTION
+
+# PLOTTING SECTION
 model.load_weights(checkpoint_file)
 if args.generator == 'ON':
     print('\nCLASSIFIER: recovering truth labels (generator batches:',
@@ -147,11 +149,10 @@ if args.generator == 'ON':
 else:
     y_true = test_labels
     y_prob = model.predict(test_data)
-print('\nCLASSIFIER: last checkpoint validation accuracy:', val_accuracy(y_true,y_prob))
+print('\nCLASSIFIER: best test sample accuracy:', format(100*val_accuracy(y_true, y_prob), '.2f'), '%')
 class_matrix(train_labels, y_true, y_prob)
 if args.plotting == 'ON':
     plot_history(training)
     plot_distributions(y_true, y_prob)
     plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=1)
     plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2)
-    #plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=3)

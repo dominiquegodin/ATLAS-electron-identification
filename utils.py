@@ -1,9 +1,10 @@
 import tensorflow as tf, numpy as np, h5py, sys
 from sklearn.metrics import confusion_matrix
-from tabulate import tabulate
+from tabulate        import tabulate
+from skimage         import transform
 
 
-def make_sample(data_file, batch_size, all_features, images=[], denormalize=False, index=0):
+def make_sample(data_file, batch_size, all_features, images, upscale=False, denormalize=False, index=0):
     data = h5py.File(data_file, 'r')
     idx_1, idx_2 = index*batch_size, (index+1)*batch_size
     sample_dict  = dict([key, data[key][idx_1:idx_2]] for key in all_features)
@@ -11,7 +12,14 @@ def make_sample(data_file, batch_size, all_features, images=[], denormalize=Fals
         energy = sample_dict['p_e']
         for key in images: sample_dict[key] = sample_dict[key] * energy[:, np.newaxis, np.newaxis]
         sample_dict['tracks'][:,:,0] = sample_dict['tracks'][:,:,0] * energy[:, np.newaxis]
+    if images != [] and upscale:
+        for i in images: sample_dict[i] = resize_images(np.float32(sample_dict[i]), target_shape=(56,11))
     return sample_dict
+
+
+def resize_images(images_array, target_shape=(7,11)):
+    if images_array.shape[1:] == target_shape: return images_array
+    else: return transform.resize( images_array, ( (len(images_array),) + target_shape) )
 
 
 def generator_sample(data_file, features, indices, batch_size=None, index=0):
@@ -50,7 +58,7 @@ def class_matrix(train_labels, test_labels, y_prob=[]):
     n_classes   = len(matrix)
     test_sizes  = [100*np.sum( test_labels==n)/len( test_labels) for n in np.arange(n_classes)]
     train_sizes = [100*np.sum(train_labels==n)/len(train_labels) for n in np.arange(n_classes)]
-    classes     = ['CLASS '+str(n+1) for n in np.arange(n_classes)]
+    classes     = ['CLASS '+str(n) for n in np.arange(n_classes)]
     if y_prob == []:
         print('\n+--------------------------------------+')
         print(  '| CLASS DISTRIBUTIONS                  |')
@@ -62,13 +70,13 @@ def class_matrix(train_labels, test_labels, y_prob=[]):
             table   = [classes] + [train_sizes] + [test_sizes] + matrix.T.tolist()
             table   = list(map(list, zip(*table)))
             print('\n+'+30*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n', '\b| CLASS DISTRIBUTIONS (%)',
-                  '    ', '| TEST PREDICTIONS (%)              '+12*(n_classes-3)*' '+ '|')
+                  '    ', '| TEST SAMPLE PREDICTIONS (%)       '+12*(n_classes-3)*' '+ '|')
         else:
             headers = ['CLASS #', 'TRAIN (%)', 'TEST (%)', 'ACC. (%)']
             table   = zip(classes, train_sizes, test_sizes, matrix.diagonal())
             print('\n+---------------------------------------------------+')
             print(  '| CLASS DISTRIBUTIONS AND ACCURACY                  |')
-    print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"), '\n')
+    print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".3f"), '\n')
 
 
 def check_values(sample):
