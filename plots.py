@@ -1,4 +1,5 @@
 import numpy as np, h5py, sys, time
+import matplotlib ; matplotlib.use('pdf') #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from   matplotlib import pylab
@@ -100,14 +101,13 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
     if ROC_type == 2:
         pylab.grid(False)
         len_0 = len(fpr[fpr==0])
-        x_min = 60
-        y_max = 100*np.ceil(max(1/fpr[np.argwhere(np.diff(np.sign(tpr-x_min/100)))[0][0]], 1/eff_class1[0])/100)
+        x_min = min(60, 10*np.floor(10*eff_class0[0]))
+        y_max = 100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min/100)[0]], 1/eff_class1[0])/100)
         plt.xlim([x_min, 100])
         plt.ylim([1,   y_max])
-        LLH_scores = [1/fpr[np.argwhere(np.diff(np.sign(tpr - value)))[0][0]] for value in eff_class0]
-
+        LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]] for value in eff_class0]
         for n in np.arange(len(LLH_scores)):
-            axes.axhline(LLH_scores[n], xmin=(eff_class0[n]-0.6)/0.4, xmax=1,
+            axes.axhline(LLH_scores[n], xmin=(eff_class0[n]-x_min/100)/(1-x_min/100), xmax=1,
             ls='--', linewidth=0.5, color='#1f77b4')
             axes.axvline(100*eff_class0[n], ymin=abs(1/eff_class1[n]-1)/(plt.yticks()[0][-1]-1),
             ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='#1f77b4')
@@ -135,6 +135,7 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
         #plt.plot( 100*threshold[1:], 100*(1-fpr[1:]), color='g')
         std_accuracy  = val_accuracy(y_true, y_prob)
         std_threshold = np.argwhere(np.diff(np.sign(accuracy-std_accuracy))).flatten()
+        #std_threshold = np.argwhere(accuracy >= std_accuracy)[0].flatten()
         plt.scatter( [ 50], #100*threshold[std_threshold[-1]] ],
                      [ 100*accuracy [std_threshold[-1]] ],
                      s=40, marker='o', c=val[0].get_color(),
