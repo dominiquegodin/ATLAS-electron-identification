@@ -112,7 +112,7 @@ if args.n_epochs >= 1:
         class_ratios = [np.sum(train_labels==m)/len(train_labels) for m in np.arange(args.n_classes)]
         class_weight = {m:1/(class_ratios[m]*args.n_classes)    for m in np.arange(args.n_classes)}
         training = model.fit( train_data, train_labels, validation_data=(test_data,test_labels),
-                              callbacks=[Model_Checkpoint, Early_Stopping], verbose=1,
+                              callbacks=[Model_Checkpoint, Early_Stopping], verbose=2,
                               class_weight=class_weight,
                               batch_size=max(1,n_gpus)*int(args.batch_size), epochs=args.n_epochs )
 
@@ -120,7 +120,7 @@ if args.n_epochs >= 1:
 # PLOTTING SECTION
 model.load_weights(checkpoint_file)
 print('\nCLASSIFIER: test sample', n_test, 'class predictions')
-test_prob = model.predict(test_data, batch_size=20000, verbose=1)
+test_prob = model.predict(test_data, batch_size=20000, verbose=0)
 if args.n_epochs < 1: train_labels = test_labels
 class_matrix(train_labels, test_labels, test_prob)
 print('TEST SAMPLE ACCURACY:', format(100*test_accuracy(test_labels, test_prob), '.2f'), '%\n')

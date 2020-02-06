@@ -67,6 +67,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 1) For each epoch where the validation performance (either accuracy or loss function) has reached its best so far, the training model will automatically be saved to a h5 file checkpoint. 
 2) An early stopping callback allows the training to stop automatically when the validation performance has stop improving for a pre-determined number of epochs (default=10).  
 3) Finished or aborted trainings can be resumed from where they were stopped by using previously trained weights of other same-model
-h5 file checkpoints (see --load_weights option).
+h5 file checkpoints (see --weight_file option).
 4) All plots, weights and models are saved by default in the "outputs" directory.
-5) In order to optimize data transfer rate, datasets should physically be present on the same server of the GPU's. Significant access speed gain is achieved by simply linking to "/opt/tmp/godin/el_data" as shown above. 
+5) To use pre-trained weights for generating plots without training, just specifiy n_epochs = 0.
+6) In order to optimize data transfer rate, datasets should physically be present on the same server of the GPU's. Significant access speed gain is achieved by simply linking to "/opt/tmp/godin/el_data" as shown above. 
