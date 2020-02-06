@@ -1,7 +1,7 @@
-from numpy                         import arange
-from tensorflow.keras.layers       import Input, Conv2D, MaxPooling2D, Flatten, Dense, ReLU, LeakyReLU
-from tensorflow.keras.layers       import concatenate, Reshape, Dropout, LSTM, Masking, BatchNormalization
-from tensorflow.keras              import regularizers, models
+from numpy                   import arange
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense, ReLU, LeakyReLU
+from tensorflow.keras.layers import concatenate, Reshape, Dropout, LSTM, Masking, BatchNormalization
+from tensorflow.keras        import regularizers, models
 
 
 def multi_CNNs(n_classes, NN_type, image_shapes, tracks_shape, images, tracks, scalars):
@@ -41,34 +41,3 @@ def multi_CNNs(n_classes, NN_type, image_shapes, tracks_shape, images, tracks, s
         outputs = Dropout(dropout)                                   (outputs)
     outputs = Dense(n_classes, activation='softmax', dtype='float32')(outputs)
     return models.Model(inputs = images_inputs + tracks_inputs + scalars_inputs, outputs = outputs)
-
-
-'''
-def multichannel_CNN(images_shape, tracks_shape, n_classes, images, tracks, scalars):
-    images_inputs  = [Input( shape = images_shape[n] ) for n in arange(len(images))]
-    tracks_inputs  = [Input( shape = tracks_shape )    for n in tracks             ]
-    scalars_inputs = [Input( shape = ( )          )    for n in scalars            ]
-    features_list  = []
-    if len(images)  != 0:
-        single_images   = [Reshape( images_shape[n]+(1,) )( images_inputs[n] ) for n in arange(len(images))]
-        merged_images   = concatenate( single_images, axis=3 ) if len(single_images)>1 else single_images[0]
-        images_outputs  = Conv2D       ( 200, (3,3), activation='relu' )( merged_images  )
-        images_outputs  = MaxPooling2D ( 2, 2                          )( images_outputs )
-        images_outputs  = Conv2D       ( 100, (3,3), activation='relu' )( images_outputs )
-        images_outputs  = MaxPooling2D ( 2, 2                          )( images_outputs )
-        images_outputs  = Flatten      (                               )( images_outputs )
-        features_list  += [images_outputs]
-    if len(tracks)  != 0:
-        tracks_outputs  = Flatten( )( tracks_inputs[0] )
-        features_list  += [tracks_outputs]
-    if len(scalars) != 0:
-        single_scalars  = [Reshape( (1,) )( scalars_inputs[n] ) for n in arange(len(scalars))]
-        merged_scalars  = concatenate( single_scalars ) if len(single_scalars)>1 else single_scalars[0]
-        scalars_outputs = Flatten( )( merged_scalars )
-        features_list  += [scalars_outputs]
-    concatenated = concatenate( features_list ) if len(features_list)>1 else features_list[0]
-    outputs      = Dense( 100,       activation='relu'    )( concatenated )
-    outputs      = Dense( 50,        activation='relu'    )( outputs      )
-    outputs      = Dense( n_classes, activation='softmax' )( outputs      )
-    return Model( inputs = images_inputs + tracks_inputs + scalars_inputs, outputs = outputs )
-'''

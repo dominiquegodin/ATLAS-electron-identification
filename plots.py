@@ -6,16 +6,16 @@ from   matplotlib import pylab
 from   sklearn    import metrics
 
 
-def val_accuracy( y_true, y_prob ):
+def test_accuracy(y_true, y_prob):
     y_pred = np.argmax(y_prob, axis=1)
     return sum(y_pred==y_true)/len(y_true)
 
 
-def get_LLH(test_LLH, y_true):
+def get_LLH(data, y_true):
     eff_class0, eff_class1 = [],[]
     for wp in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']:
-        y_class0 = test_LLH[wp][y_true == 0]
-        y_class1 = test_LLH[wp][y_true == 1]
+        y_class0 = data[wp][y_true == 0]
+        y_class1 = data[wp][y_true == 1]
         eff_class0.append( np.sum(y_class0 == 0)/len(y_class0) )
         eff_class1.append( np.sum(y_class1 == 0)/len(y_class1) )
     return eff_class0, eff_class1
@@ -63,8 +63,8 @@ def plot_distributions(y_true, y_prob, file_name='outputs/distributions.png'):
     plt.savefig(file_name)
 
 
-def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
-    file_name = 'outputs/ROC'+str(ROC_type)+'_curve.png'
+def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, tag=''):
+    file_name = 'outputs/ROC'+str(ROC_type)+'_curve'+tag+'.png'
     print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
     eff_class0, eff_class1 = get_LLH(test_sample, y_true)
 
@@ -133,7 +133,7 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type):
         val = plt.plot(100*threshold[1:], 100*accuracy[1:], color='#1f77b4')
         #plt.plot( 100*threshold[1:], 100*tpr[1:], color='r')
         #plt.plot( 100*threshold[1:], 100*(1-fpr[1:]), color='g')
-        std_accuracy  = val_accuracy(y_true, y_prob)
+        std_accuracy  = test_accuracy(y_true, y_prob)
         std_threshold = np.argwhere(np.diff(np.sign(accuracy-std_accuracy))).flatten()
         #std_threshold = np.argwhere(accuracy >= std_accuracy)[0].flatten()
         plt.scatter( [ 50], #100*threshold[std_threshold[-1]] ],

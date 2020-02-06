@@ -1,9 +1,9 @@
 # PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
 from argparse  import ArgumentParser
-from utils     import make_data, make_labels, class_matrix#, generator_sample, Batch_Generator
-from models    import two_CNNs, multi_CNNs
-from plots     import val_accuracy, plot_history, plot_distributions, plot_ROC_curves
+from utils     import make_data, class_filter, make_labels, class_matrix#, generator_sample, Batch_Generator
+from models    import multi_CNNs
+from plots     import test_accuracy, plot_history, plot_distributions, plot_ROC_curves
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing   import StandardScaler
 from collections import Counter
@@ -14,7 +14,7 @@ parser = ArgumentParser()
 parser.add_argument( '--generator'   , default='OFF'            )
 parser.add_argument( '--plotting'    , default='OFF'            )
 parser.add_argument( '--checkpoint'  , default='checkpoint.h5'  )
-parser.add_argument( '--load_weights', default='OFF'            )
+parser.add_argument( '--weight_file', default='OFF'            )
 parser.add_argument( '--n_type'      , default='CNN'            )
 parser.add_argument( '--n_epochs'    , default=100 , type=int   )
 parser.add_argument( '--batch_size'  , default=1000, type=int   )
@@ -104,7 +104,7 @@ if args.generator == 'ON':
 else:
     print('\nCLASSIFIER: data generator is OFF\nCLASSIFIER: loading data', end='    ... ', flush=True)
     start_time   = time.time()
-    train_data   = make_data(data_file, all_var, train_var['images'], 0, n_e, upscale=False)
+    train_data   = make_data(data_file, all_var, train_var['images'], [0, n_e], floats16=False,  upscale=False)
     tracks_shape = dict([key, train_data[key].shape[1:]] for key in train_var['tracks'])
     image_shapes = dict([key, train_data[key].shape[1:]] for key in train_var['images'])
     print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)')
@@ -119,17 +119,19 @@ else:
     #train_data   = [np.float32(train_data[key]) for key in np.sum(list(train_var.values()))]
     #test_data    = [ test_data[key] for key in np.sum(list(train_var.values()))]
     #train_data   = [train_data[key] for key in np.sum(list(train_var.values()))]
+    train_data, train_labels = class_filter(train_data, train_labels)
+    test_data, test_labels = class_filter(test_data, test_labels)
     print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)\n')
 
 
 # ARCHITECTURE SELECTION AND MULTI-GPU PROCESSING
 if args.generator == 'ON' or n_e < 1e6:
     n_gpus = min(1,len(tf.config.experimental.list_physical_devices('GPU')))
-    model = two_CNNs(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
+    model = multi_CNNs(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
     print() ; model.summary()
-    if '.h5' in args.load_weights:
-        print('\nCLASSIFIER: loading weights from', args.load_weights)
-        model.load_weights(args.load_weights)
+    if '.h5' in args.weight_file:
+        print('\nCLASSIFIER: loading weights from', args.weight_file)
+        model.load_weights(args.weight_file)
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 else:
     n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
@@ -138,11 +140,11 @@ else:
     mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
     with mirrored_strategy.scope():
         tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
-        model = two_CNNs(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
+        model = multi_CNNs(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
         print() ; model.summary()
-        if '.h5' in args.load_weights:
-            print('\nCLASSIFIER: loading weights from', args.load_weights)
-            model.load_weights(args.load_weights)
+        if '.h5' in args.weight_file:
+            print('\nCLASSIFIER: loading weights from', args.weight_file)
+            model.load_weights(args.weight_file)
         model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
 
@@ -195,7 +197,7 @@ if args.generator == 'ON':
 else:
     y_true = test_labels
     y_prob = model.predict(test_data)
-print('\nCLASSIFIER: best test sample accuracy:', format(100*val_accuracy(y_true, y_prob), '.2f'), '%')
+print('\nCLASSIFIER: best test sample accuracy:', format(100*test_accuracy(y_true, y_prob), '.2f'), '%')
 class_matrix(train_labels, y_true, y_prob)
 if args.plotting == 'ON':
     plot_history(training)

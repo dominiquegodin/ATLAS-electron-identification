@@ -5,10 +5,10 @@ from tabulate        import tabulate
 from skimage         import transform
 
 
-def make_data(data_file, all_var, images, indices, upscale=False, denormalize=False):
+def make_data(data_file, all_var, images, indices, floats16=True, upscale=False, denormalize=False):
     data = h5py.File(data_file, 'r')
-    sample = dict([key, data[key][indices[0]:indices[1]]] for key in all_var)
-    #sample = dict([key, np.float32(data[key][indices[0]:indices[1]])] for key in all_var)
+    if floats16: sample = dict([key,            data[key][indices[0]:indices[1]]]  for key in all_var)
+    else:        sample = dict([key, np.float32(data[key][indices[0]:indices[1]])] for key in all_var)
     if images != [] and denormalize:
         for i in images: sample[i] = sample[i]               * sample['p_e'][:, np.newaxis, np.newaxis]
         sample['tracks'][:,:,0]    = sample['tracks'][:,:,0] * sample['p_e'][:, np.newaxis]
@@ -17,35 +17,77 @@ def make_data(data_file, all_var, images, indices, upscale=False, denormalize=Fa
     return sample
 
 
-def make_labels(data, n_classes):
-    if   n_classes == 2:
-        labels = np.where(np.logical_or(data['p_TruthType']==2, data['p_TruthType']==4), 0, 1)
+def make_labels(sample, n_classes):
+    labels = sample['p_iffTruth']
+    #if n_classes == 2:
+    #    labels = np.where(labels<=1                          , -1, labels)
+    #    labels = np.where(labels>=4                          ,  1, labels)
+    #    return   np.where(np.logical_or(labels==2, labels==3),  0, labels)
+    #if n_classes == 2:
+    #    labels = sample['p_TruthType']
+    #    return   np.where(np.logical_or(labels==2, labels==4),  0, 1     )
+    if n_classes == 2: # removal of type 4 electrons
+        labels = sample['p_TruthType']
+        labels = np.where(np.logical_and(labels!=2, labels!=4), 1, labels)
+        labels = np.where(labels==2,  0, labels)
+        return   np.where(labels==4, -1, labels)
     elif n_classes == 5:
-        truth  = data['p_iffTruth']
-        labels = np.where(truth==2, 0, 4     )
-        labels = np.where(truth==3, 1, labels)
-        labels = np.where(np.logical_or (truth==1, truth==10), 2, labels)
-        labels = np.where(np.logical_and(truth>=7, truth<= 9), 3, labels)
+        labels = np.where(np.logical_or(labels<=1, labels==4), -1, labels)
+        labels = np.where(np.logical_or(labels==6, labels==7), -1, labels)
+        labels = np.where(labels==2                          ,  0, labels)
+        labels = np.where(labels==3                          ,  1, labels)
+        labels = np.where(labels==5                          ,  2, labels)
+        labels = np.where(np.logical_or(labels==8, labels==9),  3, labels)
+        return   np.where(labels==10                         ,  4, labels)
     elif n_classes == 9:
-        labels = data['p_iffTruth']
         labels = np.where(labels== 9, 4, labels)
-        labels = np.where(labels==10, 6, labels)
-    else:
-        print('\nCLASSIFIER:', n_classes, 'classes not supported -> exiting program\n')
-        sys.exit()
-    return labels
+        return   np.where(labels==10, 6, labels)
+    else: print('\nCLASSIFIER: classes not supported -> exiting program\n') ; sys.exit()
 
 
-def class_matrix(train_labels, test_labels, y_prob=[]):
-    if y_prob == []: y_pred = test_labels
-    else:            y_pred = np.argmax(y_prob, axis=1)
-    matrix      = confusion_matrix(test_labels, y_pred)
+def class_filter(sample, labels):
+    label_rows  = np.where(labels!=-1)[0]
+    n_conserved = 100*len(label_rows)/len(labels)
+    for key in sample.keys(): sample[key] = np.take(sample[key], label_rows, axis=0)
+    print('CLASSIFIER: filtering sample ->', format(n_conserved, '.2f'),'% electrons conserved\n')
+    return sample, np.take(labels, label_rows)
+
+
+def balance_sample(sample, labels, n_classes):
+    class_size = int(len(labels)/n_classes)
+    class_rows = [np.where(labels==m)[0] for m in np.arange(n_classes)]
+    class_rows = [np.random.choice(class_rows[m], class_size, replace=len(class_rows[m])<class_size)
+                  for m in np.arange(n_classes)]
+    class_rows = np.concatenate(class_rows) ; np.random.shuffle(class_rows)
+    for key in sample.keys(): sample[key] = np.take(sample[key], class_rows, axis=0)
+    return sample, np.take(labels, class_rows)
+
+
+class Batch_Generator(tf.keras.utils.Sequence):
+    def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):
+        self.file_name  = file_name  ; self.train_features = train_features
+        self.indices    = indices    ; self.all_features   = all_features
+        self.batch_size = batch_size ; self.n_classes      = n_classes
+    def __len__(self):
+        "number of batches per epoch"
+        return int(self.indices.size/self.batch_size)
+    def __getitem__(self, index):
+        data   = generator_sample(self.file_name, self.all_features, self.indices, self.batch_size, index)
+        labels = make_labels(data, self.n_classes)
+        data   = [np.float32(data[key]) for key in np.sum(list(self.train_features.values()))]
+        return data, labels
+
+
+def class_matrix(train_labels, test_labels, test_prob=[]):
+    if test_prob == []: test_pred = test_labels
+    else:               test_pred = np.argmax(test_prob, axis=1)
+    matrix      = confusion_matrix(test_labels, test_pred)
     matrix      = 100*matrix.T/matrix.sum(axis=1)
     n_classes   = len(matrix)
     test_sizes  = [100*np.sum( test_labels==n)/len( test_labels) for n in np.arange(n_classes)]
     train_sizes = [100*np.sum(train_labels==n)/len(train_labels) for n in np.arange(n_classes)]
     classes     = ['CLASS '+str(n) for n in np.arange(n_classes)]
-    if y_prob == []:
+    if test_prob == []:
         print('\n+--------------------------------------+')
         print(  '| CLASS DISTRIBUTIONS                  |')
         headers = ['CLASS #', 'TRAIN (%)', 'TEST (%)']
@@ -62,7 +104,7 @@ def class_matrix(train_labels, test_labels, y_prob=[]):
             table   = zip(classes, train_sizes, test_sizes, matrix.diagonal())
             print('\n+---------------------------------------------------+')
             print(  '| CLASS DISTRIBUTIONS AND ACCURACIES                |')
-    print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".3f"), '\n')
+    print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
 
 
 def make_samples(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, int_var, index):
@@ -73,15 +115,11 @@ def make_samples(h5_file, output_path, batch_size, sum_e, images, tracks, scalar
     sample_list += [              data['train'][ key ][idx_1:idx_2]         for key in tracks+scalars]
     sample_dict  = dict(zip(images+tracks+scalars, sample_list))
     sample_dict.update({'em_barrel_Lr1_fine':data['train']['em_barrel_Lr1'][idx_1:idx_2]/energy})
-    #sample_list  = [resize_images(data['train'][ key ][idx_1:idx_2])/energy for key in images.keys()      ]
-    #sample_list += [              data['train'][ key ][idx_1:idx_2] for key in tracks+list(scalars.keys())]
-    #sample_dict  = dict(zip(list(images.values())+tracks+list(scalars.values()), sample_list))
-    #sample_dict.update({'s1_fine':data['train']['em_barrel_Lr1'][idx_1:idx_2]/energy})
     tracks_list  = [np.expand_dims(get_tracks(sample_dict, e), axis=0) for e in np.arange(batch_size)]
     sample_dict.update({'tracks':np.concatenate(tracks_list), 'true_m':get_truth_m(sample_dict)})
     for wp in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample_dict[wp] = get_LLH(sample_dict, wp)
     for var in tracks + ['p_truth_E', 'p_LHValue']: sample_dict.pop(var)
-    # Shuffling (for next time)
+    # For shuffling (to use next time)
     #for key in sample_dict.keys(): sample_dict[key] = shuffle(sample_dict[key], random_state=0)
     data = h5py.File(output_path+'temp_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a')
     for key in sample_dict.keys():
@@ -125,6 +163,7 @@ def get_truth_m(sample, new=True, m_e=0.511, max_eta=4.9):
 
 def merge_samples(n_e, n_files, output_path, output_file):
     temp_files = sorted([h5_file for h5_file in os.listdir(output_path) if 'temp' in h5_file])
+    # For shuffling (to use next time)
     #temp_files = [h5_file for h5_file in os.listdir(output_path) if 'temp' in h5_file]
     os.rename(output_path+temp_files[0], output_path+output_file)
     dataset    = h5py.File(output_path+output_file, 'a')
@@ -143,20 +182,3 @@ def merge_samples(n_e, n_files, output_path, output_file):
 def check_sample(sample):
     bad_values = [np.sum(np.isfinite(sample[key])==False) for key in sample.keys()]
     print('CLASSIFIER:', sum(bad_values), 'found in sample')
-
-
-'''
-class Batch_Generator(tf.keras.utils.Sequence):
-    def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):
-        self.file_name  = file_name  ; self.train_features = train_features
-        self.indices    = indices    ; self.all_features   = all_features
-        self.batch_size = batch_size ; self.n_classes      = n_classes
-    def __len__(self):
-        "number of batches per epoch"
-        return int(self.indices.size/self.batch_size)
-    def __getitem__(self, index):
-        data   = generator_sample(self.file_name, self.all_features, self.indices, self.batch_size, index)
-        labels = make_labels(data, self.n_classes)
-        data   = [np.float32(data[key]) for key in np.sum(list(self.train_features.values()))]
-        return data, labels
-'''
