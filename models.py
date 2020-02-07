@@ -4,16 +4,16 @@ from tensorflow.keras.layers import concatenate, Reshape, Dropout, LSTM, Masking
 from tensorflow.keras        import regularizers, models
 
 
-def multi_CNNs(n_classes, NN_type, image_shapes, tracks_shape, images, tracks, scalars):
+def multi_CNN(n_classes, NN_type, data, images, tracks, scalars):
     FC_neurons = [200, 200] ; dropout = 0.2 ; regularizer = regularizers.l2(1e-6) ; alpha=0.
-    images_inputs  = [Input(shape = image_shapes[n], name = n) for n in  images]
-    tracks_inputs  = [Input(shape = tracks_shape[n], name = n) for n in  tracks]
-    scalars_inputs = [Input(shape = ( )            , name = n) for n in scalars]
-    images_coarse  = [image for image in images if image_shapes[image] == ( 7, 11)]
-    images_fine    = [image for image in images if image_shapes[image] == (56, 11)]
+    images_inputs  = [Input(shape = data[n].shape[1:], name = n) for n in  images]
+    tracks_inputs  = [Input(shape = data[n].shape[1:], name = n) for n in  tracks]
+    scalars_inputs = [Input(shape = ( )              , name = n) for n in scalars]
+    images_coarse  = [image for image in images if data[image].shape[1:] == ( 7, 11)]
+    images_fine    = [image for image in images if data[image].shape[1:] == (56, 11)]
     features_list  = []
     for subset in [subset for subset in [images_coarse, images_fine] if len(subset) != 0]:
-        single_images  = [Reshape(image_shapes[n]+(1,))(images_inputs[images.index(n)]) for n in subset]
+        single_images  = [Reshape(data[n].shape[1:]+(1,))(images_inputs[images.index(n)]) for n in subset]
         images_outputs = concatenate(single_images, axis=3) if len(single_images)>1 else single_images[0]
         if NN_type == 'CNN':
             images_outputs = Conv2D(200, (3,3), kernel_regularizer=regularizer)(images_outputs)

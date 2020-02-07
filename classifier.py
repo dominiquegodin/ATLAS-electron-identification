@@ -1,7 +1,7 @@
 # PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
 from argparse  import ArgumentParser
-from utils     import make_data, class_filter, make_labels, class_matrix#, generator_sample, Batch_Generator
+from utils     import make_data, filter_sample, make_labels, show_matrix#, generator_sample, Batch_Generator
 from models    import multi_CNNs
 from plots     import test_accuracy, plot_history, plot_distributions, plot_ROC_curves
 from sklearn.model_selection import train_test_split
@@ -119,8 +119,8 @@ else:
     #train_data   = [np.float32(train_data[key]) for key in np.sum(list(train_var.values()))]
     #test_data    = [ test_data[key] for key in np.sum(list(train_var.values()))]
     #train_data   = [train_data[key] for key in np.sum(list(train_var.values()))]
-    train_data, train_labels = class_filter(train_data, train_labels)
-    test_data, test_labels = class_filter(test_data, test_labels)
+    train_data, train_labels = filter_sample(train_data, train_labels)
+    test_data, test_labels = filter_sample(test_data, test_labels)
     print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)\n')
 
 
@@ -161,7 +161,7 @@ callbacks_list   = [Model_Checkpoint, Early_Stopping]
 # TRAINING AND TESTING
 print('\nCLASSIFIER: training sample:', format(train_indices.size, '8.0f'), 'e')
 print(  'CLASSIFIER: testing sample: ', format( test_indices.size, '8.0f'), 'e')
-if args.generator != 'ON': class_matrix(train_labels, test_labels)
+if args.generator != 'ON': show_matrix(train_labels, test_labels)
 print(  'CLASSIFIER: using TensorFlow', tf.__version__  )
 print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
 print('\nCLASSIFIER: using', args.n_type, 'architecture with', end=' ')
@@ -198,7 +198,7 @@ else:
     y_true = test_labels
     y_prob = model.predict(test_data)
 print('\nCLASSIFIER: best test sample accuracy:', format(100*test_accuracy(y_true, y_prob), '.2f'), '%')
-class_matrix(train_labels, y_true, y_prob)
+show_matrix(train_labels, y_true, y_prob)
 if args.plotting == 'ON':
     plot_history(training)
     plot_distributions(y_true, y_prob)

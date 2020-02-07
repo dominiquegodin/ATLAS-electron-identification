@@ -5,32 +5,33 @@ from tabulate        import tabulate
 from skimage         import transform
 
 
-def make_data(data_file, all_var, images, indices, floats16=True, upscale=False, denormalize=False):
-    data = h5py.File(data_file, 'r')
-    if floats16: sample = dict([key,            data[key][indices[0]:indices[1]]]  for key in all_var)
-    else:        sample = dict([key, np.float32(data[key][indices[0]:indices[1]])] for key in all_var)
-    if images != [] and denormalize:
-        for i in images: sample[i] = sample[i]               * sample['p_e'][:, np.newaxis, np.newaxis]
-        sample['tracks'][:,:,0]    = sample['tracks'][:,:,0] * sample['p_e'][:, np.newaxis]
-    if images != [] and upscale:
-        for i in images: sample[i] = resize_images(np.float32(sample[i]), target_shape=(56,11))
+def make_data(data_file, dict_var, indices, float16=True, upscale=False, denormalize=False):
+    data, list_var = h5py.File(data_file, 'r'), np.sum(list(dict_var.values()))
+    images, tracks = dict_var['images'], dict_var['tracks']
+    if float16: sample = dict([key,            data[key][indices[0]:indices[1]]]  for key in list_var)
+    else:       sample = dict([key, np.float32(data[key][indices[0]:indices[1]])] for key in list_var)
+    if denormalize:
+        for n in images: sample[n]        = sample[n]        * sample['p_e'][:, np.newaxis, np.newaxis]
+        for n in tracks: sample[n][:,:,0] = sample[n][:,:,0] * sample['p_e'][:, np.newaxis]
+    if upscale:
+        for n in images: sample[n]        = resize_images(np.float32(sample[n]), target_shape=(56,11))
     return sample
 
 
 def make_labels(sample, n_classes):
     labels = sample['p_iffTruth']
-    #if n_classes == 2:
-    #    labels = np.where(labels<=1                          , -1, labels)
-    #    labels = np.where(labels>=4                          ,  1, labels)
-    #    return   np.where(np.logical_or(labels==2, labels==3),  0, labels)
-    #if n_classes == 2:
+    if n_classes == 2: # iffTruth based with iff=2,3 signal electrons
+        labels = np.where(labels<=1                          , -1, labels)
+        labels = np.where(labels>=4                          ,  1, labels)
+        return   np.where(np.logical_or(labels==2, labels==3),  0, labels)
+    #if n_classes == 2: # TruthType based with type 2 and 4 signal electrons
     #    labels = sample['p_TruthType']
     #    return   np.where(np.logical_or(labels==2, labels==4),  0, 1     )
-    if n_classes == 2: # removal of type 4 electrons
-        labels = sample['p_TruthType']
-        labels = np.where(np.logical_and(labels!=2, labels!=4), 1, labels)
-        labels = np.where(labels==2,  0, labels)
-        return   np.where(labels==4, -1, labels)
+    #if n_classes == 2: # TruthType based without type 4 signal electrons
+    #    labels = sample['p_TruthType']
+    #    labels = np.where(np.logical_and(labels!=2, labels!=4), 1, labels)
+    #    labels = np.where(labels==2,  0, labels)
+    #    return   np.where(labels==4, -1, labels)
     elif n_classes == 5:
         labels = np.where(np.logical_or(labels<=1, labels==4), -1, labels)
         labels = np.where(np.logical_or(labels==6, labels==7), -1, labels)
@@ -39,17 +40,27 @@ def make_labels(sample, n_classes):
         labels = np.where(labels==5                          ,  2, labels)
         labels = np.where(np.logical_or(labels==8, labels==9),  3, labels)
         return   np.where(labels==10                         ,  4, labels)
+    elif n_classes == 6:
+        labels = np.where(np.logical_or(labels<=1, labels==4),                   -1, labels)
+        labels = np.where(np.logical_or(labels==6, labels==7),                   -1, labels)
+        labels = np.where(labels==2                          ,                    0, labels)
+        labels = np.where(labels==3                          ,                    1, labels)
+        labels = np.where(labels==5                          ,                    2, labels)
+        labels = np.where(np.logical_or(labels==8, labels==9),                    3, labels)
+        labels = np.where(np.logical_and(labels==10, sample['p_TruthType']==4 ),  4, labels)
+        labels = np.where(np.logical_and(labels==10, sample['p_TruthType']==17),  5, labels)
+        return   np.where(labels==10                                           , -1, labels)
     elif n_classes == 9:
         labels = np.where(labels== 9, 4, labels)
         return   np.where(labels==10, 6, labels)
     else: print('\nCLASSIFIER: classes not supported -> exiting program\n') ; sys.exit()
 
 
-def class_filter(sample, labels):
+def filter_sample(sample, labels):
     label_rows  = np.where(labels!=-1)[0]
     n_conserved = 100*len(label_rows)/len(labels)
-    for key in sample.keys(): sample[key] = np.take(sample[key], label_rows, axis=0)
-    print('CLASSIFIER: filtering sample ->', format(n_conserved, '.2f'),'% electrons conserved\n')
+    for key in sample: sample[key] = np.take(sample[key], label_rows, axis=0)
+    print('CLASSIFIER: filtering sample ->', format(n_conserved, '.2f'),'% conserved\n')
     return sample, np.take(labels, label_rows)
 
 
@@ -59,7 +70,7 @@ def balance_sample(sample, labels, n_classes):
     class_rows = [np.random.choice(class_rows[m], class_size, replace=len(class_rows[m])<class_size)
                   for m in np.arange(n_classes)]
     class_rows = np.concatenate(class_rows) ; np.random.shuffle(class_rows)
-    for key in sample.keys(): sample[key] = np.take(sample[key], class_rows, axis=0)
+    for key in sample: sample[key] = np.take(sample[key], class_rows, axis=0)
     return sample, np.take(labels, class_rows)
 
 
@@ -78,7 +89,7 @@ class Batch_Generator(tf.keras.utils.Sequence):
         return data, labels
 
 
-def class_matrix(train_labels, test_labels, test_prob=[]):
+def show_matrix(train_labels, test_labels, test_prob=[]):
     if test_prob == []: test_pred = test_labels
     else:               test_pred = np.argmax(test_prob, axis=1)
     matrix      = confusion_matrix(test_labels, test_pred)
@@ -88,8 +99,8 @@ def class_matrix(train_labels, test_labels, test_prob=[]):
     train_sizes = [100*np.sum(train_labels==n)/len(train_labels) for n in np.arange(n_classes)]
     classes     = ['CLASS '+str(n) for n in np.arange(n_classes)]
     if test_prob == []:
-        print('\n+--------------------------------------+')
-        print(  '| CLASS DISTRIBUTIONS                  |')
+        print('+--------------------------------------+')
+        print('| CLASS DISTRIBUTIONS                  |')
         headers = ['CLASS #', 'TRAIN (%)', 'TEST (%)']
         table   = zip(classes, train_sizes, test_sizes)
     else:
