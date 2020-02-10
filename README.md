@@ -60,6 +60,9 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --weight_file = name of h5 weight file from a previous training checkpoint (requires .h5 extension)  
 
+--transform   = ON applies Quantile transform to scalar variables (fit performed on train sample
+	        and applied to whole sample)  
+
 --checkpoint  = name of h5 checkpoint file used for saving and updating the model best weights
 
 

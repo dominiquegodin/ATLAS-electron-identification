@@ -18,6 +18,7 @@ parser.add_argument( '--n_gpus'     , default=4  , type=int   )
 parser.add_argument( '--NN_type'    , default='CNN'           )
 parser.add_argument( '--plotting'   , default='OFF'           )
 parser.add_argument( '--weight_file', default='OFF'           )
+parser.add_argument( '--transform'  , default='ON'            )
 parser.add_argument( '--rebalance'  , default='OFF'           )
 parser.add_argument( '--checkpoint' , default='checkpoint.h5' )
 args = parser.parse_args(); float16  = tf.__version__ >= '2.1.0'
@@ -25,12 +26,13 @@ args = parser.parse_args(); float16  = tf.__version__ >= '2.1.0'
 
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1_fine', 'em_barrel_Lr2'  , 'em_barrel_Lr3',
-             'tile_barrel_Lr1', 'tile_barrel_Lr2'   , 'tile_barrel_Lr3', 'image_tracks']
+             'tile_barrel_Lr1', 'tile_barrel_Lr2'   , 'tile_barrel_Lr3']#, 'image_tracks']
 tracks    = ['tracks' ]
 scalars   = ['p_Eratio', 'p_Reta', 'p_Rhad', 'p_Rphi', 'p_TRTPID', 'p_d0', 'p_d0Sig', 'p_dPOverP',
              'p_deltaPhiRescaled2', 'p_deltaEta1', 'p_f1', 'p_f3', 'p_numberOfSCTHits', 'p_weta2']
 others    = ['p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose', 'p_e', 'mcChannelNumber']
-train_var = {'images':images, 'tracks':[], 'scalars':scalars}
+#train_var = {'images':images, 'tracks':[], 'scalars':scalars}
+train_var = {'images':images, 'tracks':tracks, 'scalars':scalars}
 total_var = {**train_var, 'others':others}
 if train_var['images'] == []: args.NN_type = 'FCN'
 
@@ -49,23 +51,13 @@ n_valid = [n_train[-1], min(n_train[-1]+int(args.n_valid), n_max)]
 
 
 # TEST SAMPLE GENERATION
-print('\nCLASSIFIER: loading test sample', n_valid, end=' ... ', flush=True); t0 =time.time()
+print('\nCLASSIFIER: loading test sample', n_valid, end=' ... ', flush=True)
+start_time   = time.time()
 valid_sample = make_sample(data_file, total_var, n_valid, float16)
 valid_labels = make_labels(valid_sample, args.n_classes)
-print('(', '\b'+format(time.time() - t0, '2.1f'), '\b'+' s)')
+print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
 valid_sample, valid_labels = filter_sample(valid_sample, valid_labels)
 analyze_sample(valid_sample); #sys.exit()
-
-
-'''
-#from copy import deepcopy
-train_sample = make_sample(data_file, total_var, n_train, float16)
-train_sample2, valid_sample2 = train_sample.copy(), valid_sample.copy()
-train_sample2, valid_sample2 = transform_sample(train_sample2, valid_sample2, scalars)
-#for key in scalars: print(key, train_sample[key].shape)
-for key in scalars: print( np.allclose(valid_sample[key], valid_sample2[key]) )
-sys.exit()
-'''
 
 
 # ARCHITECTURE SELECTION AND MULTI-GPU PROCESSING
@@ -96,16 +88,17 @@ if args.n_epochs >= 1:
     Early_Stopping   = tf.keras.callbacks.EarlyStopping  (patience=10, restore_best_weights=True,
                                                           monitor='val_accuracy', verbose=1)
     for idx in list(zip(n_train[:-1], n_train[1:])):
-        print('\nCLASSIFIER: loading train sample', n_train, end=' ... ', flush=True); t0 =time.time()
+        print('\nCLASSIFIER: loading train sample', n_train, end=' ... ', flush=True)
+        start_time   = time.time()
         train_sample = make_sample(data_file, total_var, idx, float16)
         train_labels = make_labels(train_sample, args.n_classes)
-        print('(', '\b'+format(time.time() - t0, '2.1f'), '\b'+' s)')
+        print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
         train_sample, train_labels = filter_sample(train_sample, train_labels)
         show_matrix(train_labels, valid_labels)
         if args.rebalance == 'ON':
-            print('CLASSIFIER: rebalancing train sample', end=' ... ', flush=True); t0 =time.time()
             train_sample, train_labels = balance_sample(train_sample, train_labels, args.n_classes)
-            print('(', '\b'+format(time.time() - t0, '2.1f'), '\b'+' s)\n')
+        if args.transform == 'ON':
+            train_sample, valid_sample = transform_sample(train_sample, valid_sample, scalars)
         class_ratios = [np.sum(train_labels==m)/len(train_labels) for m in np.arange(args.n_classes)]
         class_weight = {m:1/(class_ratios[m]*args.n_classes)      for m in np.arange(args.n_classes)}
         training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),

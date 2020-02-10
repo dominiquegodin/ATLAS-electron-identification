@@ -6,7 +6,6 @@ from   tabulate              import tabulate
 from   skimage               import transform
 
 
-
 def make_sample(data_file, var_dict, idx, float16=True, upscale=False, denormalize=False):
     data  , var_list = h5py.File(data_file, 'r'), np.sum(list(var_dict.values()))
     images, tracks   = var_dict['images']       , var_dict['tracks']
@@ -129,30 +128,30 @@ def show_matrix(train_labels, valid_labels, valid_prob=[]):
 
 
 def balance_sample(sample, labels, n_classes):
+    print('CLASSIFIER: rebalancing train sample', end=' ... ', flush=True)
+    start_time = time.time()
     class_size = int(len(labels)/n_classes)
     label_rows = [np.where(labels==m)[0] for m in np.arange(n_classes)]
     label_rows = [np.random.choice(label_rows[m], class_size, replace=len(label_rows[m])<class_size)
                   for m in np.arange(n_classes)]
     label_rows = np.concatenate(label_rows); np.random.shuffle(label_rows)
     for key in sample: sample[key] = np.take(sample[key], label_rows, axis=0)
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
     return sample, np.take(labels, label_rows)
 
 
 def transform_sample(train_sample, valid_sample, scalars):
+    print('\nCLASSIFIER: applying Quantile transform to scalars', end=' ... ', flush=True)
+    start_time    = time.time()
     train_scalars = np.hstack([np.expand_dims(train_sample[key], axis=1) for key in scalars])
     valid_scalars = np.hstack([np.expand_dims(valid_sample[key], axis=1) for key in scalars])
-    quantile      = QuantileTransformer(n_quantiles=10, random_state=0); start_time = time.time()
+    quantile      = QuantileTransformer(n_quantiles=10000, output_distribution='normal', random_state=0)
     train_scalars = quantile.fit_transform(train_scalars)
     valid_scalars = quantile.transform(valid_scalars)
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    #print( np.allclose(train_scalars, valid_scalars) )
-    #print(train_scalars.shape, valid_scalars.shape)
-    #for n in np.arange(train_scalars.shape[1]): print(train_scalars[:,n].shape)
-    n = 0
-    for key in scalars:
-        train_sample[key] = train_scalars[:,n]
-        valid_sample[key] = valid_scalars[:,n]
-        n += 1
+    for n in np.arange(len(scalars)):
+        train_sample[scalars[n]] = train_scalars[:,n]
+        valid_sample[scalars[n]] = valid_scalars[:,n]
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
     return train_sample, valid_sample
 
 
