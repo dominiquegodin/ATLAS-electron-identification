@@ -6,7 +6,7 @@ from   matplotlib import pylab
 from   sklearn    import metrics
 
 
-def test_accuracy(y_true, y_prob):
+def valid_accuracy(y_true, y_prob):
     y_pred = np.argmax(y_prob, axis=1)
     return sum(y_pred==y_true)/len(y_true)
 

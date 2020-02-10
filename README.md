@@ -44,7 +44,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 # classifier.py Options
 --n_train     = number of training electrons (default=1e5)
 
---n_test      = number of testing electrons (default=1e5)
+--n_valid     = number of testing electrons (default=1e5)
 
 --batch_size  = size of training batches (default=1000)
 
