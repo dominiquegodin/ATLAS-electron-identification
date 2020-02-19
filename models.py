@@ -14,7 +14,7 @@ def multi_CNN(n_classes, NN_type, sample, images, tracks, scalars):
         image_inputs  = [Reshape(sample[n].shape[1:]+(1,))(input_dict[n]) for n in shape_dict[shape]]
         image_outputs = concatenate(image_inputs, axis=3) if len(image_inputs)>1 else image_inputs[0]
         if NN_type == 'CNN':
-            field = (3, 3) if min(shape) > 5 else (2, 2)
+            field = (3, 3) if min(shape) > 5 else (3, 2)
             for n_neurons in CNN_neurons:
                 image_outputs = Conv2D(n_neurons, field, kernel_regularizer=regularizer)(image_outputs)
                 image_outputs = LeakyReLU(alpha=alpha)                                  (image_outputs)
@@ -23,7 +23,6 @@ def multi_CNN(n_classes, NN_type, sample, images, tracks, scalars):
         output_list += [Flatten()(image_outputs)]
     for track  in tracks : output_list += [Flatten()(input_dict[track])]
     for scalar in scalars: output_list += [Flatten()(input_dict[scalar])]
-
     outputs = concatenate(output_list) if len(output_list)>1 else output_list[0]
     for n_neurons in FCL_neurons:
         outputs = Dense(n_neurons, kernel_regularizer=regularizer)   (outputs)

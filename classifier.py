@@ -23,7 +23,7 @@ parser.add_argument( '--n_classes'   , default=2   , type=int   )
 parser.add_argument( '--n_gpus'      , default=4   , type=int   )
 parser.add_argument( '--n_cpus'      , default=12  , type=int   )
 parser.add_argument( '--n_e'         , default=1e5 , type=float )
-args = parser.parse_args()
+args = parser.parse_args(); float16 = tf.__version__ >= '2.1.0'
 
 
 # TRAINING VARIABLES
@@ -141,7 +141,7 @@ else:
     tf.debugging.set_log_device_placement(False)
     mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
     with mirrored_strategy.scope():
-        tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
+        if float16: tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
         #model = multi_CNN(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
         model = multi_CNN(args.n_classes, args.n_type, test_data, **train_var)
         print() ; model.summary()
