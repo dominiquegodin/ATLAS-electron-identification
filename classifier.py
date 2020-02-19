@@ -1,9 +1,9 @@
 # PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
 from argparse  import ArgumentParser
-from utils     import make_data, filter_sample, make_labels, show_matrix#, generator_sample, Batch_Generator
-from models    import multi_CNNs
-from plots     import test_accuracy, plot_history, plot_distributions, plot_ROC_curves
+from utils     import make_sample, filter_sample, make_labels, show_matrix#, generator_sample, Batch_Generator
+from models    import multi_CNN
+from plots     import valid_accuracy, plot_history, plot_distributions, plot_ROC_curves
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing   import StandardScaler
 from collections import Counter
@@ -14,10 +14,10 @@ parser = ArgumentParser()
 parser.add_argument( '--generator'   , default='OFF'            )
 parser.add_argument( '--plotting'    , default='OFF'            )
 parser.add_argument( '--checkpoint'  , default='checkpoint.h5'  )
-parser.add_argument( '--weight_file', default='OFF'            )
+parser.add_argument( '--weight_file' , default='OFF'            )
 parser.add_argument( '--n_type'      , default='CNN'            )
 parser.add_argument( '--n_epochs'    , default=100 , type=int   )
-parser.add_argument( '--batch_size'  , default=1000, type=int   )
+parser.add_argument( '--batch_size'  , default=1000, type=float )
 parser.add_argument( '--random_state', default=0   , type=int   )
 parser.add_argument( '--n_classes'   , default=2   , type=int   )
 parser.add_argument( '--n_gpus'      , default=4   , type=int   )
@@ -36,6 +36,7 @@ others    = ['p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose'
 train_var = {'images':images, 'tracks':tracks, 'scalars':scalars}
 #train_var = {'images':[], 'tracks':[], 'scalars':scalars}
 all_var   = np.sum(list(train_var.values())) + others
+total_var = {**train_var, 'others':others}
 if train_var['images'] == []: args.n_type = 'FCN'
 
 
@@ -98,13 +99,14 @@ if args.generator == 'ON':
                                       all_var, train_indices , train_batch_size)
     test_generator  = Batch_Generator(data_file,    args.n_classes, train_var,
                                       all_var,  test_indices ,  test_batch_size)
-    train_data   = make_data(data_file, 1, all_var, train_var['images'], upscale=False)
+    train_data   = make_sample(data_file, 1, all_var, train_var['images'], upscale=False)
     tracks_shape = dict([key, train_data[key].shape[1:]] for key in train_var['tracks'])
     image_shapes = dict([key, train_data[key].shape[1:]] for key in train_var['images'])
 else:
     print('\nCLASSIFIER: data generator is OFF\nCLASSIFIER: loading data', end='    ... ', flush=True)
     start_time   = time.time()
-    train_data   = make_data(data_file, all_var, train_var['images'], [0, n_e], floats16=False,  upscale=False)
+    #train_data   = make_sample(data_file, all_var, train_var['images'], [0, n_e], float16=False, upscale=False)
+    train_data   = make_sample(data_file, total_var, [0, n_e], float16=False, upscale=False)
     tracks_shape = dict([key, train_data[key].shape[1:]] for key in train_var['tracks'])
     image_shapes = dict([key, train_data[key].shape[1:]] for key in train_var['images'])
     print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)')
@@ -127,7 +129,7 @@ else:
 # ARCHITECTURE SELECTION AND MULTI-GPU PROCESSING
 if args.generator == 'ON' or n_e < 1e6:
     n_gpus = min(1,len(tf.config.experimental.list_physical_devices('GPU')))
-    model = multi_CNNs(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
+    model = multi_CNN(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
     print() ; model.summary()
     if '.h5' in args.weight_file:
         print('\nCLASSIFIER: loading weights from', args.weight_file)
@@ -140,7 +142,8 @@ else:
     mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
     with mirrored_strategy.scope():
         tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
-        model = multi_CNNs(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
+        #model = multi_CNN(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
+        model = multi_CNN(args.n_classes, args.n_type, test_data, **train_var)
         print() ; model.summary()
         if '.h5' in args.weight_file:
             print('\nCLASSIFIER: loading weights from', args.weight_file)
@@ -184,7 +187,7 @@ else:
                                      callbacks=callbacks_list, epochs=args.n_epochs,
                                      #class_weight=class_weight,
                                      workers=n_cpus, use_multiprocessing=True,
-                                     batch_size=max(1,n_gpus)*args.batch_size, verbose=1 )
+                                     batch_size=max(1,n_gpus)*int(args.batch_size), verbose=1 )
 
 
 # PLOTTING SECTION
@@ -197,10 +200,12 @@ if args.generator == 'ON':
 else:
     y_true = test_labels
     y_prob = model.predict(test_data)
-print('\nCLASSIFIER: best test sample accuracy:', format(100*test_accuracy(y_true, y_prob), '.2f'), '%')
+print('\nCLASSIFIER: best test sample accuracy:', format(100*valid_accuracy(y_true, y_prob), '.2f'), '%')
 show_matrix(train_labels, y_true, y_prob)
 if args.plotting == 'ON':
     plot_history(training)
     plot_distributions(y_true, y_prob)
-    plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=1)
-    plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2)
+    #plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=1)
+    #plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2)
+    plot_ROC_curves(test_data, y_true, y_prob, ROC_type=1)
+    plot_ROC_curves(test_data, y_true, y_prob, ROC_type=2)

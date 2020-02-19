@@ -7,7 +7,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (login to atlas16 for GPU's avaibility)	  
 2) cd /opt/tmp/$USER  
 (change to user directory)  
-3) ln -s /opt/tmp/godin/el_data/2019-12-10/el_data.h5 .  
+3) ln -s /opt/tmp/godin/el_data/2020-02-18/el_data.h5 .  
 (link data file to user directory)  
 4) git clone https://github.com/dominiquegodin/el_classifier.git  
 (clone framework from GitHub)  
@@ -27,7 +27,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (login to Beluga cluster)	  
 2) cd /home/$USER  
 (change to user directory)  
-3) ln -s /project/def-arguinj/dgodin/el_data/2019-12-10/el_data.h5 .  
+3) ln -s /project/def-arguinj/dgodin/el_data/2020-02-18/el_data.h5 .  
 (link data file to user directory)  
 4) git clone https://github.com/dominiquegodin/el_classifier.git  
 (clone framework from GitHub)  
