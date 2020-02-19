@@ -22,17 +22,17 @@ data_files  = sorted([file_path+h5_file for h5_file in os.listdir(file_path) if 
 
 
 # ELECTRONS FEATURES
-images  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
-           'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'                                       ]
-tracks  = ['tracks_pt'      , 'tracks_phi'     , 'tracks_eta'   , 'tracks_d0'                            ]
-scalars = ['p_TruthType'    , 'p_iffTruth'     , 'p_truth_pt'   , 'p_truth_phi'  , 'p_truth_eta'        ,
-           'p_truth_E'      , 'p_et_calo'      , 'p_pt_track'   , 'p_Eratio'     , 'p_phi'              ,
-           'p_eta'          , 'p_e'            , 'p_Rhad'       , 'p_Rphi'       , 'p_Reta'             ,
-           'p_d0Sig'        , 'p_dPOverP'      , 'p_d0'         , 'p_f1'         , 'p_deltaPhiRescaled2',
-           'p_f3'           , 'p_weta2'        , 'p_TRTPID'     , 'p_deltaEta1'  , 'p_numberOfSCTHits'  ,
-           'p_LHTight'      , 'p_LHMedium'     , 'p_LHLoose'    , 'p_LHValue'    , 'mcChannelNumber'     ]
+images  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3'  ,
+           'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'                                        ]
+tracks  = ['tracks_pt'      , 'tracks_phi'     , 'tracks_eta'   , 'tracks_d0'      , 'tracks_z0'          ]
+scalars = ['p_TruthType'    , 'p_iffTruth'     , 'p_truth_pt'   , 'p_truth_phi'    , 'p_truth_eta'        ,
+           'p_truth_E'      , 'p_et_calo'      , 'p_pt_track'   , 'p_Eratio'       , 'p_phi'              ,
+           'p_eta'          , 'p_e'            , 'p_Rhad'       , 'p_Rphi'         , 'p_Reta'             ,
+           'p_d0Sig'        , 'p_dPOverP'      , 'p_d0'         , 'p_f1'           , 'p_deltaPhiRescaled2',
+           'p_f3'           , 'p_weta2'        , 'p_TRTPID'     , 'p_deltaEta1'    , 'p_numberOfSCTHits'  ,
+           'p_LHTight'      , 'p_LHMedium'     , 'p_LHLoose'    , 'p_LHValue'      , 'mcChannelNumber'    ]
 int_var = ['p_TruthType'    , 'p_iffTruth'     , 'eventNumber'  , 'mcChannelNumber',
-           'p_LHTight'      , 'p_LHMedium'     , 'p_LHLoose'    , 'p_numberOfSCTHits'                    ]
+           'p_LHTight'      , 'p_LHMedium'     , 'p_LHLoose'    , 'p_numberOfSCTHits'                     ]
 
 
 # POSSIBLE NOMENCLATURE CHANGE (disabled right now)
