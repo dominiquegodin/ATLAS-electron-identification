@@ -4,7 +4,154 @@ from   sklearn.utils         import shuffle
 from   sklearn.preprocessing import QuantileTransformer
 from   tabulate              import tabulate
 from   skimage               import transform
+import matplotlib.pyplot as plt
 
+def find_bin(array,binning):
+
+    binarized_bin_indices=list()
+    for i in range(len(binning)-1):
+        binarized_bin_indices.append( ((binning[i]<array) & (array<=binning[i+1])).astype(float) )
+        #tmp_array = (binning[i]<array) & (array<binning[i+1])
+        #print(tmp_array)
+        pass
+
+    #print(np.shape(binarized_bin_indices[0]))
+
+    return binarized_bin_indices
+#def find_bin(element,binning):
+#    
+#    binNum=-1 # underflow and overflow
+#    for i in range(len(binning)-1):
+#        if binning[i]<element and element<binning[i+1]: binNum=i
+#        pass
+#
+#    return binNum
+
+def get_bin_indices(p_var,boundaries):
+    bin_indices=list()
+    #print("hi=",boundaries[0],np.where( p_var<boundaries[0] )[0])
+    bin_indices.append (np.where( p_var<=boundaries[0] )[0])
+    for idx in range(len(boundaries)-1):
+        #print("lo, hi=",boundaries[idx],":",boundaries[idx+1])
+        bin_indices.append (np.where( (boundaries[idx]<p_var) & (p_var<=boundaries[idx+1]) )[0])
+        #bin_indices.append (np.where( (boundaries[idx]<=p_var) & (p_var<boundaries[idx+1]) & (isnan(p_var)) )[0])
+        pass
+    #print("lo=",boundaries[len(boundaries)-1],np.where( boundaries[len(boundaries)-1]<p_var )[0])
+    bin_indices.append (np.where( boundaries[len(boundaries)-1]<p_var )[0])
+    #print(len(bin_indices),len(boundaries))
+
+    tmp_idx=0
+    total=0
+    #total=len(bin_indices[0])
+    #print("hi=",boundaries[0],bin_indices[0],len(bin_indices[0]),total)
+    
+    debug=False
+    for bin_idx in bin_indices:
+        total+=len(bin_idx)
+
+        if debug:
+            if tmp_idx==0:
+                print("hi=",boundaries[tmp_idx],bin_idx,len(bin_idx),total)
+            elif tmp_idx==len(bin_indices)-1:
+                print("lo=",boundaries[tmp_idx-1],bin_idx,len(bin_idx),total)
+            else:
+                print("lo,hi=[",boundaries[tmp_idx-1],",",boundaries[tmp_idx],"]",bin_idx,len(bin_idx),total)
+                pass
+            pass
+
+        tmp_idx+=1
+        pass
+    total+=len(bin_indices[-1])
+    #print("lo=",boundaries[-1],bin_indices[-1],len(bin_indices[-1]),total)
+
+    return bin_indices
+
+def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
+    if weight_type=="none": return None
+
+    print("-------------------------------")
+    print("generate_weights: sample weight mode \"",weight_type,"\" designated. Generating weights.",)
+    print("-------------------------------")
+
+    binning=[0,10,20,30,40,60,80,100,130,180,250,500]
+    labels=['sig','bkg']
+    colors=['blue','red']
+    binContents=[0,0]
+    if nClass>2:
+        #below 2b implemented
+        labels=['sig','bkg']
+        colors=['blue','red']
+        binContents=[0,0]
+        pass
+
+    variable=list()                          #only for specific label
+    variable_array = train_data['p_et_calo'] #entire set
+    if   ref_var=='eta'  : variable_array = train_data['p_eta']
+    #elif ref_var=='pteta': variable_array = train_data['p_eta']
+
+    for i_class in range(nClass):
+        variable.append( variable_array[ train_labels==i_class ] )
+        (binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(variable[i_class])),label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        pass
+
+        plt.savefig(output_dir+ref_var+"_bfrReweighting.png")
+    plt.clf() #clear figure
+
+    weights=list() #KM: currently implemented for the 2-class case only
+    if weight_type=="flattening":
+        weights.append(np.average(binContents[0])/binContents[0] )
+        weights.append(np.average(binContents[1])/binContents[1] )
+    elif weight_type=="match2b": #shaping sig to match the bkg, using pt,or any other designated variable
+        weights.append(binContents[1]/binContents[0])
+        weights.append(np.ones(len(binContents[1])))
+    elif weight_type=="match2s": #shaping bkg to match the sig, using pt,or any other designated variable
+        weights.append(np.ones(len(binContents[0])))
+        weights.append(binContents[0]/binContents[1])
+
+    debug=0
+    if debug:
+        print(weights[0])
+        print(weights[1])
+        pass
+
+    #KM: Generates weights for all events
+    #    This is not very efficient, to be improved
+
+    #final_weights*=weights[train_labels][1]
+
+    sig_weight=np.full(len(variable_array),0,dtype=float)
+    bkg_weight=np.full(len(variable_array),0,dtype=float)
+
+    bin_indices0or1=find_bin(variable_array,binning)
+    tmp_i=0
+    for vec01 in bin_indices0or1:
+        sig_weight += (vec01 * (train_labels==0) )* weights[0][tmp_i]
+        bkg_weight += (vec01 * (train_labels==1) )* weights[1][tmp_i]
+        tmp_i+=1
+        pass
+
+    if debug:
+        print()
+        print(sig_weight,"\n", bkg_weight)
+        print(sig_weight+bkg_weight,(sig_weight+bkg_weight).all()==1) # w
+        print(train_labels)
+        pass
+
+    final_weights = sig_weight+bkg_weight
+
+    if debug:
+        print(variable_array)
+        print(final_weights, len(final_weights), "any element is zero?",final_weights.any()==0)
+        pass
+
+    #KM: below only for plotting
+    for i_class in range(nClass):
+        plt.hist(variable[i_class],bins=binning,weights=final_weights[ train_labels==i_class ],label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        pass
+    plt.savefig(output_dir+ref_var+"_aftReweighting.png")
+    plt.clf() #clear plot
+
+    return final_weights
 
 def make_sample(data_file, var_dict, idx, float16=True, n_tracks=15, upscale=False, denormalize=False):
     data  , var_list = h5py.File(data_file, 'r'), np.sum(list(var_dict.values()))

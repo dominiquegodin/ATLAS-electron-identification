@@ -2,6 +2,7 @@ import numpy as np, h5py, sys, time
 import matplotlib; matplotlib.use('Agg') #matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+import os
 from   matplotlib import pylab
 from   sklearn    import metrics
 
@@ -41,36 +42,74 @@ def plot_history(history, key='accuracy', file_name='outputs/history.png'):
     plt.savefig(file_name)
 
 
-def plot_distributions(y_true, y_prob, file_name='outputs/distributions.png'):
+def plot_distributions(y_true, y_prob, var_name='',output_dir='outputs/',postfix=''):
+    if var_name=='': var_name='distributions'
+    file_name=output_dir+var_name+postfix+'.png'
+
     print('CLASSIFIER: saving test sample distributions in:', file_name)
-    probs_class0   = 100*y_prob[:,0][ y_true==0 ]
-    probs_class1   = 100*y_prob[:,0][ y_true==1 ]
+    
+    if var_name=='distributions':
+        probs_class0   = 100*y_prob[:,0][ y_true==0 ]
+        probs_class1   = 100*y_prob[:,0][ y_true==1 ]
+        bins     = np.arange(0, 100, 0.1)
+        pylab.xlim(-0.5,100.5)
+        plt.xticks(np.arange(0,101,step=10))
+        xstring= 'Signal Probability (%)'
+        ystring='Distribution (% per '+str(100/len(bins))+'% bin)'
+        legloc='upper center'
+    else:
+        probs_class0   = y_prob[ y_true==0 ]
+        probs_class1   = y_prob[ y_true==1 ]
+        bins     = np.arange(-2.5, 2.5, 0.1)
+        ystring='arbitrary unit'
+        legloc='upper right'
+        pass
+
+    if var_name=="eta":
+        bins     = np.arange(-2.5, 2.5, 0.1)
+        pylab.xlim(-2.5,2.5)
+        plt.xticks(np.arange(-2.5,2.5,step=0.1))
+        xstring='Eta'
+        ystring='arbitrary unit'
+    elif var_name=="pt":
+        bins     = np.arange(0, 100, 1)
+        pylab.xlim(-2.5,2.5)
+        plt.xticks(np.arange(0,100,step=5))
+        xstring='Pt [GeV]'
+        ystring='arbitrary unit'
+        pass
+
     weights_class0 = len(probs_class0)*[100/len(probs_class0)]
     weights_class1 = len(probs_class1)*[100/len(probs_class1)]
-    bins     = np.arange(0, 100, 0.1)
+
     histtype ='step'
     plt.figure(figsize=(12,8))
     pylab.grid(True)
-    pylab.xlim(-0.5,100.5)
-    plt.xticks(np.arange(0,101,step=10))
+
     pylab.hist( probs_class0, bins=bins, label='Signal',
                 facecolor='blue', histtype=histtype, weights=weights_class0 )
     pylab.hist( probs_class1, bins=bins, label='Background',
                 facecolor='red',  histtype=histtype, weights=weights_class1 )
-    plt.xlabel('Signal Probability (%)',fontsize=20)
-    plt.ylabel('Distribution (% per '+str(100/len(bins))+'% bin)',fontsize=20)
-    plt.legend(loc='upper center', fontsize=20, numpoints=3)
+
+    plt.xlabel(xstring,fontsize=20)
+    plt.ylabel(ystring,fontsize=20)
+    plt.legend(title=postfix[1:],loc=legloc, fontsize=15, numpoints=3)
+
     plt.savefig(file_name)
+    plt.close()
 
-
-def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, tag=''):
-    file_name = 'outputs/ROC'+str(ROC_type)+'_curve'+tag+'.png'
+def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir='outputs/'):
+    file_name = output_dir
+    if postfix!='':file_name+='differential/'
+    if not os.path.isdir(file_name): os.mkdir(file_name)
+    file_name+= 'ROC'+str(ROC_type)+'_curve'+postfix+'.png'
     print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
     eff_class0, eff_class1 = get_LLH(test_sample, y_true)
 
     #y_prob = y_prob[np.logical_or(y_true==0, y_true==1)]
     #y_true = y_true[np.logical_or(y_true==0, y_true==1)]
 
+    #FalsePositveRate, TruePositveRate
     fpr, tpr, threshold    = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
     signal_ratio           = len(y_true[y_true==0])/len(y_true)
     accuracy               = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
@@ -102,26 +141,35 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, tag=''):
         pylab.grid(False)
         len_0 = len(fpr[fpr==0])
         x_min = min(60, 10*np.floor(10*eff_class0[0]))
-        y_max = 100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min/100)[0]], 1/eff_class1[0])/100)
+        y_max = 10000
+        if fpr[np.argwhere(np.diff(np.sign(tpr-x_min/100)))[0][0]]>0 and eff_class1[0]>0:
+            y_max = 100*np.ceil(max(1/fpr[np.argwhere(np.diff(np.sign(tpr-x_min/100)))[0][0]], 1/eff_class1[0])/100)
+        elif fpr[np.argwhere(np.diff(np.sign(tpr-x_min/100)))[0][0]]>0:
+            y_max = 100*np.ceil(1/fpr[np.argwhere(np.diff(np.sign(tpr-x_min/100)))[0][0]]/100)
+        elif eff_class1[0]>0:
+            y_max = 100*np.ceil(1/eff_class1[0]/100)
+            pass
         plt.xlim([x_min, 100])
         plt.ylim([1,   y_max])
         LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]] for value in eff_class0]
         for n in np.arange(len(LLH_scores)):
             axes.axhline(LLH_scores[n], xmin=(eff_class0[n]-x_min/100)/(1-x_min/100), xmax=1,
-            ls='--', linewidth=0.5, color='#1f77b4')
-            axes.axvline(100*eff_class0[n], ymin=abs(1/eff_class1[n]-1)/(plt.yticks()[0][-1]-1),
-            ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='#1f77b4')
+                         ls='--', linewidth=0.5, color='#1f77b4')
+            if eff_class0[n]>0 and eff_class1[n]>0:
+                axes.axvline(100*eff_class0[n], ymin=abs(1/eff_class1[n]-1)/(plt.yticks()[0][-1]-1),
+                             ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='#1f77b4')
         for val in LLH_scores:
             plt.text(100.2, val, str(int(val)), {'color': '#1f77b4', 'fontsize': 10}, va="center", ha="left")
         axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
         plt.ylabel('1/(Background Efficiency)',fontsize=20)
-        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='Signal vs Bkg', color='#1f77b4')
+        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='Signal vs Bkg ' + postfix[1:]+(" %d e"%len(y_true)), color='#1f77b4',)
         plt.scatter( 100*best_tpr, 1/best_fpr, s=30, marker='D', c=val[0].get_color(),
                      label="{0:<15s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
         for LLH in zip( eff_class0, eff_class1, colors, labels ):
-            plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker='o', c=LLH[2], label='('+\
-                         str(format(100*LLH[0],'.1f'))+'%, '+str(format(1/LLH[1],'.0f'))+\
-                         ')'+r'$\rightarrow$'+LLH[3] )
+            if LLH[0]>0 and LLH[1]>0:
+                plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker='o', c=LLH[2], label='('+\
+                             str(format(100*LLH[0],'.1f'))+'%, '+str(format(1/LLH[1],'.0f'))+\
+                             ')'+r'$\rightarrow$'+LLH[3] )
         plt.legend(loc='upper right', fontsize=15, numpoints=3)
         plt.savefig(file_name)
     if ROC_type == 3:
@@ -144,7 +192,43 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, tag=''):
                      label="{0:<16s} {1:>8.2f}%".format('Best Accuracy:',100*max(accuracy)) )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
         plt.savefig(file_name)
+        pass
+    plt.close()
+        
+def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname,output_dir='outputs/'):
 
+    tmp_idx=0
+    for bin_idx in bin_indices:
+        if bin_idx.size==0: 
+            tmp_idx+=1
+            continue
+            pass
+
+        pfix ="_"+varname+"%d" % tmp_idx
+        if tmp_idx!=0:                  pfix+="_Lo%.2f" % boundaries[tmp_idx-1]         #lo
+        if tmp_idx!=len(bin_indices)-1: pfix+="_Hi%.2f" % boundaries[tmp_idx]           #hi
+
+        new_test_labels=y_true.take(bin_idx)
+        new_y_prob     =y_prob.take(bin_idx,axis=0)
+
+        new_test_LLH=dict()
+        for llh in test_LLH:
+            #print(llh)
+            new_test_LLH[llh]=test_LLH[llh][bin_idx]
+            pass
+
+        if not (len(new_y_prob)==len(new_test_labels) and len(new_test_labels)==len(new_test_LLH['p_LHTight'])):
+            print("data size for data, label, llh= ",len(new_y_prob),len(new_test_labels),len(new_test_LLH['p_LHTight']))
+
+        if not(~np.isnan(new_y_prob).any() and ~np.isinf(new_y_prob).any()): print("Nan or Inf detected")
+
+        plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir)
+
+        plot_distributions (new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
+        tmp_idx+=1
+        pass
+
+    return
 
 def plot_image(cal_image, n_classes, e_class, images, image):
     #norm_type = None
