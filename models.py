@@ -3,9 +3,9 @@ from tensorflow.keras.layers import concatenate, Reshape, Dropout, LSTM, Masking
 from tensorflow.keras        import regularizers, models
 
 
-def multi_CNN(n_classes, NN_type, sample, images, tracks, scalars):
+def multi_CNN(n_classes, NN_type, sample, l2, dropout, alpha, images, tracks, scalars):
     FCL_neurons = [200, 200]; CNN_neurons = [200, 200]
-    dropout = 0.2; regularizer = regularizers.l2(1e-6); alpha = 0.
+    regularizer = regularizers.l2(l2)#; dropout = 0.2; alpha = 0.
     input_dict  = {n:Input(shape = sample[n].shape[1:], name = n) for n in images + tracks + scalars}
     shape_set   = set([sample[n].shape[1:] for n in images])
     shape_dict  = {shape:[n for n in images if sample[n].shape[1:] == shape] for shape in shape_set}
@@ -14,8 +14,7 @@ def multi_CNN(n_classes, NN_type, sample, images, tracks, scalars):
         image_inputs  = [Reshape(sample[n].shape[1:]+(1,))(input_dict[n]) for n in shape_dict[shape]]
         image_outputs = concatenate(image_inputs, axis=3) if len(image_inputs)>1 else image_inputs[0]
         if NN_type == 'CNN':
-            field = {(56,11):(3,3), (7,11):(2,3), sample['tracks_image'].shape[1:]:(3,2) }[shape]
-             #field = (3 if shape[0] > 35 else 2, 3 if shape[1] > 15 else 2)
+            field = (3,3) if shape == (56,11) else (2,3) if shape == (7,11) else (2,2)
             for n_neurons in CNN_neurons:
                 image_outputs = Conv2D(n_neurons, field, kernel_regularizer=regularizer)(image_outputs)
                 image_outputs = LeakyReLU(alpha=alpha)                                  (image_outputs)
