@@ -1,5 +1,6 @@
 import numpy as np, h5py, sys, time
-import matplotlib; matplotlib.use('Agg') #matplotlib.use('pdf')
+import matplotlib; matplotlib.use('Agg')
+#import matplotlib; matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import os
@@ -32,7 +33,7 @@ def plot_history(history, key='accuracy', file_name='outputs/history.png'):
              color=val[0].get_color(), label='Testing')
     min_acc = np.floor(100*min( history.history[key]+history.history['val_'+key] ))
     max_acc = np.ceil (100*max( history.history[key]+history.history['val_'+key] ))
-    plt.xlim([1,max(history.epoch)+1])
+    plt.xlim([1, max(history.epoch)+1])
     plt.xticks( np.append(1,np.arange(5,max(history.epoch)+2,step=5)) )
     plt.xlabel('Epochs',fontsize=20)
     plt.ylim( max(80,min_acc),max_acc )
@@ -272,31 +273,30 @@ def cal_images(files, images, file_name='outputs/cal_images.png'):
 
 
 def plot_scalars(sample, sample_trans, variable):
-    bins = 100
+    bins = np.arange(100)
     fig = plt.figure(figsize=(18,8))
     plt.subplot(1,2,1)
-    #plt.title('$\\alpha_e$ Histograms')
-    #plt.xlabel('$\\alpha_e$')
-    #plt.ylabel('Number of Entries')
-    pylab.hist(sample_trans[variable], bins=bins, histtype='stepfilled', density=True)
-    pylab.hist(sample[variable], bins=bins, histtype='stepfilled', density=True)
+    plt.title('Histogram')
+    plt.xlabel('Value')
+    plt.ylabel('Number of Entries')
+    pylab.hist(sample_trans[variable], bins=bins, histtype='step', density=True)
+    pylab.hist(sample      [variable], bins=bins, histtype='step', density=True)
     plt.subplot(1,2,2)
-    #plt.title('$e$ Histograms')
-    #plt.xlabel('$e$')
-    #plt.ylabel('Number of Entries')
+    plt.title('Histogram')
+    plt.xlabel('Value')
+    plt.ylabel('Number of Entries')
     pylab.hist(sample_trans[variable], bins=bins)
-    #fig.subplots_adjust(hspace=0.4, wspace=0.3)
     file_name = 'outputs/scalars/'+variable+'.png'
     print('Printing:', file_name)
     plt.savefig(file_name)
 
 
 def plot_tracks(tracks, labels, variable):
-    tracks_var = {'efrac':{'idx':0, 'mean_lim':( 0,     1), 'max_lim':(0,   4), 'diff_lim':(0,  0.3)},
-                  'deta' :{'idx':1, 'mean_lim':(-0.4, 0.4), 'max_lim':(0, 0.5), 'diff_lim':(0, 0.25)},
-                  'dphi' :{'idx':2, 'mean_lim':(-0.4, 0.4), 'max_lim':(0, 0.5), 'diff_lim':(0, 0.25)},
-                  'd0'   :{'idx':3, 'mean_lim':(  -3,   3), 'max_lim':(0,  14), 'diff_lim':(0,    2)},
-                  'z0'   :{'idx':4, 'mean_lim':(-150, 150), 'max_lim':(0, 400), 'diff_lim':(0,   80)}}
+    tracks_var = {'efrac':{'idx':0, 'mean_lim':( 0,      3), 'max_lim':(0,    2), 'diff_lim':(0,    1)},
+                  'deta' :{'idx':1, 'mean_lim':( 0, 0.0005), 'max_lim':(0, 0.03), 'diff_lim':(0, 0.04)},
+                  'dphi' :{'idx':2, 'mean_lim':( 0,  0.001), 'max_lim':(0,  0.1), 'diff_lim':(0, 0.05)},
+                  'd0'   :{'idx':3, 'mean_lim':( 0,    0.2), 'max_lim':(0,  0.1), 'diff_lim':(0,  0.3)},
+                  'z0'   :{'idx':4, 'mean_lim':( 0,    0.5), 'max_lim':(0,  0.3), 'diff_lim':(0,   10)}}
     classes    = np.arange(max(labels)+1)
     n_e        = np.arange(len(labels)  )
     n_tracks   = np.sum(abs(tracks), axis=2)
@@ -312,35 +312,34 @@ def plot_tracks(tracks, labels, variable):
     var_max    = [var_max [np.logical_and(labels==n, var_max !=None)] for n in classes]
     var_diff   = [var_diff[np.logical_and(labels==n, var_diff!=None)] for n in classes]
     n_tracks   = [n_tracks[labels==n                                ] for n in classes]
-    n_mean   =   [np.mean(n_tracks[n])                                for n in classes]
-    #for n in n_tracks: print(n.shape, len(n[n==0]))
-    #for n in var_mean:  print(n.shape, np.float16(min(abs(n))), np.float16(max(abs(n))))
-
+    trk_mean   = [np.mean(n_tracks[n])                                for n in classes]
     fig  = plt.figure(figsize=(18,7))
-    xlim = (0, 60)
-    bins = np.arange(xlim[0], xlim[1]+5)
+    xlim = (0, 15)
+    bins = np.arange(xlim[0], xlim[1]+2, 1)
     for n in [1,2]:
         plt.subplot(1,2,n); axes = plt.gca()
         plt.xlim(xlim)
         plt.xlabel('Number of tracks'      , fontsize=20)
+        plt.xticks( np.arange(xlim[0],xlim[1]+1,1) )
         plt.ylabel('Normalized entries (%)', fontsize=20)
         title = 'Track number distribution (' + str(len(classes)) + '-class)'
         if n == 1: title += '\n(individually normalized)'
-        weight = [len(n_tracks[n]) for n in classes] if n==1 else len(classes)*[len(labels)]
+        weights = [len(n_tracks[n]) for n in classes] if n==1 else len(classes)*[len(labels)]
+        weights = [len(n_tracks[n])*[100/weights[n]] for n in classes]
         plt.title(title, fontsize=20)
-        weights = [len(n_tracks[n])*[100/weight[n]] for n in classes]
-        plt.hist([n_tracks[n] for n in classes][::-1], bins=bins, weights=weights[::-1],
-                 label=['class '+str(n)+' (mean: '+format(n_mean[n],'2.0f')+')' for n in classes][::-1],
-                 histtype='step', lw=2)
-        plt.text(0.99, 0.1, '(sample: '+str(len(n_e))+' e)', {'color': 'black', 'fontsize': 12},
+        label  =  ['class '+str(n)+' (mean: '+format(trk_mean[n],'3.1f')+')' for n in classes]
+        plt.hist([n_tracks[n] for n in classes][::-1], bins=bins, lw=2, align='left',
+                 weights=weights[::-1], label=label[::-1], histtype='step')
+        plt.text(0.99, 0.05, '(sample: '+str(len(n_e))+' e)', {'color': 'black', 'fontsize': 12},
                  ha='right', va= 'center', transform=axes.transAxes)
         plt.legend(loc='upper right', fontsize=13)
-    file_name = 'outputs/tracks_numer.png'; print('Printing:', file_name)
+    file_name = 'outputs/tracks_number.png'; print('Printing:', file_name)
     plt.savefig(file_name)
-
     fig     = plt.figure(figsize=(22,6)); n = 1
     metrics = {'mean':(var_mean, 'Average'), 'max':(var_max, 'Maximum absolute'),
                'diff':(var_diff, 'Average difference')}
+    #metrics = {'mean':(var_mean, 'Average'), 'max':(var_mean, 'Average'),
+    #           'diff':(var_mean, 'Average')}
     for metric in metrics:
         plt.subplot(1, 3, n); axes = plt.gca(); n+=1
         n_e    = sum([len(metrics[metric][0][n]) for n in classes])
