@@ -1,13 +1,13 @@
 # PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
 from argparse  import ArgumentParser
-from utils     import make_sample, filter_sample, make_labels, show_matrix#, generator_sample, Batch_Generator
+from utils     import make_sample, filter_sample, make_labels, show_matrix, find_bin, generate_weights, get_bin_indices#, generator_sample, Batch_Generator
 from models    import multi_CNN
-from plots     import valid_accuracy, plot_history, plot_distributions, plot_ROC_curves
+from plots     import valid_accuracy, plot_history, plot_distributions, plot_ROC_curves, differential_plots
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing   import StandardScaler
 from collections import Counter
-
+import matplotlib.pyplot as plt
 
 # OPTIONS
 parser = ArgumentParser()
@@ -16,6 +16,8 @@ parser.add_argument( '--plotting'    , default='OFF'            )
 parser.add_argument( '--checkpoint'  , default='checkpoint.h5'  )
 parser.add_argument( '--weight_file' , default='OFF'            )
 parser.add_argument( '--n_type'      , default='CNN'            )
+parser.add_argument( '--weight_type' , default='none'              )
+parser.add_argument( '--output_dir'  , default='outputs/'          )
 parser.add_argument( '--n_epochs'    , default=100 , type=int   )
 parser.add_argument( '--batch_size'  , default=1000, type=float )
 parser.add_argument( '--random_state', default=0   , type=int   )
@@ -25,6 +27,11 @@ parser.add_argument( '--n_cpus'      , default=12  , type=int   )
 parser.add_argument( '--n_e'         , default=1e5 , type=float )
 args = parser.parse_args(); float16 = tf.__version__ >= '2.1.0'
 
+#eta_boundaries=  [-2.47,-1.6,-1.3, -0.8, 0, 0.8, 1.3, 1.6, 2.47.]
+eta_boundaries=  [-1.6, -0.8, 0, 0.8, 1.6]
+#eta_boundaries=  [0, 0.4, 0.8, 1.2, 1.6]
+
+pt_boundaries=  [10, 20, 30, 40]
 
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0',   'em_barrel_Lr1_fine', 'em_barrel_Lr2', 'em_barrel_Lr3',
@@ -32,16 +39,16 @@ images    = ['em_barrel_Lr0',   'em_barrel_Lr1_fine', 'em_barrel_Lr2', 'em_barre
 tracks    = ['tracks' ]
 scalars   = ['p_Eratio', 'p_Reta', 'p_Rhad', 'p_Rphi', 'p_TRTPID', 'p_d0', 'p_d0Sig', 'p_dPOverP',
              'p_deltaPhiRescaled2', 'p_deltaEta1', 'p_f1', 'p_f3', 'p_numberOfSCTHits', 'p_weta2']
-others    = ['p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose', 'p_e']
-train_var = {'images':images, 'tracks':tracks, 'scalars':scalars}
-#train_var = {'images':[], 'tracks':[], 'scalars':scalars}
+others    = ['p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose', 'p_e','p_eta','p_et_calo']
+#train_var = {'images':images, 'tracks':tracks, 'scalars':scalars}
+train_var = {'images':[], 'tracks':[], 'scalars':scalars}
 all_var   = np.sum(list(train_var.values())) + others
 total_var = {**train_var, 'others':others}
 if train_var['images'] == []: args.n_type = 'FCN'
 
 
 # DATAFILE PATH
-if not os.path.isdir('outputs'): os.mkdir('outputs')
+if not os.path.isdir(args.output_dir): os.mkdir(args.output_dir)
 data_file = '/opt/tmp/godin/el_data/2019-12-10/el_data.h5'
 
 
@@ -111,20 +118,24 @@ else:
     image_shapes = dict([key, train_data[key].shape[1:]] for key in train_var['images'])
     print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)')
     print('CLASSIFIER: processing data', end=' ... ', flush=True)
+    print()
     start_time   = time.time()
-    test_data    = dict([key, np.take(train_data[key],  test_indices, axis=0)] for key in all_var)
+    test_data_   = dict([key, np.take(train_data[key],  test_indices, axis=0)] for key in all_var)
     train_data   = dict([key, np.take(train_data[key], train_indices, axis=0)] for key in all_var)
-    test_labels  = make_labels( test_data, args.n_classes)
-    train_labels = make_labels(train_data, args.n_classes)
-    test_LLH     = dict([key,   test_data[key]] for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose'])
-    #test_data    = [np.float32( test_data[key]) for key in np.sum(list(train_var.values()))]
-    #train_data   = [np.float32(train_data[key]) for key in np.sum(list(train_var.values()))]
-    #test_data    = [ test_data[key] for key in np.sum(list(train_var.values()))]
-    #train_data   = [train_data[key] for key in np.sum(list(train_var.values()))]
-    train_data, train_labels = filter_sample(train_data, train_labels)
-    test_data, test_labels = filter_sample(test_data, test_labels)
-    print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)\n')
+    #print(test_data_.keys())
 
+    test_labels  = make_labels( test_data_, args.n_classes)
+    train_labels = make_labels(train_data, args.n_classes)
+
+    train_data, train_labels = filter_sample(train_data, train_labels)
+    test_data, test_labels = filter_sample(test_data_, test_labels)
+    print('CLASSIFIER: time elapsed for preprocessing data: ', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s\n')
+    p_eta=test_data["p_eta"]
+    et_calo=test_data["p_et_calo"]
+    eta_bin_indices=get_bin_indices(p_eta,eta_boundaries)
+    pt_bin_indices=get_bin_indices(et_calo,pt_boundaries)
+
+    test_LLH     = dict([key,   test_data[key]] for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose'])
 
 # ARCHITECTURE SELECTION AND MULTI-GPU PROCESSING
 if args.generator == 'ON' or n_e < 1e6:
@@ -153,13 +164,17 @@ else:
 
 # CALLBACKS
 monitored_value  = 'val_accuracy'
-checkpoint_file  = 'outputs/'+args.checkpoint
+checkpoint_file  = args.output_dir+args.checkpoint
 Model_Checkpoint = tf.keras.callbacks.ModelCheckpoint(checkpoint_file, save_best_only=True,
                                                       monitor=monitored_value, verbose=1)
 Early_Stopping   = tf.keras.callbacks.EarlyStopping  (patience=10, restore_best_weights=True,
                                                       monitor=monitored_value, verbose=1)
 callbacks_list   = [Model_Checkpoint, Early_Stopping]
 
+if args.n_epochs==0 and args.load_weights=='OFF':
+    print("------------------------------------")
+    print("WARNING: No training will be done while not loading a pre-trained model. It will give you some random results!!")
+    print("------------------------------------")
 
 # TRAINING AND TESTING
 print('\nCLASSIFIER: training sample:', format(train_indices.size, '8.0f'), 'e')
@@ -182,12 +197,14 @@ if args.generator == 'ON':
 else:
     #training = model.train_on_batch( train_data, train_labels, reset_metrics=True )
     #class_weight = {0:1., 1:2.}
+    
     training = model.fit           ( train_data, train_labels,
                                      validation_data=(test_data,test_labels),
                                      callbacks=callbacks_list, epochs=args.n_epochs,
                                      #class_weight=class_weight,
                                      workers=n_cpus, use_multiprocessing=True,
-                                     batch_size=max(1,n_gpus)*int(args.batch_size), verbose=1 )
+                                     batch_size=max(1,n_gpus)*int(args.batch_size), verbose=1 , 
+                                     sample_weight=generate_weights(train_data,train_labels,args.n_classes,weight_type=args.weight_type,output_dir=args.output_dir) )
 
 
 # PLOTTING SECTION
@@ -203,9 +220,18 @@ else:
 print('\nCLASSIFIER: best test sample accuracy:', format(100*valid_accuracy(y_true, y_prob), '.2f'), '%')
 show_matrix(train_labels, y_true, y_prob)
 if args.plotting == 'ON':
-    plot_history(training)
-    plot_distributions(y_true, y_prob)
-    #plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=1)
-    #plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2)
-    plot_ROC_curves(test_data, y_true, y_prob, ROC_type=1)
-    plot_ROC_curves(test_data, y_true, y_prob, ROC_type=2)
+    if args.n_epochs>0: plot_history(training,file_name=args.output_dir+'history.png')
+    plot_distributions(y_true, y_prob,output_dir=args.output_dir)
+    plot_distributions(y_true, p_eta,'eta',output_dir=args.output_dir)
+    plot_distributions(y_true, et_calo,'pt',output_dir=args.output_dir)
+
+    plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=1,output_dir=args.output_dir)
+    plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2,output_dir=args.output_dir)
+
+    print()
+    print('Evaluating differential performance in eta')
+    differential_plots (test_LLH, y_true, y_prob, eta_boundaries, eta_bin_indices,"eta",output_dir=args.output_dir)
+    print()
+    print('Evaluating differential performance in pt')
+    differential_plots (test_LLH, y_true, y_prob, pt_boundaries, pt_bin_indices,"pt",output_dir=args.output_dir)
+    pass
