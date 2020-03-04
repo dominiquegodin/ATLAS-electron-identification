@@ -1,7 +1,7 @@
 # PACKAGES IMPORTS
 import tensorflow as tf, numpy as np, h5py, multiprocessing, time, os, sys
 from argparse  import ArgumentParser
-from utils     import make_sample, filter_sample, make_labels, show_matrix, find_bin, generate_weights, get_bin_indices#, generator_sample, Batch_Generator
+from utils     import make_sample, sample_cuts, make_labels, compo_matrix, find_bin, generate_weights, get_bin_indices#, generator_sample, Batch_Generator
 from models    import multi_CNN
 from plots     import valid_accuracy, plot_history, plot_distributions, plot_ROC_curves, differential_plots
 from sklearn.model_selection import train_test_split
@@ -25,7 +25,13 @@ parser.add_argument( '--n_classes'   , default=2   , type=int   )
 parser.add_argument( '--n_gpus'      , default=4   , type=int   )
 parser.add_argument( '--n_cpus'      , default=12  , type=int   )
 parser.add_argument( '--n_e'         , default=1e5 , type=float )
-args = parser.parse_args(); float16 = tf.__version__ >= '2.1.0'
+parser.add_argument( '--cuts'       ,  default =  None               )
+parser.add_argument( '--n_tracks'   ,  default =  15,  type = int   )
+parser.add_argument( '--l2'         ,  default = 1e-6,  type = float )
+parser.add_argument( '--dropout'    ,  default =  0.2,  type = float )
+parser.add_argument( '--alpha'      ,  default =    0,  type = float )
+args = parser.parse_args(); 
+#float16 = tf.__version__ >= '2.1.0'
 
 #eta_boundaries=  [-2.47,-1.6,-1.3, -0.8, 0, 0.8, 1.3, 1.6, 2.47.]
 eta_boundaries=  [-1.6, -0.8, 0, 0.8, 1.6]
@@ -106,14 +112,14 @@ if args.generator == 'ON':
                                       all_var, train_indices , train_batch_size)
     test_generator  = Batch_Generator(data_file,    args.n_classes, train_var,
                                       all_var,  test_indices ,  test_batch_size)
-    train_data   = make_sample(data_file, 1, all_var, train_var['images'], upscale=False)
+    train_data   = make_sample(data_file, all_var, 1, args.n_tracks, train_var['images'], upscale=False)
     tracks_shape = dict([key, train_data[key].shape[1:]] for key in train_var['tracks'])
     image_shapes = dict([key, train_data[key].shape[1:]] for key in train_var['images'])
 else:
     print('\nCLASSIFIER: data generator is OFF\nCLASSIFIER: loading data', end='    ... ', flush=True)
     start_time   = time.time()
     #train_data   = make_sample(data_file, all_var, train_var['images'], [0, n_e], float16=False, upscale=False)
-    train_data   = make_sample(data_file, total_var, [0, n_e], float16=False, upscale=False)
+    train_data   = make_sample(data_file, total_var, [0, n_e], args.n_tracks, p='', upscale=False)
     tracks_shape = dict([key, train_data[key].shape[1:]] for key in train_var['tracks'])
     image_shapes = dict([key, train_data[key].shape[1:]] for key in train_var['images'])
     print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)')
@@ -127,8 +133,8 @@ else:
     test_labels  = make_labels( test_data_, args.n_classes)
     train_labels = make_labels(train_data, args.n_classes)
 
-    train_data, train_labels = filter_sample(train_data, train_labels)
-    test_data, test_labels = filter_sample(test_data_, test_labels)
+    train_data, train_labels = sample_cuts(train_data, train_labels,args.cuts)
+    test_data, test_labels = sample_cuts(test_data_, test_labels,args.cuts)
     print('CLASSIFIER: time elapsed for preprocessing data: ', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s\n')
     p_eta=test_data["p_eta"]
     et_calo=test_data["p_et_calo"]
@@ -152,9 +158,9 @@ else:
     tf.debugging.set_log_device_placement(False)
     mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
     with mirrored_strategy.scope():
-        if float16: tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
+        #if float16: tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
         #model = multi_CNN(args.n_classes, args.n_type, image_shapes, tracks_shape, **train_var)
-        model = multi_CNN(args.n_classes, args.n_type, test_data, **train_var)
+        model = multi_CNN(args.n_classes, args.n_type, test_data, args.l2, args.dropout, args.alpha, **train_var)
         print() ; model.summary()
         if '.h5' in args.weight_file:
             print('\nCLASSIFIER: loading weights from', args.weight_file)
@@ -179,7 +185,7 @@ if args.n_epochs==0 and args.load_weights=='OFF':
 # TRAINING AND TESTING
 print('\nCLASSIFIER: training sample:', format(train_indices.size, '8.0f'), 'e')
 print(  'CLASSIFIER: testing sample: ', format( test_indices.size, '8.0f'), 'e')
-if args.generator != 'ON': show_matrix(train_labels, test_labels)
+if args.generator != 'ON': compo_matrix(train_labels, test_labels)
 print(  'CLASSIFIER: using TensorFlow', tf.__version__  )
 print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
 print('\nCLASSIFIER: using', args.n_type, 'architecture with', end=' ')
@@ -218,7 +224,7 @@ else:
     y_true = test_labels
     y_prob = model.predict(test_data)
 print('\nCLASSIFIER: best test sample accuracy:', format(100*valid_accuracy(y_true, y_prob), '.2f'), '%')
-show_matrix(train_labels, y_true, y_prob)
+compo_matrix(train_labels, y_true, y_prob)
 if args.plotting == 'ON':
     if args.n_epochs>0: plot_history(training,file_name=args.output_dir+'history.png')
     plot_distributions(y_true, y_prob,output_dir=args.output_dir)
