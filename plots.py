@@ -1,12 +1,12 @@
 import numpy as np, h5py, sys, time
 import matplotlib; matplotlib.use('Agg')
 #import matplotlib; matplotlib.use('pdf')
+import matplotlib.style as style
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-import os
 from   matplotlib import pylab
 from   sklearn    import metrics
-
+import os, math
 
 def valid_accuracy(y_true, y_prob):
     y_pred = np.argmax(y_prob, axis=1)
@@ -199,15 +199,50 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
 def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname,output_dir='outputs/'):
 
     tmp_idx=0
+
+    x_centers = list()
+    x_errs    = list()
+
+    y_prob_sig = y_prob[y_true==0]
+
+    sigEffs    = [0.7,0.8,0.9]
+    globalCuts = list()
+    bkg_rejs_fEff  = {}
+    bkg_errs_fEff  = {}
+    bkg_rejs_gEff  = {}
+    bkg_errs_gEff  = {}
+    sig_effs_gEff  = {}
+    sig_errs_gEff  = {}
+    for sigEff in sigEffs:
+        bkg_rejs_fEff.update({sigEff:[]})
+        bkg_errs_fEff.update({sigEff:[]})
+        bkg_rejs_gEff.update({sigEff:[]})
+        bkg_errs_gEff.update({sigEff:[]})
+        sig_effs_gEff.update({sigEff:[]})
+        sig_errs_gEff.update({sigEff:[]})
+        pCut = np.percentile(y_prob_sig,(1-sigEff)*100,axis=0) [0] #global cut
+        globalCuts.append(pCut)
+        pass
+
     for bin_idx in bin_indices:
         if bin_idx.size==0: 
             tmp_idx+=1
             continue
             pass
 
+
+        fill_rej=False
         pfix ="_"+varname+"%d" % tmp_idx
         if tmp_idx!=0:                  pfix+="_Lo%.2f" % boundaries[tmp_idx-1]         #lo
         if tmp_idx!=len(bin_indices)-1: pfix+="_Hi%.2f" % boundaries[tmp_idx]           #hi
+        
+        if tmp_idx!=0 and tmp_idx!=len(bin_indices)-1:
+            x_center = (boundaries[tmp_idx-1] + boundaries[tmp_idx])/2
+            x_centers.append(x_center)
+            x_err      = boundaries[tmp_idx]-x_center
+            x_errs.append(x_err)
+            fill_rej=True
+            pass
 
         new_test_labels=y_true.take(bin_idx)
         new_y_prob     =y_prob.take(bin_idx,axis=0)
@@ -224,12 +259,121 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         if not(~np.isnan(new_y_prob).any() and ~np.isinf(new_y_prob).any()): print("Nan or Inf detected")
 
         plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir)
+        #plot_distributions (new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
 
-        plot_distributions (new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
+        if fill_rej: 
+            fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,
+                            new_y_prob,new_test_labels,sigEffs)
+            fill_info_g    (bkg_rejs_gEff,bkg_errs_gEff,
+                            sig_effs_gEff,sig_errs_gEff,
+                            new_y_prob,new_test_labels,sigEffs,globalCuts)
+            
         tmp_idx+=1
         pass
 
+#    print(x_centers)
+#    print(x_errs)
+#    print(bkg_rejs_fEff[.7])
+#    print(bkg_errs_fEff[.7])
+#    print()
+#    print(bkg_rejs_fEff[.8])
+#    print(bkg_errs_fEff[.8])
+#    print()
+#    print(bkg_rejs_fEff[.9])
+#    print(bkg_errs_fEff[.9])
+#
+    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_fEff,bkg_errs_fEff, sigEffs,varname,output_dir,boundaries,"Flat")
+    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_gEff,bkg_errs_gEff, sigEffs,varname,output_dir,boundaries,"GlobB")
+    plot_rej_vsX_curves(x_centers,x_errs, sig_effs_gEff,sig_errs_gEff, sigEffs,varname,output_dir,boundaries,"GlobS")
+
     return
+
+def plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs,bkg_errs, sigEffs,varname,output_dir,boundaries,cType='Flat'):
+    plt.close()
+    style.use('classic')
+    #ax = plt.figure().add_subplot(111)
+    for sigEff in sigEffs: plt.errorbar(np.asarray(x_centers), np.asarray(bkg_rejs[sigEff]), xerr=np.asarray(x_errs), yerr= np.asarray(bkg_errs[sigEff]) ,marker='o',capsize=2, linestyle='None',fillstyle='none')
+
+    if   varname.find("eta")>=0:
+        pylab.xlim(-2.5,2.5)
+        plt.xticks(np.arange(-2.5,2.6,step=0.5))
+    elif varname.find("pt")>=0: 
+        #pylab.ylim(0,1800)
+        pylab.xlim(0,boundaries[-1]+20)
+        plt.xticks(np.arange(0,boundaries[-1],step=50))
+        pass
+
+        
+    ystring='Bkg-rejection'
+    if cType.find('GlobS')!=-1: ystring='Sig-efficiency'
+    plt.ylabel(ystring,fontsize=15)
+    if varname.find('pt')!=-1: plt.xlabel(varname+' [GeV]',fontsize=15)
+    else:                      plt.xlabel(varname,         fontsize=15)
+    plt.title(cType+" efficiency plot. sig-eff: ",fontweight='bold')
+
+    #KM: some sort of legend
+    plt.text(0.75, 1.02, '70%', transform=plt.gca().transAxes, color='b', fontsize=15)
+    plt.text(0.85, 1.02, '80%', transform=plt.gca().transAxes, color='g', fontsize=15)
+    plt.text(0.95, 1.02, '90%', transform=plt.gca().transAxes, color='r', fontsize=15)
+
+    output_name=output_dir+"rej_vs_"    
+    if cType.find('GlobS')!=-1: output_name=output_dir+"eff_vs_"
+    output_name+=varname+"_"+cType+".png"
+    print(output_name)
+
+    plt.savefig(output_name)
+    #plt.close()
+    return
+
+def fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,new_y_prob,new_test_labels,sigEffs):
+
+    for sigEff in sigEffs:
+        new_y_prob_sig = new_y_prob[new_test_labels==0]
+        new_y_prob_bkg = new_y_prob[new_test_labels==1]
+        #KM: get percentile cut value
+        pCut = np.percentile(new_y_prob_sig,(1-sigEff)*100,axis=0) [0] #70% from right side --> 1 - sig_eff
+        binaryClassified_bkg = new_y_prob_bkg[:,0] > pCut
+
+        bkgRej    = 0
+        bkgRejErr = 0
+        if binaryClassified_bkg.sum()>0:
+            bkgRej = binaryClassified_bkg.size / binaryClassified_bkg.sum()    #inverted bkg-eff as rejection
+            bkgRejErr = math.sqrt(bkgRej * (bkgRej-1) / binaryClassified_bkg.sum())
+            pass
+
+        bkg_rejs_fEff[sigEff].append(bkgRej)
+        bkg_errs_fEff[sigEff].append(bkgRejErr)
+        pass
+    return
+
+def fill_info_g(bkg_rejs_gEff,bkg_errs_gEff,
+                sig_effs_gEff,sig_errs_gEff,
+                new_y_prob,new_test_labels,sigEffs,globalCuts):
+
+    for sigEff_target,globCut in zip(sigEffs,globalCuts):
+        new_y_prob_sig = new_y_prob[new_test_labels==0]
+        new_y_prob_bkg = new_y_prob[new_test_labels==1]
+        binaryClassified_bkg = new_y_prob_bkg[:,0] > globCut
+        binaryClassified_sig = new_y_prob_sig[:,0] > globCut
+
+        bkgRej    = 0
+        bkgRejErr = 0
+        sigEff    = 0
+        sigEffErr = 0
+        if binaryClassified_bkg.sum()>0:
+            bkgRej = binaryClassified_bkg.size / binaryClassified_bkg.sum()    #inverted bkg-eff as rejection
+            sigEff = binaryClassified_sig.sum()/ binaryClassified_sig.size     #sig-eff
+            bkgRejErr = math.sqrt(bkgRej * (bkgRej-1) / binaryClassified_bkg.sum())
+            sigEffErr = math.sqrt(sigEff * (1-sigEff) / binaryClassified_sig.size )
+            pass
+
+        bkg_rejs_gEff[sigEff_target].append(bkgRej)
+        bkg_errs_gEff[sigEff_target].append(bkgRejErr)
+        sig_effs_gEff[sigEff_target].append(sigEff)
+        sig_errs_gEff[sigEff_target].append(sigEffErr)
+        pass
+    return
+
 
 def plot_image(cal_image, n_classes, e_class, images, image):
     #norm_type = None

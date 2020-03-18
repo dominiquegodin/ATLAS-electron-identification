@@ -37,7 +37,7 @@ args = parser.parse_args();
 eta_boundaries=  [-1.6, -0.8, 0, 0.8, 1.6]
 #eta_boundaries=  [0, 0.4, 0.8, 1.2, 1.6]
 
-pt_boundaries=  [10, 20, 30, 40]
+pt_boundaries=  [10, 20, 30, 40, 60, 80, 120, 180, 300, 500]
 
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0',   'em_barrel_Lr1_fine', 'em_barrel_Lr2', 'em_barrel_Lr3',
