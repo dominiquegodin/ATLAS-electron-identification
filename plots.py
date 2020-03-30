@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from   matplotlib import pylab
 from   sklearn    import metrics
-import os, math
+import os, math, pickle
 
 def valid_accuracy(y_true, y_prob):
     y_pred = np.argmax(y_prob, axis=1)
@@ -282,25 +282,40 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 #    print(bkg_rejs_fEff[.9])
 #    print(bkg_errs_fEff[.9])
 #
-    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_fEff,bkg_errs_fEff, sigEffs,varname,output_dir,boundaries,"Flat")
-    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_gEff,bkg_errs_gEff, sigEffs,varname,output_dir,boundaries,"GlobB")
-    plot_rej_vsX_curves(x_centers,x_errs, sig_effs_gEff,sig_errs_gEff, sigEffs,varname,output_dir,boundaries,"GlobS")
+    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_fEff,bkg_errs_fEff, sigEffs,varname,output_dir,boundaries[-1],cType="Flat" ,makeOutput=True)
+    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_gEff,bkg_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobB",makeOutput=True)
+    plot_rej_vsX_curves(x_centers,x_errs, sig_effs_gEff,sig_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobS",makeOutput=True)
 
     return
 
-def plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs,bkg_errs, sigEffs,varname,output_dir,boundaries,cType='Flat'):
+def plot_rej_vsX_curves(x_centers,x_errs, 
+                        bkg_rejs,bkg_errs, 
+                        sigEffs,varname,output_dir,x_up,
+                        cType='Flat',makeOutput=False):
     plt.close()
     style.use('classic')
     #ax = plt.figure().add_subplot(111)
-    for sigEff in sigEffs: plt.errorbar(np.asarray(x_centers), np.asarray(bkg_rejs[sigEff]), xerr=np.asarray(x_errs), yerr= np.asarray(bkg_errs[sigEff]) ,marker='o',capsize=2, linestyle='None',fillstyle='none')
+
+    errGraphs = dict()
+
+    for sigEff in sigEffs: 
+        plt.errorbar(np.asarray(x_centers), np.asarray(bkg_rejs[sigEff]), 
+                     xerr=np.asarray(x_errs), yerr= np.asarray(bkg_errs[sigEff]), 
+                     marker='o',capsize=2, linestyle='None',fillstyle='none')
+        data_points = [np.asarray(x_centers), 
+                       np.asarray(bkg_rejs[sigEff]), 
+                       np.asarray(x_errs), 
+                       np.asarray(bkg_errs[sigEff])]
+        errGraphs[cType+"_%d"%(sigEff*100)]=data_points
+        pass
 
     if   varname.find("eta")>=0:
         pylab.xlim(-2.5,2.5)
         plt.xticks(np.arange(-2.5,2.6,step=0.5))
     elif varname.find("pt")>=0: 
         #pylab.ylim(0,1800)
-        pylab.xlim(0,boundaries[-1]+20)
-        plt.xticks(np.arange(0,boundaries[-1],step=50))
+        pylab.xlim(0,x_up+20)
+        plt.xticks(np.arange(0,x_up,step=50))
         pass
 
         
@@ -320,9 +335,15 @@ def plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs,bkg_errs, sigEffs,varname,out
     if cType.find('GlobS')!=-1: output_name=output_dir+"eff_vs_"
     output_name+=varname+"_"+cType+".png"
     print(output_name)
-
     plt.savefig(output_name)
     #plt.close()
+
+    if makeOutput: #pickle.dump(errGraphs, open(output_dir+cType+'_graphs.pickle', 'wb'))
+        outfilename=output_dir+cType+'_graphs.pkl'
+        print('Writing pickle file:', outfilename)
+        pickle.dump(errGraphs,open(outfilename, 'wb'))
+        pass
+
     return
 
 def fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,new_y_prob,new_test_labels,sigEffs):
