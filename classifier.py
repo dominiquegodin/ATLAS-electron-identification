@@ -62,15 +62,11 @@ print(sorted(train_indices))
 sys.exit()
 '''
 shuffle = False if args.generator=='ON' else True
-n_e = int(max(1e2, min(args.n_e, len(h5py.File(data_file, 'r')['p_TruthType']))))
+n_e = int(max(1e5, min(args.n_e, len(h5py.File(data_file, 'r')['p_TruthType']))))
 train_indices, test_indices = train_test_split(np.arange(n_e), test_size=0.1,
                               random_state=args.random_state, shuffle=False)
-#print(train_indices)
-#print(test_indices)
-#b_size = 10
-#index = 1
-#idx_1, idx_2 = train_indices[0] + index*b_size, train_indices[0] +(index+1)*b_size
-#print(idx_1,idx_2) 
+
+#print(n_e, len(train_indices), len(test_indices))
 #sys.exit()
 
 '''
@@ -106,7 +102,7 @@ else:
     print('\nCLASSIFIER: data generator is OFF\nCLASSIFIER: loading data', end='    ... ', flush=True)
     start_time   = time.time()
     #train_data   = make_sample(data_file, all_var, train_var['images'], [0, n_e], float16=False, upscale=False)
-    train_data   = make_sample(data_file, total_var, [0, n_e], float16=False, upscale=False)
+    train_data   = make_sample(data_file, total_var, [0, n_e], float16, upscale=False)
     tracks_shape = dict([key, train_data[key].shape[1:]] for key in train_var['tracks'])
     image_shapes = dict([key, train_data[key].shape[1:]] for key in train_var['images'])
     print('(', '\b'+format(time.time() - start_time,'2.1f'), '\b'+' s)')
