@@ -426,7 +426,6 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
     sample.update({'tracks'  :np.concatenate(tracks_list)})
     tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_'), axis=0) for n in np.arange(batch_size)]
     sample.update({'p_tracks':np.concatenate(tracks_list)})
-    #sample.update({'true_m':np.float16(get_truth_m(sample))})
     var_dict = {'p_mean_efrac'  :0 , 'p_mean_deta'   :1 , 'p_mean_dphi'   :2 , 'p_mean_d0'          :3 ,
                 'p_mean_z0'     :4 , 'p_mean_charge' :5 , 'p_mean_vertex' :6 , 'p_mean_chi2'        :7 ,
                 'p_mean_ndof'   :8 , 'p_mean_pixhits':9 , 'p_mean_scthits':10, 'p_mean_trthits'     :11,
@@ -435,6 +434,7 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
     var_list = np.concatenate(var_list)
     sample.update({key:var_list[:,var_dict[key]] for key in var_dict})
     for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
+    #sample.update({'true_m':np.float16(get_truth_m(sample))})
     for key in tracks + ['p_truth_E']: sample.pop(key)
     with h5py.File(output_path+'temp_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
         for key in sample:
@@ -462,13 +462,8 @@ def get_tracks(sample, idx, max_tracks=20, p='', scalars=False):
     tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
     p_tracks    = ['p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof',
                    'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0']
-    tracks      = tracks + [sample[key][idx] for key in p_tracks] if p=='p_' else tracks
-    #if p == 'p_':
-    #    tracks += [ sample['p_tracks_charge' ][idx],  sample['p_tracks_vertex' ][idx],
-    #                sample['p_tracks_pixhits'][idx],  sample['p_tracks_scthits'][idx],
-    #                sample['p_tracks_trthits'][idx],
-    #                sample['p_tracks_chi2'   ][idx] / sample['p_tracks_ndof'   ][idx],
-    #                sample['p_tracks_charge' ][idx] / sample['p_tracks_sigmad0'][idx] * tracks_d0 ]
+    tracks      = tracks + [sample[key][idx] for key in p_tracks] if p == 'p_' else tracks
+    #if p == 'p_': tracks += sample['p_tracks_charge' ][idx]*tracks_d0/sample['p_tracks_sigmad0'][idx]
     tracks      = np.float16(np.vstack(tracks).T)
     tracks      = tracks[np.isfinite(np.sum(abs(tracks), axis=1))][:max_tracks,:]
     if p == 'p_' and scalars:

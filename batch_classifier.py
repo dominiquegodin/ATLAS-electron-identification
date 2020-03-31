@@ -1,6 +1,6 @@
 # IMPORT PACKAGES AND FUNCTIONS
-import tensorflow as tf, numpy as np, multiprocessing as mp, time, os, sys, h5py
-import tensorflow.keras.callbacks as cb
+import tensorflow as tf, tensorflow.keras.callbacks as cb
+import numpy      as np, multiprocessing as mp, time, os, sys, h5py
 from   argparse   import ArgumentParser
 from   tabulate   import tabulate
 from   utils      import valid_data, train_data, compo_matrix, class_weights, binarization
@@ -29,10 +29,10 @@ parser.add_argument( '--plotting'    ,  default = 'ON'                )
 parser.add_argument( '--scaling'     ,  default = 'ON'                )
 parser.add_argument( '--resampling'  ,  default = 'OFF'               )
 parser.add_argument( '--differential',  default = 'ON'                )
+parser.add_argument( '--weight_type' ,  default =  None               )
 parser.add_argument( '--metrics'     ,  default = 'val_accuracy'      )
 parser.add_argument( '--checkpoint'  ,  default = 'checkpoint.h5'     )
 parser.add_argument( '--weight_file' ,  default =  None               )
-parser.add_argument( '--weight_type' ,  default =  None               )
 parser.add_argument( '--pickle_file' ,  default = 'scaler.pkl'        )
 parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        )
 parser.add_argument( '--cuts'        ,  default =  None               )
@@ -48,7 +48,7 @@ if '.h5' not in args.weight_file: args.weight_file = None
 # DATAFILE PATH AND SAMPLES SIZES
 if not os.path.isdir('outputs'): os.mkdir('outputs')
 checkpoint_file = 'outputs/' + args.checkpoint
-#data_file       = '/project/def-arguinj/dgodin/el_data/2019-12-10/el_data.h5'
+#data_file       = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
 data_file       = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
 n_max           = len(h5py.File(data_file, 'r')['mcChannelNumber'])
 args.n_train    = [0               , min(n_max, args.n_train                 )]
@@ -83,11 +83,11 @@ if train_var['images'] == []: args.NN_type = 'FCN'
 args.scaling = args.scaling == 'ON' and scalars != []
 
 
-# CUTS ON IFF/MC TRUTH LABELLING AND/OR PHYSICS VARIABLES
-#args.cuts += ' & (sample["p_et_calo"] >= 20)'
-#args.cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
-#args.cuts  = '(abs(sample["p_eta"]) <= 0.6)'
-#args.cuts  = '(abs(sample["p_eta"]) >  0.6)'
+# APPLIED CUTS ON PHYSICS VARIABLES
+#args.cuts = '(sample["p_et_calo"] >= 20)'
+#args.cuts = '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
+#args.cuts = '(abs(sample["p_eta"]) <= 0.6)'
+#args.cuts = '(abs(sample["p_eta"]) >  0.6)'
 
 
 # TEST SAMPLE GENERATION
@@ -125,7 +125,6 @@ if args.n_epochs >= 1:
     arguments = (data_file, valid_sample, all_var, scalars, args.n_train, args.n_tracks, args.n_classes,
                  args.resampling, args.scaling, args.scaler_file, args.pickle_file, args.weight_file, args.cuts)
     train_sample, valid_sample, train_labels = train_data(*arguments)
-
     compo_matrix(valid_labels, train_labels=train_labels); print()
     checkpoint = cb.ModelCheckpoint(checkpoint_file, save_best_only=True, monitor=args.metrics, verbose=1)
     early_stop = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
@@ -143,15 +142,15 @@ valid_probs  = model.predict(valid_sample, batch_size=20000, verbose=2)
 train_labels = [] if args.n_epochs < 1 else train_labels
 print(); compo_matrix(valid_labels, train_labels, valid_probs)
 print('TEST SAMPLE ACCURACY:', format(100*valid_accuracy(valid_labels, valid_probs), '.2f'), '%\n')
-if args.n_classes > 2 and False:
+if args.n_classes > 2 and True:
     print('CLASSIFIER: binarized confusion matrix (multi-class)')
-    valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs, [0], [2])
+    valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs)#,[0],[1])
     compo_matrix(valid_labels, train_labels=[], valid_probs=valid_probs)
     print('TEST SAMPLE ACCURACY:', format(100*valid_accuracy(valid_labels, valid_probs), '.2f'), '%\n')
 if args.plotting == 'ON':
-    processes = [mp.Process(target=plot_distributions_DG, args=(valid_labels,valid_probs,))]
     #from plots import separate_distributions
-    #processes = [mp.Process(target=separate_distributions,args=(valid_labels,valid_probs,valid_sample))]
+    #processes = [mp.Process(target=separate_distributions,args=(valid_labels, valid_probs, valid_sample))]
+    processes  = [mp.Process(target=plot_distributions_DG, args=(valid_labels,valid_probs,))]
     if args.n_epochs > 1: processes += [mp.Process(target=plot_history, args=(training,))]
     arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,) for ROC_type in [1,2]]
     processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
@@ -171,3 +170,5 @@ if args.plotting == 'ON' and args.differential == 'ON':
     differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, 'eta')
     print('\nEvaluating differential performance in pt')
     differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries , pt_bin_indices , 'pt')
+
+
