@@ -35,17 +35,17 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (enter framework directory)  
 
 
-# Using Slurm jobs manager
+# Using Slurm jobs manager (LPS or Beluga)
 1) sbatch slurm.sh  
 (run classifier.sh script and sent jobs to Slurm batch system)  
-2) squeue or sview 
+2) squeue or sview  
 (report status of job) 
-3) scancel 'job_id' 
+3) scancel $job_id  
 (cancel job) 
-4) srun --jobid 'job_id' --pty watch -n 2 nvidia-smi  
+4) srun --jobid $job_id --pty watch -n 2 nvidia-smi  
 (monitor jobs GPU usage at 2s interval)  
 4) salloc --time=00:30:00 --gres=gpu:1 --mem=16G --x11 --account=def-arguinj  
-(use Slurm interactively and request appropriate ressources)
+(use Slurm interactively and request appropriate ressources on Beluga)
 
 
 # classifier.py Options
