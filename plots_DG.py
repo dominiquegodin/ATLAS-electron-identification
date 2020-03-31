@@ -42,7 +42,7 @@ def plot_history(history, key='accuracy', file_name='outputs/history.png'):
     plt.savefig(file_name)
 
 
-def plot_distributions(y_true, y_prob, tag=''):
+def plot_distributions_DG(y_true, y_prob, tag=''):
     file_name = 'outputs/distributions'+tag+'.png'
     print('CLASSIFIER: saving test sample distributions in:', file_name)
     if max(y_true)+1 == 2:
@@ -71,7 +71,7 @@ def plot_distributions(y_true, y_prob, tag=''):
     plt.savefig(file_name)
 
 
-def plot_distributions_new(y_true, y_prob, sample, tag=''):
+def separate_distributions(y_true, y_prob, sample, tag=''):
     from utils import make_labels
     file_name = 'outputs/distributions'+tag+'.png'
     labels = make_labels(sample, n_classes=6)

@@ -65,6 +65,9 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --checkpoint  = name of h5 checkpoint file used for saving and updating the model best weights
 
+--weight_type = name of weighting method, either of 'none' (default), 'match2b', 'match2s', 'flattening' should be given
+
+--output_dir  = name of output directory, which should be useful when you run jobs in parallel
 
 # Explanations
 1) For each epoch where the validation performance (either accuracy or loss function) has reached its best so far, the training model will automatically be saved to a h5 file checkpoint. 
