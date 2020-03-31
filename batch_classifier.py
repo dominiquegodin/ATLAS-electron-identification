@@ -26,6 +26,7 @@ parser.add_argument( '--NN_type'     ,  default = 'CNN'               )
 parser.add_argument( '--images'      ,  default = 'ON'                )
 parser.add_argument( '--scalars'     ,  default = 'ON'                )
 parser.add_argument( '--plotting'    ,  default = 'ON'                )
+parser.add_argument( '--differential',  default = 'ON'                )
 parser.add_argument( '--scaling'     ,  default = 'ON'                )
 parser.add_argument( '--resampling'  ,  default = 'OFF'               )
 parser.add_argument( '--weight_type' ,  default =  None               )
@@ -158,7 +159,7 @@ if args.plotting == 'ON':
 
 
 # DIFFERENTIAL PLOTS
-if args.plotting == 'ON' and args.weight_type != None:
+if args.plotting == 'ON' and args.differential == 'ON':
     eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
     pt_boundaries   = [10, 20, 30, 40, 60, 80, 120, 180, 300, 500]
     eta, pt         = valid_sample['p_eta'], valid_sample['p_et_calo']
