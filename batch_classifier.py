@@ -40,6 +40,7 @@ args = parser.parse_args()
 #for key, val in vars(args).items(): vars(args)[key]= int(val) if type(val)==float else val
 #for key, val in vars(args).items(): exec(key + '= val')
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
+if args.weight_type not in ['flattening', 'match2s', 'match2b']: args.weight_type = None
 if '.h5' not in args.weight_file and args.n_epochs < 1:
     print('\nCLASSIFIER: no valid weight file -> exiting program\n'); sys.exit()
 if '.h5' not in args.weight_file: args.weight_file = None
@@ -152,7 +153,7 @@ if args.plotting == 'ON':
     #processes = [mp.Process(target=separate_distributions,args=(valid_labels, valid_probs, valid_sample))]
     processes  = [mp.Process(target=plot_distributions_DG, args=(valid_labels,valid_probs,))]
     if args.n_epochs > 1: processes += [mp.Process(target=plot_history, args=(training,))]
-    arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,) for ROC_type in [1,2]]
+    arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,) for ROC_type in [1,2,3]]
     processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
     for job in processes: job.start()
 
@@ -170,5 +171,3 @@ if args.plotting == 'ON' and args.differential == 'ON':
     differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, 'eta')
     print('\nEvaluating differential performance in pt')
     differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries , pt_bin_indices , 'pt')
-
-
