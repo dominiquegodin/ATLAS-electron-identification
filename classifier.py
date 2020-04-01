@@ -213,8 +213,7 @@ else:
                                      #class_weight=class_weight,
                                      workers=n_cpus, use_multiprocessing=True,
                                      batch_size=max(1,n_gpus)*int(args.batch_size), verbose=1 ,
-                                     #sample_weight=sample_weights(train_data,train_labels,args.n_classes,weight_type=args.weight_type,output_dir=args.output_dir) )
-                                     sample_weight=sample_weights(train_data,train_labels,args.n_classes,weight_type=args.weight_type) )
+                                     sample_weight=sample_weights(train_data,train_labels,args.n_classes,weight_type=args.weight_type,output_dir=args.output_dir) )
 
 
 # PLOTTING SECTION
@@ -235,15 +234,13 @@ if args.plotting == 'ON':
     plot_distributions_KM(y_true, p_eta,'eta',output_dir=args.output_dir)
     plot_distributions_KM(y_true, et_calo,'pt',output_dir=args.output_dir)
 
-    plot_ROC_curves(test_LLH, y_true, y_probs, ROC_type=1)#,output_dir=args.output_dir)
-    plot_ROC_curves(test_LLH, y_true, y_probs, ROC_type=2)#,output_dir=args.output_dir)
+    #plot_ROC_curves(test_LLH, y_true, y_probs, ROC_type=1)#,output_dir=args.output_dir)
+    #plot_ROC_curves(test_LLH, y_true, y_probs, ROC_type=2)#,output_dir=args.output_dir)
 
     print()
     print('Evaluating differential performance in eta')
-    #differential_plots (test_LLH, y_true, y_probs, eta_boundaries, eta_bin_indices,"eta",output_dir=args.output_dir)
-    differential_plots(test_LLH, y_true, y_probs, eta_boundaries, eta_bin_indices,"eta")
+    differential_plots(test_LLH, y_true, y_probs, eta_boundaries, eta_bin_indices,"eta",output_dir=args.output_dir)
     print()
     print('Evaluating differential performance in pt')
-    #differential_plots (test_LLH, y_true, y_probs, pt_boundaries, pt_bin_indices,"pt",output_dir=args.output_dir)
-    differential_plots(test_LLH, y_true, y_probs, pt_boundaries, pt_bin_indices,"pt")
+    differential_plots (test_LLH, y_true, y_probs, pt_boundaries, pt_bin_indices,"pt",output_dir=args.output_dir)
     pass

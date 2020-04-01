@@ -76,8 +76,9 @@ def plot_distributions_KM(y_true, y_prob, var_name='',output_dir='outputs/',post
     plt.close()
 
 def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir='outputs/'):
+
     file_name = output_dir
-    if postfix!='':file_name+='differential/'
+    #if postfix!='':file_name+='differential/'
     if not os.path.isdir(file_name): os.mkdir(file_name)
     file_name+= 'ROC'+str(ROC_type)+'_curve'+postfix+'.png'
     print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
@@ -174,6 +175,8 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
 
 def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname,output_dir='outputs/'):
 
+    plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2,output_dir=output_dir+"differential/")
+
     tmp_idx=0
 
     x_centers = list()
@@ -235,7 +238,7 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 
         if not(~np.isnan(new_y_prob).any() and ~np.isinf(new_y_prob).any()): print("Nan or Inf detected")
 
-        plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir)
+        plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir+'differential/')
         #plot_distributions_KM(new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
 
         if fill_rej:
