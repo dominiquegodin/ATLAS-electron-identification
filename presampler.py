@@ -34,19 +34,20 @@ if args.sampling != 'ON' and args.merging != 'ON': sys.exit()
 
 
 # ELECTRONS VARIABLES
-images  =  ['em_barrel_Lr0'   , 'em_barrel_Lr1'   , 'em_barrel_Lr2'   , 'em_barrel_Lr3'  ,
-            'tile_barrel_Lr1' , 'tile_barrel_Lr2' , 'tile_barrel_Lr3'                                   ]
-tracks  =  ['tracks_pt'       , 'tracks_phi'      , 'tracks_eta'      , 'tracks_d0'      , 'tracks_z0'  ,
-            'p_tracks_pt'     , 'p_tracks_phi'    , 'p_tracks_eta'    , 'p_tracks_d0'    , 'p_tracks_z0',
-            'p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof'  ,
-            'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0'              ]
-scalars =  ['p_truth_pt'      , 'p_truth_phi'     , 'p_truth_eta'     , 'p_truth_E'      , 'p_et_calo'  ,
-            'p_pt_track'      , 'p_Eratio'        , 'p_phi'           , 'p_eta'          , 'p_e'        ,
-            'p_Rhad'          , 'p_Rphi'          , 'p_Reta'          , 'p_d0Sig'        , 'p_dPOverP'  ,
-            'p_d0'            , 'p_f1'            , 'p_f3'            , 'p_weta2'        , 'p_TRTPID'   ,
-            'p_deltaEta1'     , 'p_LHValue'       , 'p_deltaPhiRescaled2'                               ]
-integers = ['p_TruthType'     , 'p_iffTruth'      , 'p_nTracks'       , 'mcChannelNumber',
-            'p_LHTight'       , 'p_LHMedium'      , 'p_LHLoose'       , 'p_numberOfSCTHits'             ]
+images  =  ['em_barrel_Lr0'   , 'em_barrel_Lr1'   , 'em_barrel_Lr2'   , 'em_barrel_Lr3'    ,
+            'tile_barrel_Lr1' , 'tile_barrel_Lr2' , 'tile_barrel_Lr3'                                     ]
+tracks  =  ['tracks_pt'       , 'tracks_phi'      , 'tracks_eta'      , 'tracks_d0'        , 'tracks_z0'  ,
+            'p_tracks_pt'     , 'p_tracks_phi'    , 'p_tracks_eta'    , 'p_tracks_d0'      , 'p_tracks_z0',
+            'p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof'    ,
+            'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0'                ]
+scalars =  ['p_truth_pt'      , 'p_truth_phi'     , 'p_truth_eta'     , 'p_truth_E'        , 'p_et_calo'  ,
+            'p_pt_track'      , 'p_Eratio'        , 'p_phi'           , 'p_eta'            , 'p_e'        ,
+            'p_Rhad'          , 'p_Rphi'          , 'p_Reta'          , 'p_d0'             , 'p_d0Sig'    ,
+            'p_sigmad0'       , 'p_dPOverP'       , 'p_f1'            , 'p_f3'             , 'p_weta2'    ,
+            'p_TRTPID'        , 'p_deltaEta1'     , 'p_LHValue'       , 'p_chi2'           , 'p_ndof'     ,
+            'p_deltaPhiRescaled2'                                                                         ]
+integers = ['p_TruthType'     , 'p_iffTruth'      , 'p_nTracks'       , 'mcChannelNumber'  , 'eventNumber',
+            'p_LHTight'       , 'p_LHMedium'      , 'p_LHLoose'       , 'p_numberOfSCTHits', 'p_charge'   ]
 
 
 # REMOVING TEMPORARY FILES (if any)
@@ -74,23 +75,3 @@ pool.close(); pool.join();
 
 # MERGING FILES
 if args.merging=='ON': merge_presamples(sum_e, n_tasks, output_path, args.output_file); print()
-
-
-
-
-'''
-# POSSIBLE NOMENCLATURE CHANGE (disabled right now)
-images  = {'em_barrel_Lr0'      :'ecal_L0'   , 'em_barrel_Lr1'  :'ecal_L1' ,
-           'em_barrel_Lr2'      :'ecal_L2'   , 'em_barrel_Lr3'  :'ecal_L3' ,
-           'tile_barrel_Lr1'    :'hcal_L1'   , 'tile_barrel_Lr2':'hcal_L2'   , 'tile_barrel_Lr3':'hcal_L3'}
-scalars = {'p_TruthType'        :'MC_type'   , 'p_iffTruth'     :'IFF_type'  , 'p_truth_pt'     :'truth_pt' ,
-           'p_truth_phi'        :'truth_phi' , 'p_truth_eta'    :'truth_eta' , 'p_truth_E'      :'truth_e'  ,
-           'p_et_calo'          :'pt_calo'   , 'p_pt_track'     :'pt_track'  , 'p_Eratio'       :'e_ratio'  ,
-           'p_phi'              :'phi'       , 'p_eta'          :'eta'       , 'p_e'            :'e'        ,
-           'p_Rhad'             :'r_had'     , 'p_Rphi'         :'r_phi'     , 'p_Reta'         :'r_eta'    ,
-           'p_d0Sig'            :'d0_sig'    , 'p_dPOverP'      :'dp_over_p' , 'p_d0'           :'d0'       ,
-           'mcChannelNumber'    :'MC_channel', 'p_f1'           :'f1'        , 'p_f3'           :'f3'       ,
-           'p_LHTight'          :'LLH_tight' , 'p_LHMedium'     :'LLH_medium', 'p_LHLoose'      :'LLH_loose',
-           'p_numberOfSCTHits'  :'nSCT'      , 'p_LHValue'      :'LLH_value' , 'p_deltaEta1'    :'deta1'    ,
-           'p_deltaPhiRescaled2':'dphi_res2' , 'p_TRTPID'       :'TRT_PID'   , 'p_weta2'        :'w_eta2'}
-'''

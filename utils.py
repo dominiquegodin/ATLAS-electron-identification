@@ -1,13 +1,11 @@
-import tensorflow            as tf, numpy as np, multiprocessing, time, os, sys, h5py
+import tensorflow as tf, matplotlib.pyplot as plt
+import numpy      as np, multiprocessing, time, os, sys, h5py, pickle
 from   sklearn.metrics       import confusion_matrix
 from   sklearn.utils         import shuffle
-from   sklearn.preprocessing import QuantileTransformer, RobustScaler, StandardScaler
-from   pickle                import dump, load
+from   sklearn.preprocessing import QuantileTransformer
 from   tabulate              import tabulate
 from   skimage               import transform
-import matplotlib.pyplot as plt
-from   skimage.util          import img_as_int
-from   scipy.sparse          import csr_matrix
+
 
 def find_bin(array,binning):
 
@@ -22,7 +20,7 @@ def find_bin(array,binning):
 
     return binarized_bin_indices
 #def find_bin(element,binning):
-#    
+#
 #    binNum=-1 # underflow and overflow
 #    for i in range(len(binning)-1):
 #        if binning[i]<element and element<binning[i+1]: binNum=i
@@ -47,7 +45,7 @@ def get_bin_indices(p_var,boundaries):
     total=0
     #total=len(bin_indices[0])
     #print("hi=",boundaries[0],bin_indices[0],len(bin_indices[0]),total)
-    
+
     debug=False
     for bin_idx in bin_indices:
         total+=len(bin_idx)
@@ -69,8 +67,10 @@ def get_bin_indices(p_var,boundaries):
 
     return bin_indices
 
-def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
-    if weight_type=="none": return None
+#def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
+def sample_weights(train_data,train_labels,nClass,weight_type,ref_var='pt',output_dir='outputs/'):
+#    if weight_type=="none": return None
+    if weight_type==None: return None
 
     print("-------------------------------")
     print("generate_weights: sample weight mode \"",weight_type,"\" designated. Generating weights.",)
@@ -95,6 +95,7 @@ def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='
     for i_class in range(nClass):
         variable.append( variable_array[ train_labels==i_class ] )
         (binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(variable[i_class])),label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        #(binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(train_labels)),label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
 
         plt.savefig(output_dir+ref_var+"_bfrReweighting.png")
@@ -150,6 +151,8 @@ def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='
     #KM: below only for plotting
     for i_class in range(nClass):
         plt.hist(variable[i_class],bins=binning,weights=final_weights[ train_labels==i_class ],label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        #weights = final_weights[ train_labels==i_class ]/len(train_labels)
+        #plt.hist(variable[i_class],bins=binning, weights=weights, label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
     plt.savefig(output_dir+ref_var+"_aftReweighting.png")
     plt.clf() #clear plot
@@ -157,24 +160,11 @@ def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='
     return final_weights
 
 
+
+
 #################################################################################
 ##### Batch_classifier.py functions #############################################
 #################################################################################
-
-
-def sample_checks(sample, labels):
-    #for key in sample: print(key, sample[key].shape)
-    make_images(sample['tracks_image']); sys.exit()
-    analyze_sample(sample, scan=True); sys.exit()
-    # trackss distributions
-    arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
-    processes = [multiprocessing.Process(target=plot_tracks, args=arg) for arg in arguments]
-    for job in processes: job.start()
-    for job in processes: job.join()
-    # scalars distributions
-    sample_trans = sample.copy()
-    sample_trans = scale_sample(sample_trans, sample_trans, scalars)[0]
-    for key in train_var['scalars']: plot_scalars(sample, sample_trans, key); sys.exit()
 
 
 def valid_data(data_file, all_var, scalars, idx, n_tracks, n_classes,
@@ -184,8 +174,7 @@ def valid_data(data_file, all_var, scalars, idx, n_tracks, n_classes,
     valid_labels = make_labels(valid_sample, n_classes)
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     valid_sample, valid_labels = sample_cuts(valid_sample, valid_labels, cuts)
-    # validation sample diagnosis and plots
-    #sample_checks(valid_sample, valid_labels); sys.exit()
+    #sample_checks(valid_sample, valid_labels, scalars, pickle_file); sys.exit()
     if weight_file != None and scaling:
         valid_sample = load_scaler(valid_sample, scalars, pickle_file)
     return valid_sample, valid_labels
@@ -198,13 +187,11 @@ def train_data(data_file, valid_sample, all_var, scalars, idx, n_tracks, n_class
     train_labels = make_labels(train_sample, n_classes)
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     train_sample, train_labels = sample_cuts(train_sample, train_labels, cuts)
-    analyze_sample(train_sample)
+    sample_composition(train_sample)
     if resampling == 'ON':
         train_sample, train_labels = balance_sample(train_sample, train_labels, n_classes)
     if weight_file == None and scaling:
         train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_file)
-        #train_sample, valid_sample = tracks_scaler(train_sample, valid_sample, n_tracks)
-        #print(train_sample['tracks_image']) #print(valid_sample['tracks_image']);
     if weight_file != None and scaling:
         train_sample = load_scaler(train_sample, scalars, pickle_file)
     return train_sample, valid_sample, train_labels
@@ -220,9 +207,6 @@ def make_sample(data_file, all_var, idx, n_tracks, p='p_', upscale=False, denorm
             tracks_data = np.concatenate((abs(tracks_data[...,0:5]), tracks_data[...,5:13]), axis=2)
     if 'tracks_image' in var_list: sample.update({'tracks_image':tracks_data})
     if 'tracks'       in var_list: sample['tracks'] = tracks_data
-    #tracks = {'efrac' :0 , 'deta'  :1 , 'dphi'     :2 , 'd0'       :3,  'z0'       :4,  'p_efrac'  :5 ,
-    #          'p_deta':6 , 'p_dphi':7 , 'p_d0'     :8 , 'p_z0'     :9,  'p_charge' :10, 'p_vertex' :11,
-    #          'p_chi2':12, 'p_ndof':13, 'p_pixhits':14, 'p_scthits':15, 'p_trthits':16, 'p_sigmad0':17}
     if tf.__version__ < '2.1.0': sample = {key:np.float32(sample[key]) for key in sample}
     if denormalize:
         for n in images: sample[n]        = sample[n]        * sample['p_e'][:, np.newaxis, np.newaxis]
@@ -272,7 +256,7 @@ def sample_cuts(sample, labels, cuts):
     print(); return sample, labels
 
 
-def analyze_sample(sample):
+def sample_composition(sample):
     MC_type, IFF_type  = sample['p_TruthType']    , sample['p_iffTruth']
     MC_list, IFF_list  = np.arange(max(MC_type)+1), np.arange(max(IFF_type)+1)
     ratios = np.array([ [np.sum(MC_type[IFF_type==IFF]==MC) for MC in MC_list] for IFF in IFF_list ])
@@ -301,43 +285,12 @@ def balance_sample(sample, labels, n_classes):
     start_time = time.time()
     class_size = int(len(labels)/n_classes)
     label_rows = [np.where(labels==m)[0] for m in np.arange(n_classes)]
-    label_rows = [np.random.choice(label_rows[m], class_size, replace=len(label_rows[m])<class_size)
+    label_rows = [np.random.choice(label_rows[m], class_size, replace = len(label_rows[m]) < class_size)
                   for m in np.arange(n_classes)]
     label_rows = np.concatenate(label_rows); np.random.shuffle(label_rows)
     for key in sample: sample[key] = np.take(sample[key], label_rows, axis=0)
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
     return sample, np.take(labels, label_rows)
-
-
-def scaled_tracks(tracks, n_tracks, max_tracks):
-    tracks =  np.split(tracks, np.cumsum(n_tracks)[0:-1], axis=0)
-    tracks = [np.vstack([n, np.zeros((max(0, max_tracks-len(n)), n.shape[1]))]) for n in tracks]
-    return    np.concatenate([np.expand_dims(n, axis=0) for n in tracks])
-
-
-def tracks_scaler(train_sample, valid_sample, max_tracks):
-    print('CLASSIFIER: applying scaler transform to tracks variables', end=' ... ', flush=True)
-    start_time    = time.time()
-    valid_tracks   = valid_sample['tracks_image']
-    train_tracks   = train_sample['tracks_image']
-    n_valid_tracks = np.sum(abs(valid_tracks), axis=2)
-    n_train_tracks = np.sum(abs(train_tracks), axis=2)
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)', end=' ... ', flush=True)
-    n_valid_tracks = np.array([sum(n_valid_tracks[n,:]!=0) for n in np.arange(len(valid_tracks))])
-    n_train_tracks = np.array([sum(n_train_tracks[n,:]!=0) for n in np.arange(len(train_tracks))])
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)', end=' ... ', flush=True)
-    valid_tracks   = [valid_tracks[n,:n_valid_tracks[n],:] for n in np.arange(len(valid_tracks))]
-    train_tracks   = [train_tracks[n,:n_train_tracks[n],:] for n in np.arange(len(train_tracks))]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)', end=' ... ', flush=True)
-    scaler         = QuantileTransformer(n_quantiles=10000, output_distribution='normal', random_state=0)
-    train_tracks   = scaler.fit_transform(np.concatenate(train_tracks, axis=0))
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)', end=' ... ', flush=True)
-    valid_tracks   = scaler.transform(np.concatenate(valid_tracks, axis=0))
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)', end=' ... ', flush=True)
-    train_sample['tracks_image'] = scaled_tracks(train_tracks, n_train_tracks, max_tracks)
-    valid_sample['tracks_image'] = scaled_tracks(valid_tracks, n_valid_tracks, max_tracks)
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    return train_sample, valid_sample
 
 
 def apply_scaler(train_sample, valid_sample, scalars, scaler_file):
@@ -353,13 +306,13 @@ def apply_scaler(train_sample, valid_sample, scalars, scaler_file):
         valid_sample[scalars[n]] = valid_scalars[:,n]
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     print('CLASSIFIER: saving fitted data in scaler: outputs/' + scaler_file + '\n')
-    dump(scaler, open('outputs/' + scaler_file, 'wb'))
+    pickle.dump(scaler, open('outputs/' + scaler_file, 'wb'))
     return train_sample, valid_sample
 
 
 def load_scaler(sample, scalars, scaler_file):
     print('CLASSIFIER: loading fitted data from scaler: outputs/' + scaler_file)
-    scaler         = load(open('outputs/' + scaler_file, 'rb'))
+    scaler         = pickle.load(open('outputs/' + scaler_file, 'rb'))
     start_time     = time.time()
     scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
@@ -369,16 +322,24 @@ def load_scaler(sample, scalars, scaler_file):
     return sample
 
 
-def compo_matrix(train_labels, valid_labels, valid_prob=[]):
-    if valid_prob == []: valid_pred = valid_labels
-    else:                valid_pred = np.argmax(valid_prob, axis=1)
-    matrix      = confusion_matrix(valid_labels, valid_pred)
-    matrix      = 100*matrix.T/matrix.sum(axis=1)
-    n_classes   = len(matrix)
-    valid_sizes = [100*np.sum(valid_labels==n)/len(valid_labels) for n in np.arange(n_classes)]
-    train_sizes = [100*np.sum(train_labels==n)/len(train_labels) for n in np.arange(n_classes)]
+def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
+    valid_pred = valid_labels if valid_probs == [] else np.argmax(valid_probs, axis=1)
+    matrix     = confusion_matrix(valid_labels, valid_pred)
+    matrix     = 100*matrix.T/matrix.sum(axis=1)
+    n_classes  = len(matrix)
+    def mp_get_sizes(labels, n_classes):
+        def get_sizes(labels, n, return_dict): return_dict[n] = 100*sum(labels==n)/len(labels)
+        manager   = multiprocessing.Manager(); return_dict = manager.dict()
+        processes = [multiprocessing.Process(target=get_sizes, args=(labels, n, return_dict))
+                     for n in np.arange(n_classes)]
+        for job in processes: job.start()
+        for job in processes: job.join()
+        return [return_dict[n] for n in np.arange(n_classes)]
+    #valid_sizes = [100*sum(valid_labels==n)/len(valid_labels) for n in np.arange(n_classes)]
+    valid_sizes = mp_get_sizes(valid_labels, n_classes)
+    train_sizes = n_classes*['n/a'] if train_labels == [] else mp_get_sizes(train_labels, n_classes)
     classes     = ['CLASS '+str(n) for n in np.arange(n_classes)]
-    if valid_prob == []:
+    if valid_probs == []:
         print('+--------------------------------------+')
         print('| CLASS DISTRIBUTIONS                  |')
         headers = ['CLASS #', 'TRAIN (%)', 'TEST (%)']
@@ -388,13 +349,13 @@ def compo_matrix(train_labels, valid_labels, valid_prob=[]):
             headers = ['CLASS #', 'TRAIN', 'TEST'] + classes
             table   = [classes] + [train_sizes] + [valid_sizes] + matrix.T.tolist()
             table   = list(map(list, zip(*table)))
-            print('\n+'+30*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n', '\b| CLASS DISTRIBUTIONS (%)',
+            print('+'+30*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n', '\b| CLASS DISTRIBUTIONS (%)',
                   '    ', '| TEST SAMPLE PREDICTIONS (%)       '+12*(n_classes-3)*' '+ '|')
         else:
             headers = ['CLASS #', 'TRAIN (%)', 'TEST (%)', 'ACC. (%)']
             table   = zip(classes, train_sizes, valid_sizes, matrix.diagonal())
-            print('\n+---------------------------------------------------+')
-            print(  '| CLASS DISTRIBUTIONS AND TEST SAMPLE ACCURACIES    |')
+            print('+---------------------------------------------------+')
+            print('| CLASS DISTRIBUTIONS AND TEST SAMPLE ACCURACIES    |')
     print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
 
 
@@ -403,22 +364,50 @@ def class_weights(labels):
     return {m:len(labels)/sum(labels==m)/n_classes for m in np.arange(n_classes)}
 
 
+def binarization(sample, labels, probs, class_0=[0], class_1=None):
+    from functools import reduce
+    class_1 = set(np.arange(max(labels)+1)) - set(class_0) if class_1==None else class_1
+    labels  = np.array([0 if label in class_0 else 1 if label in class_1 else -1 for label in labels])
+    prob_0  = reduce(np.add,[probs[:,n] for n in class_0])[labels!=-1]
+    prob_1  = reduce(np.add,[probs[:,n] for n in class_1])[labels!=-1]
+    sample  = {key:sample[key][labels!=-1] for key in sample}
+    labels  = labels[labels!=-1]
+    prob_0, prob_1 = np.where(prob_0!=prob_1, prob_0, 0.5), np.where(prob_0!=prob_1, prob_1, 0.5)
+    return sample, labels, (np.vstack([prob_0, prob_1])/(prob_0+prob_1)).T
+
+
 def scan_sample(sample):
     def scan(sample, batch_size, index, return_dict):
         idx1, idx2 = index*batch_size, (index+1)*batch_size
         return_dict[index] = sum([np.sum(np.isfinite(sample[key][idx1:idx2])==False) for key in sample])
     n_e = len(list(sample.values())[0]); start_time = time.time()
     print('SCANNING', n_e, 'ELECTRONS FOR ERRORS ...', end=' ', flush=True)
-    for n in np.arange(min(12, multiprocessing.cpu_count()), 1, -1):
-        if n_e  % n == 0: n_tasks = n; batch_size = n_e//n_tasks; break
+    for n in np.arange(min(12, multiprocessing.cpu_count()), 0, -1):
+        if n_e % n == 0: n_tasks = n; batch_size = n_e//n_tasks; break
     manager   =  multiprocessing.Manager(); return_dict = manager.dict()
-    processes = [multiprocessing.Process(target=scan, args=(sample, batch_size, job, return_dict))
-                for job in np.arange(n_tasks)]
+    processes = [multiprocessing.Process(target=scan, args=(sample, batch_size, index, return_dict))
+                for index in np.arange(n_tasks)]
     for job in processes: job.start()
     for job in processes: job.join()
     #for key in sample: print(key, np.where(np.isfinite(sample[key])==False))
     print(sum(return_dict.values()), 'ERRORS FOUND', end=' ', flush=True)
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
+
+
+def sample_checks(sample, labels, scalars, pickle_file):
+    for key in sample: print(key, sample[key].shape)
+    scan_sample(sample)
+    # TRACKS DISTRIBUTIONS
+    #from plots import plot_tracks
+    #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
+    #processes = [multiprocessing.Process(target=plot_tracks, args=arg) for arg in arguments]
+    #for job in processes: job.start()
+    #for job in processes: job.join()
+    # SCALARS DISTRIBUTIONS
+    #from plots import plot_scalars
+    #sample_trans = sample.copy()
+    #sample_trans = load_scaler(sample_trans, scalars, pickle_file)#[0]
+    #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
 
 
@@ -439,9 +428,16 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
     sample.update({'tracks'  :np.concatenate(tracks_list)})
     tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_'), axis=0) for n in np.arange(batch_size)]
     sample.update({'p_tracks':np.concatenate(tracks_list)})
-    sample.update({'true_m':np.float16(get_truth_m(sample))})
-    for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = get_LLH(sample, key)
-    for key in tracks + ['p_truth_E', 'p_LHValue']: sample.pop(key)
+    var_dict = {'p_mean_efrac'  :0 , 'p_mean_deta'   :1 , 'p_mean_dphi'   :2 , 'p_mean_d0'          :3 ,
+                'p_mean_z0'     :4 , 'p_mean_charge' :5 , 'p_mean_vertex' :6 , 'p_mean_chi2'        :7 ,
+                'p_mean_ndof'   :8 , 'p_mean_pixhits':9 , 'p_mean_scthits':10, 'p_mean_trthits'     :11,
+                'p_mean_sigmad0':12, 'p_qd0Sig'      :13, 'p_nTracks'     :14, 'p_sct_weight_charge':15}
+    var_list = [np.expand_dims(get_tracks(sample,n,20,'p_',True), axis=0) for n in np.arange(batch_size)]
+    var_list = np.concatenate(var_list)
+    sample.update({key:var_list[:,var_dict[key]] for key in var_dict})
+    for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
+    #sample.update({'true_m':np.float16(get_truth_m(sample))})
+    for key in tracks + ['p_truth_E']: sample.pop(key)
     with h5py.File(output_path+'temp_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
         for key in sample:
             shape = (sum_e+batch_size,) + sample[key].shape[1:]
@@ -457,26 +453,29 @@ def resize_images(images_array, target_shape=(7,11)):
     else: return transform.resize(images_array, ( (len(images_array),) + target_shape))
 
 
-def get_tracks(sample, idx, max_tracks=20, p=''):
+def get_tracks(sample, idx, max_tracks=20, p='', scalars=False):
     tracks_p    = np.cosh(sample[p+'tracks_eta'][idx]) * sample[p+'tracks_pt' ][idx]
     tracks_deta =         sample[p+'tracks_eta'][idx]  - sample[  'p_eta'     ][idx]
     tracks_dphi =         sample[p+'tracks_phi'][idx]  - sample[  'p_phi'     ][idx]
     tracks_d0   =         sample[p+'tracks_d0' ][idx]
     tracks_z0   =         sample[p+'tracks_z0' ][idx]
-    tracks_dphi = np.where(tracks_dphi  < -np.pi, tracks_dphi + 2*np.pi, tracks_dphi )
-    tracks_dphi = np.where(tracks_dphi  >  np.pi, tracks_dphi - 2*np.pi, tracks_dphi )
+    tracks_dphi = np.where(tracks_dphi < -np.pi, tracks_dphi + 2*np.pi, tracks_dphi )
+    tracks_dphi = np.where(tracks_dphi >  np.pi, tracks_dphi - 2*np.pi, tracks_dphi )
     tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
     p_tracks    = ['p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof',
                    'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0']
-    tracks      = tracks + [sample[key][idx] for key in p_tracks] if p=='p_' else tracks
+    tracks      = tracks + [sample[key][idx] for key in p_tracks] if p == 'p_' else tracks
+    #if p == 'p_': tracks += sample['p_tracks_charge' ][idx]*tracks_d0/sample['p_tracks_sigmad0'][idx]
     tracks      = np.float16(np.vstack(tracks).T)
     tracks      = tracks[np.isfinite(np.sum(abs(tracks), axis=1))][:max_tracks,:]
-    return        np.vstack([tracks, np.zeros((max(0, max_tracks-len(tracks)), tracks.shape[1]))])
-
-
-def get_LLH(sample, wp):
-    LLH =  np.where(sample[wp] == 0                               , 2, 0  )
-    return np.where(np.logical_and(LLH==2, sample['p_LHValue']<-1), 1, LLH)
+    if p == 'p_' and scalars:
+        tracks_means       = np.mean(tracks,axis=0) if len(tracks)!=0 else tracks.shape[1]*[0]
+        qd0Sig             = sample['p_charge'][idx] * sample['p_d0'][idx] / sample['p_sigmad0'][idx]
+        sct_weight_charge  = sample['p_tracks_charge'][idx] @     sample['p_tracks_scthits'][idx]
+        sct_weight_charge *= sample['p_charge'       ][idx] / sum(sample['p_tracks_scthits'][idx])
+        return np.concatenate([tracks_means, np.array([qd0Sig, len(tracks), sct_weight_charge])])
+    else:
+        return np.vstack([tracks, np.zeros((max(0, max_tracks-len(tracks)), tracks.shape[1]))])
 
 
 def get_truth_m(sample, new=True, m_e=0.511, max_eta=4.9):
@@ -509,67 +508,8 @@ def merge_presamples(n_e, n_files, output_path, output_file):
 
 
 #################################################################################
-#####  under development functions  #############################################
+#####  UNDER DEVELOPMENT   ######################################################
 #################################################################################
-
-
-def make_images(tracks):
-    import matplotlib.pyplot as plt
-    from functools import reduce
-    #var_dict = {'efrac':{'idx':0},
-    #            'deta' :{'idx':1, 'lim':(0, 0.4), 'dim':100}, 'dphi' :{'idx':2, 'lim':(0, 0.4), 'dim':100},
-    #            'd0'   :{'idx':3, 'lim':(0,  10), 'dim':100}, 'z0'   :{'idx':4, 'lim':(0, 300), 'dim':100}}
-    var_dict = {'efrac':{'idx':0},
-                'deta' :{'idx':1, 'lim':(-0.4, 0.4), 'dim':100}, 'dphi' :{'idx':2, 'lim':(-0.4, 0.4), 'dim':100},
-                'd0'   :{'idx':3, 'lim':(-10,  10), 'dim':100}, 'z0'   :{'idx':4, 'lim':(-300, 300), 'dim':100}}
-    def indices(x, lim, dim)     : return np.round((dim-1)*(x-lim[0])/(lim[1]-lim[0]))
-    def keep(x, xdim, y, ydim, z): return z[reduce(np.logical_and,[x>=0, x<=xdim-1, y>=0, y<=ydim-1])]
-    #start_time = time.time()
-    #print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print(tracks[10])
-    print(max(tracks[10,4]))
-    n_e      = len(tracks)
-    n_tracks = np.sum(abs(tracks), axis=2)
-    n_tracks = np.array([len(np.where(n_tracks[n,:]!=0)[0]) for n in np.arange(n_e)])
-    #print( len(n_tracks[n_tracks==0]) )
-    #print( np.where(n_tracks==100) )
-    #print( np.float16(tracks[167]) )
-    #print( tracks[167].shape )
-    tracks = [tracks[n,:n_tracks[n],:] for n in np.arange(len(n_tracks))]
-    #print( tracks[168].shape )
-    #print( tracks[168] )
-    #print(n_tracks)
-    sizes = np.array([n.size for n in tracks])
-    print( len(sizes[sizes==0]) )
-    print( n_e, len(tracks) )
-
-    for track in tracks[10:11]:
-        efrac, deta, dphi, d0, z0 = [ track[:,n] for n in np.arange(5)]
-        deta = indices(deta, var_dict['deta']['lim'], var_dict['deta']['dim'])
-        dphi = indices(dphi, var_dict['dphi']['lim'], var_dict['dphi']['dim'])
-        d0   = indices(d0  , var_dict['d0'  ]['lim'], var_dict['d0'  ]['dim'])
-        z0   = indices(z0  , var_dict['z0'  ]['lim'], var_dict['z0'  ]['dim'])
-        deta, dphi, efrac = [keep(deta, var_dict['deta']['dim'], dphi, var_dict['dphi']['dim'], x)
-                             for x in [deta, dphi, efrac]]
-        fig_efrac = csr_matrix((efrac, (deta, dphi)),
-                               shape=(var_dict['deta']['dim'], var_dict['dphi']['dim'])).toarray()
-        d0, z0, ones      = [keep(d0, var_dict['d0']['dim'], z0, var_dict['z0']['dim'], x)
-                             for x in [d0, z0, np.ones(len(d0))]]
-        fig_d0z0  = csr_matrix((ones, (d0, z0)),
-                               shape=(var_dict['d0']['dim'], var_dict['z0']['dim'])).toarray()
-        print(fig_efrac.shape)
-        print(fig_d0z0.shape, np.sum(fig_d0z0))
-        #print(np.float16(fig_efrac))
-        print(np.float16(fig_d0z0))
-    fig = plt.figure(figsize=(18,8))
-
-    plt.subplot(1,2,1)
-    plt.imshow(fig_efrac, cmap='Reds')
-    plt.subplot(1,2,2)
-    plt.imshow(fig_d0z0, cmap='Reds')
-
-    file_name = 'outputs/images.png'
-    fig.savefig(file_name)
 
 
 class Batch_Generator(tf.keras.utils.Sequence):

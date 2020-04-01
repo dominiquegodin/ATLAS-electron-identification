@@ -8,10 +8,6 @@ from   matplotlib import pylab
 from   sklearn    import metrics
 import os, math, pickle
 
-def valid_accuracy(y_true, y_prob):
-    y_pred = np.argmax(y_prob, axis=1)
-    return sum(y_pred==y_true)/len(y_true)
-
 
 def get_LLH(data, y_true):
     eff_class0, eff_class1 = [],[]
@@ -23,32 +19,12 @@ def get_LLH(data, y_true):
     return eff_class0, eff_class1
 
 
-def plot_history(history, key='accuracy', file_name='outputs/history.png'):
-    if len(history.epoch) < 2: return
-    print('CLASSIFIER: saving training accuracy history in:', file_name)
-    plt.figure(figsize=(12,8))
-    pylab.grid(True)
-    val = plt.plot(np.array(history.epoch)+1, 100*np.array(history.history[key]), label='Training')
-    plt.plot(np.array(history.epoch)+1, 100*np.array(history.history['val_'+key]), '--',
-             color=val[0].get_color(), label='Testing')
-    min_acc = np.floor(100*min( history.history[key]+history.history['val_'+key] ))
-    max_acc = np.ceil (100*max( history.history[key]+history.history['val_'+key] ))
-    plt.xlim([1, max(history.epoch)+1])
-    plt.xticks( np.append(1,np.arange(5,max(history.epoch)+2,step=5)) )
-    plt.xlabel('Epochs',fontsize=20)
-    plt.ylim( max(80,min_acc),max_acc )
-    plt.yticks( np.arange(max(80,min_acc),max_acc+1,step=1) )
-    plt.ylabel(key.title()+' (%)',fontsize=20)
-    plt.legend(loc='lower right', fontsize=20, numpoints=3)
-    plt.savefig(file_name)
-
-
-def plot_distributions(y_true, y_prob, var_name='',output_dir='outputs/',postfix=''):
+def plot_distributions_KM(y_true, y_prob, var_name='',output_dir='outputs/',postfix=''):
     if var_name=='': var_name='distributions'
     file_name=output_dir+var_name+postfix+'.png'
 
     print('CLASSIFIER: saving test sample distributions in:', file_name)
-    
+
     if var_name=='distributions':
         probs_class0   = 100*y_prob[:,0][ y_true==0 ]
         probs_class1   = 100*y_prob[:,0][ y_true==1 ]
@@ -195,7 +171,7 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
         plt.savefig(file_name)
         pass
     plt.close()
-        
+
 def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname,output_dir='outputs/'):
 
     tmp_idx=0
@@ -225,7 +201,7 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         pass
 
     for bin_idx in bin_indices:
-        if bin_idx.size==0: 
+        if bin_idx.size==0:
             tmp_idx+=1
             continue
             pass
@@ -235,7 +211,7 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         pfix ="_"+varname+"%d" % tmp_idx
         if tmp_idx!=0:                  pfix+="_Lo%.2f" % boundaries[tmp_idx-1]         #lo
         if tmp_idx!=len(bin_indices)-1: pfix+="_Hi%.2f" % boundaries[tmp_idx]           #hi
-        
+
         if tmp_idx!=0 and tmp_idx!=len(bin_indices)-1:
             x_center = (boundaries[tmp_idx-1] + boundaries[tmp_idx])/2
             x_centers.append(x_center)
@@ -248,7 +224,8 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         new_y_prob     =y_prob.take(bin_idx,axis=0)
 
         new_test_LLH=dict()
-        for llh in test_LLH:
+        #for llh in test_LLH:
+        for llh in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']:
             #print(llh)
             new_test_LLH[llh]=test_LLH[llh][bin_idx]
             pass
@@ -259,15 +236,15 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         if not(~np.isnan(new_y_prob).any() and ~np.isinf(new_y_prob).any()): print("Nan or Inf detected")
 
         plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir)
-        #plot_distributions (new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
+        #plot_distributions_KM(new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
 
-        if fill_rej: 
+        if fill_rej:
             fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,
                             new_y_prob,new_test_labels,sigEffs)
             fill_info_g    (bkg_rejs_gEff,bkg_errs_gEff,
                             sig_effs_gEff,sig_errs_gEff,
                             new_y_prob,new_test_labels,sigEffs,globalCuts)
-            
+
         tmp_idx+=1
         pass
 
@@ -288,8 +265,8 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 
     return
 
-def plot_rej_vsX_curves(x_centers,x_errs, 
-                        bkg_rejs,bkg_errs, 
+def plot_rej_vsX_curves(x_centers,x_errs,
+                        bkg_rejs,bkg_errs,
                         sigEffs,varname,output_dir,x_up,
                         cType='Flat',makeOutput=False):
     plt.close()
@@ -298,13 +275,13 @@ def plot_rej_vsX_curves(x_centers,x_errs,
 
     errGraphs = dict()
 
-    for sigEff in sigEffs: 
-        plt.errorbar(np.asarray(x_centers), np.asarray(bkg_rejs[sigEff]), 
-                     xerr=np.asarray(x_errs), yerr= np.asarray(bkg_errs[sigEff]), 
+    for sigEff in sigEffs:
+        plt.errorbar(np.asarray(x_centers), np.asarray(bkg_rejs[sigEff]),
+                     xerr=np.asarray(x_errs), yerr= np.asarray(bkg_errs[sigEff]),
                      marker='o',capsize=2, linestyle='None',fillstyle='none')
-        data_points = [np.asarray(x_centers), 
-                       np.asarray(bkg_rejs[sigEff]), 
-                       np.asarray(x_errs), 
+        data_points = [np.asarray(x_centers),
+                       np.asarray(bkg_rejs[sigEff]),
+                       np.asarray(x_errs),
                        np.asarray(bkg_errs[sigEff])]
         errGraphs[cType+"_%d"%(sigEff*100)]=data_points
         pass
@@ -312,13 +289,13 @@ def plot_rej_vsX_curves(x_centers,x_errs,
     if   varname.find("eta")>=0:
         pylab.xlim(-2.5,2.5)
         plt.xticks(np.arange(-2.5,2.6,step=0.5))
-    elif varname.find("pt")>=0: 
+    elif varname.find("pt")>=0:
         #pylab.ylim(0,1800)
         pylab.xlim(0,x_up+20)
         plt.xticks(np.arange(0,x_up,step=50))
         pass
 
-        
+
     ystring='Bkg-rejection'
     if cType.find('GlobS')!=-1: ystring='Sig-efficiency'
     plt.ylabel(ystring,fontsize=15)
@@ -331,7 +308,7 @@ def plot_rej_vsX_curves(x_centers,x_errs,
     plt.text(0.85, 1.02, '80%', transform=plt.gca().transAxes, color='g', fontsize=15)
     plt.text(0.95, 1.02, '90%', transform=plt.gca().transAxes, color='r', fontsize=15)
 
-    output_name=output_dir+"rej_vs_"    
+    output_name=output_dir+"rej_vs_"
     if cType.find('GlobS')!=-1: output_name=output_dir+"eff_vs_"
     output_name+=varname+"_"+cType+".png"
     print(output_name)
@@ -394,132 +371,3 @@ def fill_info_g(bkg_rejs_gEff,bkg_errs_gEff,
         sig_errs_gEff[sigEff_target].append(sigEffErr)
         pass
     return
-
-
-def plot_image(cal_image, n_classes, e_class, images, image):
-    #norm_type = None
-    norm_type = colors.LogNorm(0.0001,1)
-    limits = [-0.13499031, 0.1349903, -0.088, 0.088]
-    e_image  = images.index(image)
-    n_images = len(images)
-    plot_number = n_classes*( e_image ) + e_class + 1
-    plt.subplot(n_images, n_classes, plot_number)
-    title='Class '+str(e_class)+' - Layer '+ image
-    x_label, y_label = '' ,''
-    x_ticks, y_ticks = [], []
-    if e_image == n_images-1:
-        x_label = '$\phi$'
-        x_ticks = [limits[0],-0.05,0.05,limits[1]]
-    if e_class == 0:
-        y_label = '$\eta$'
-        y_ticks = [limits[2],-0.05,0.0,0.05,limits[3]]
-    plt.title(title,fontweight='bold')
-    plt.xlabel(x_label,fontsize=14)
-    plt.ylabel(y_label,fontsize=14)
-    plt.xticks(x_ticks)
-    plt.yticks(y_ticks)
-    plt.imshow(cal_image.transpose(), cmap='Reds', extent=limits, norm=norm_type)
-    plt.colorbar(pad=0.02)
-    return
-
-
-def cal_images(files, images, file_name='outputs/cal_images.png'):
-    print('\nCLASSIFIER: saving calorimeter images in:', file_name,'\n')
-    fig = plt.figure(figsize=(8,12))
-    for e_class in np.arange( 0, len(files) ):
-        input_file = h5py.File( files[e_class], 'r' )
-        e_number   = np.random.randint( 0, len(input_file['data']), size=1 )[0]
-        for image in images: plot_image( input_file['data/table_'+str(e_number)][image][0],
-                                         len(files), e_class, images, image )
-    hspace, wspace = 0.4, -0.6
-    fig.subplots_adjust(left=-0.4, top=0.95, bottom=0.05, right=0.95, hspace=hspace, wspace=wspace)
-    fig.savefig(file_name)
-    plt.show() ; sys.exit()
-
-
-def plot_scalars(sample, sample_trans, variable):
-    bins = np.arange(100)
-    fig = plt.figure(figsize=(18,8))
-    plt.subplot(1,2,1)
-    plt.title('Histogram')
-    plt.xlabel('Value')
-    plt.ylabel('Number of Entries')
-    pylab.hist(sample_trans[variable], bins=bins, histtype='step', density=True)
-    pylab.hist(sample      [variable], bins=bins, histtype='step', density=True)
-    plt.subplot(1,2,2)
-    plt.title('Histogram')
-    plt.xlabel('Value')
-    plt.ylabel('Number of Entries')
-    pylab.hist(sample_trans[variable], bins=bins)
-    file_name = 'outputs/scalars/'+variable+'.png'
-    print('Printing:', file_name)
-    plt.savefig(file_name)
-
-
-def plot_tracks(tracks, labels, variable):
-    tracks_var = {'efrac':{'idx':0, 'mean_lim':( 0,      3), 'max_lim':(0,    2), 'diff_lim':(0,    1)},
-                  'deta' :{'idx':1, 'mean_lim':( 0, 0.0005), 'max_lim':(0, 0.03), 'diff_lim':(0, 0.04)},
-                  'dphi' :{'idx':2, 'mean_lim':( 0,  0.001), 'max_lim':(0,  0.1), 'diff_lim':(0, 0.05)},
-                  'd0'   :{'idx':3, 'mean_lim':( 0,    0.2), 'max_lim':(0,  0.1), 'diff_lim':(0,  0.3)},
-                  'z0'   :{'idx':4, 'mean_lim':( 0,    0.5), 'max_lim':(0,  0.3), 'diff_lim':(0,   10)}}
-    classes    = np.arange(max(labels)+1)
-    n_e        = np.arange(len(labels)  )
-    n_tracks   = np.sum(abs(tracks), axis=2)
-    n_tracks   = np.array([len(np.where(n_tracks[n,:]!=0)[0]) for n in n_e])
-    var        = tracks[..., tracks_var[variable]['idx']]
-    var_mean   = np.array([np.mean(    var[n,:n_tracks[n]])  if n_tracks[n]!=0 else None for n in n_e])
-    var_max    = np.array([np.max (abs(var[n,:n_tracks[n]])) if n_tracks[n]!=0 else None for n in n_e])
-    var_diff   = np.array([np.mean(np.diff(np.sort(var[n,:n_tracks[n]])))
-                           if n_tracks[n]>=2 else None for n in n_e])
-    var_diff   = np.array([(np.max(var[n,:n_tracks[n]]) - np.min(var[n,:n_tracks[n]]))/(n_tracks[n]-1)
-                           if n_tracks[n]>=2 else None for n in n_e])
-    var_mean   = [var_mean[np.logical_and(labels==n, var_mean!=None)] for n in classes]
-    var_max    = [var_max [np.logical_and(labels==n, var_max !=None)] for n in classes]
-    var_diff   = [var_diff[np.logical_and(labels==n, var_diff!=None)] for n in classes]
-    n_tracks   = [n_tracks[labels==n                                ] for n in classes]
-    trk_mean   = [np.mean(n_tracks[n])                                for n in classes]
-    fig  = plt.figure(figsize=(18,7))
-    xlim = (0, 15)
-    bins = np.arange(xlim[0], xlim[1]+2, 1)
-    for n in [1,2]:
-        plt.subplot(1,2,n); axes = plt.gca()
-        plt.xlim(xlim)
-        plt.xlabel('Number of tracks'      , fontsize=20)
-        plt.xticks( np.arange(xlim[0],xlim[1]+1,1) )
-        plt.ylabel('Normalized entries (%)', fontsize=20)
-        title = 'Track number distribution (' + str(len(classes)) + '-class)'
-        if n == 1: title += '\n(individually normalized)'
-        weights = [len(n_tracks[n]) for n in classes] if n==1 else len(classes)*[len(labels)]
-        weights = [len(n_tracks[n])*[100/weights[n]] for n in classes]
-        plt.title(title, fontsize=20)
-        label  =  ['class '+str(n)+' (mean: '+format(trk_mean[n],'3.1f')+')' for n in classes]
-        plt.hist([n_tracks[n] for n in classes][::-1], bins=bins, lw=2, align='left',
-                 weights=weights[::-1], label=label[::-1], histtype='step')
-        plt.text(0.99, 0.05, '(sample: '+str(len(n_e))+' e)', {'color': 'black', 'fontsize': 12},
-                 ha='right', va= 'center', transform=axes.transAxes)
-        plt.legend(loc='upper right', fontsize=13)
-    file_name = 'outputs/tracks_number.png'; print('Printing:', file_name)
-    plt.savefig(file_name)
-    fig     = plt.figure(figsize=(22,6)); n = 1
-    metrics = {'mean':(var_mean, 'Average'), 'max':(var_max, 'Maximum absolute'),
-               'diff':(var_diff, 'Average difference')}
-    #metrics = {'mean':(var_mean, 'Average'), 'max':(var_mean, 'Average'),
-    #           'diff':(var_mean, 'Average')}
-    for metric in metrics:
-        plt.subplot(1, 3, n); axes = plt.gca(); n+=1
-        n_e    = sum([len(metrics[metric][0][n]) for n in classes])
-        x1, x2 = tracks_var[variable][metric+'_lim']
-        bins   = np.arange(0.9*x1, 1.1*x2, (x2-x1)/100)
-        plt.xlim([x1, x2])
-        plt.title (metrics[metric][1] + ' value of ' + str(variable) + '\'s', fontsize=20)
-        plt.xlabel(metrics[metric][1] + ' value'                            , fontsize=20)
-        plt.ylabel('Normalized entries (%)'                                 , fontsize=20)
-        #weights = [len(metrics[metric][0][n])*[100/len(metrics[metric][0][n])] for n in classes]
-        weights = [len(metrics[metric][0][n])*[100/n_e] for n in classes]
-        plt.hist([metrics[metric][0][n] for n in classes][::-1], weights=weights[::-1], stacked=False,
-                 histtype='step', label=['class '+str(n) for n in classes][::-1], bins=bins, lw=2)
-        plt.text(0.01, 0.97, '(sample: '+str(n_e)+' e)', {'color': 'black', 'fontsize': 12},
-                 ha='left', va= 'center', transform=axes.transAxes)
-        plt.legend(loc='upper right', fontsize=13)
-    file_name = 'outputs/tracks_'+str(variable)+'.png'; print('Printing:', file_name)
-    plt.savefig(file_name)
