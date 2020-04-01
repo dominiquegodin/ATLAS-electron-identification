@@ -1,6 +1,6 @@
 # IMPORT PACKAGES AND FUNCTIONS
 import tensorflow as tf, tensorflow.keras.callbacks as cb
-import numpy      as np, multiprocessing as mp, time, os, sys, h5py
+import numpy      as np, multiprocessing as mp, os, sys, h5py
 from   argparse   import ArgumentParser
 from   tabulate   import tabulate
 from   utils      import valid_data, train_data, compo_matrix, class_weights, binarization
@@ -51,7 +51,7 @@ if not os.path.isdir('outputs'): os.mkdir('outputs')
 checkpoint_file = 'outputs/' + args.checkpoint
 #data_file       = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
 data_file       = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
-n_max           = len(h5py.File(data_file, 'r')['mcChannelNumber'])
+n_max           = len(h5py.File(data_file, 'r')['eventNumber'])
 args.n_train    = [0               , min(n_max, args.n_train                 )]
 args.n_valid    = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, n_max)]
 
@@ -66,7 +66,8 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 #scalars  += ['p_mean_efrac'  , 'p_mean_deta'   , 'p_mean_dphi'  , 'p_mean_d0'  , 'p_mean_z0'     ,
 #             'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'  , 'p_mean_ndof', 'p_mean_pixhits',
 #             'p_mean_scthits', 'p_mean_trthits', 'p_mean_sigmad0']
-others    = ['p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose', 'p_e', 'p_eta', 'p_et_calo']
+others    = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
+             'p_e', 'p_eta', 'p_et_calo']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
@@ -75,7 +76,7 @@ all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
 # ARGUMENTS AND VARIABLES SUMMARY
 print('\nCLASSIFIER OPTIONS:'); print(tabulate(vars(args).items(), tablefmt='psql'))
 print('\nTRAINING VARIABLES:')
-headers = [key            for key in train_var if train_var[key]!=[]]
+headers = [          key  for key in train_var if train_var[key]!=[]]
 table   = [train_var[key] for key in train_var if train_var[key]!=[]]
 length  = max([len(n) for n in table])
 table   = list(map(list, zip(*[n+(length-len(n))*[''] for n in table])))
@@ -130,6 +131,7 @@ if args.n_epochs >= 1:
     checkpoint = cb.ModelCheckpoint(checkpoint_file, save_best_only=True, monitor=args.metrics, verbose=1)
     early_stop = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
     sample_weight = sample_weights(train_sample, train_labels, args.n_classes, args.weight_type)
+    sys.exit()
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[checkpoint, early_stop], epochs=args.n_epochs, verbose=2,
                           class_weight=None if args.n_classes==2 else class_weights(train_labels),
@@ -139,14 +141,13 @@ if args.n_epochs >= 1:
 
 # RESULTS AND PLOTTING SECTION
 print('\nCLASSIFIER: test sample', args.n_valid, 'class predictions')
-valid_probs  = model.predict(valid_sample, batch_size=20000, verbose=2)
-train_labels = [] if args.n_epochs < 1 else train_labels
-print(); compo_matrix(valid_labels, train_labels, valid_probs)
+valid_probs = model.predict(valid_sample, batch_size=20000, verbose=2); print()
+compo_matrix(valid_labels, [] if args.n_epochs < 1 else train_labels, valid_probs)
 print('TEST SAMPLE ACCURACY:', format(100*valid_accuracy(valid_labels, valid_probs), '.2f'), '%\n')
 if args.n_classes > 2 and True:
     print('CLASSIFIER: binarized confusion matrix (multi-class)')
-    valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs)#,[0],[1])
-    compo_matrix(valid_labels, train_labels=[], valid_probs=valid_probs)
+    valid_sample, valid_labels, valid_probs = binarization(valid_sample,valid_labels,valid_probs)#,[0],[1])
+    compo_matrix(valid_labels, valid_probs=valid_probs)
     print('TEST SAMPLE ACCURACY:', format(100*valid_accuracy(valid_labels, valid_probs), '.2f'), '%\n')
 if args.plotting == 'ON':
     #from plots import separate_distributions
@@ -156,10 +157,11 @@ if args.plotting == 'ON':
     arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,) for ROC_type in [1,2,3]]
     processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
     for job in processes: job.start()
+    for job in processes: job.join()
 
 
 # DIFFERENTIAL PLOTS
-if args.plotting == 'ON' and args.differential == 'ON':
+if args.plotting == 'ON' and args.differential == 'ON' and args.n_classes == 2:
     eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
     pt_boundaries   = [10, 20, 30, 40, 60, 80, 120, 180, 300, 500]
     eta, pt         = valid_sample['p_eta'], valid_sample['p_et_calo']

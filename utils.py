@@ -1,9 +1,8 @@
-import tensorflow as tf, numpy as np, multiprocessing, time, os, sys, h5py
-import matplotlib.pyplot as plt
+import tensorflow as tf, matplotlib.pyplot as plt
+import numpy      as np, multiprocessing, time, os, sys, h5py, pickle
 from   sklearn.metrics       import confusion_matrix
 from   sklearn.utils         import shuffle
 from   sklearn.preprocessing import QuantileTransformer
-from   pickle                import dump, load
 from   tabulate              import tabulate
 from   skimage               import transform
 
@@ -96,6 +95,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,ref_var='pt',outpu
     for i_class in range(nClass):
         variable.append( variable_array[ train_labels==i_class ] )
         (binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(variable[i_class])),label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        #(binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(train_labels)),label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
 
         plt.savefig(output_dir+ref_var+"_bfrReweighting.png")
@@ -151,6 +151,8 @@ def sample_weights(train_data,train_labels,nClass,weight_type,ref_var='pt',outpu
     #KM: below only for plotting
     for i_class in range(nClass):
         plt.hist(variable[i_class],bins=binning,weights=final_weights[ train_labels==i_class ],label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        #weights = final_weights[ train_labels==i_class ]/len(train_labels)
+        #plt.hist(variable[i_class],bins=binning, weights=weights, label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
     plt.savefig(output_dir+ref_var+"_aftReweighting.png")
     plt.clf() #clear plot
@@ -304,13 +306,13 @@ def apply_scaler(train_sample, valid_sample, scalars, scaler_file):
         valid_sample[scalars[n]] = valid_scalars[:,n]
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     print('CLASSIFIER: saving fitted data in scaler: outputs/' + scaler_file + '\n')
-    dump(scaler, open('outputs/' + scaler_file, 'wb'))
+    pickle.dump(scaler, open('outputs/' + scaler_file, 'wb'))
     return train_sample, valid_sample
 
 
 def load_scaler(sample, scalars, scaler_file):
     print('CLASSIFIER: loading fitted data from scaler: outputs/' + scaler_file)
-    scaler         = load(open('outputs/' + scaler_file, 'rb'))
+    scaler         = pickle.load(open('outputs/' + scaler_file, 'rb'))
     start_time     = time.time()
     scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
