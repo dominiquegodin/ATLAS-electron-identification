@@ -131,7 +131,6 @@ if args.n_epochs >= 1:
     checkpoint = cb.ModelCheckpoint(checkpoint_file, save_best_only=True, monitor=args.metrics, verbose=1)
     early_stop = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
     sample_weight = sample_weights(train_sample, train_labels, args.n_classes, args.weight_type)
-    sys.exit()
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[checkpoint, early_stop], epochs=args.n_epochs, verbose=2,
                           class_weight=None if args.n_classes==2 else class_weights(train_labels),
