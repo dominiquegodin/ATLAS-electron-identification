@@ -42,8 +42,8 @@ def plot_history(history, key='accuracy', file_name='outputs/history.png'):
     plt.savefig(file_name)
 
 
-def plot_distributions_DG(y_true, y_prob, tag=''):
-    file_name = 'outputs/distributions'+tag+'.png'
+def plot_distributions_DG(y_true, y_prob, output_dir='outputs/',tag=''):
+    file_name = output_dir+'/distributions'+tag+'.png'
     print('CLASSIFIER: saving test sample distributions in:', file_name)
     if max(y_true)+1 == 2:
         #label_dict = {0:'signal', 1:'background'}
@@ -105,8 +105,8 @@ def separate_distributions(y_true, y_prob, sample, tag=''):
     plt.savefig(file_name)
 
 
-def plot_ROC_curves(sample, y_true, y_prob, ROC_type, tag=''):
-    file_name = 'outputs/ROC'+str(ROC_type)+'_curve'+tag+'.png'
+def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir='outputs', tag=''):
+    file_name = output_dir+'/ROC'+str(ROC_type)+'_curve'+tag+'.png'
     print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
     eff_class0, eff_class1 = get_LLH(sample, y_true)
     fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)

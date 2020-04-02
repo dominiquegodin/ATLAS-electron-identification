@@ -305,14 +305,14 @@ def apply_scaler(train_sample, valid_sample, scalars, scaler_file):
         train_sample[scalars[n]] = train_scalars[:,n]
         valid_sample[scalars[n]] = valid_scalars[:,n]
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print('CLASSIFIER: saving fitted data in scaler: outputs/' + scaler_file + '\n')
-    pickle.dump(scaler, open('outputs/' + scaler_file, 'wb'))
+    print('CLASSIFIER: saving fitted data in scaler: ' + scaler_file + '\n')
+    pickle.dump(scaler, open(scaler_file, 'wb'))
     return train_sample, valid_sample
 
 
 def load_scaler(sample, scalars, scaler_file):
     print('CLASSIFIER: loading fitted data from scaler: outputs/' + scaler_file)
-    scaler         = pickle.load(open('outputs/' + scaler_file, 'rb'))
+    scaler         = pickle.load(open(scaler_file, 'rb'))
     start_time     = time.time()
     scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)

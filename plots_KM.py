@@ -76,8 +76,9 @@ def plot_distributions_KM(y_true, y_prob, var_name='',output_dir='outputs/',post
     plt.close()
 
 def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir='outputs/'):
+
     file_name = output_dir
-    if postfix!='':file_name+='differential/'
+    #if postfix!='':file_name+='differential/'
     if not os.path.isdir(file_name): os.mkdir(file_name)
     file_name+= 'ROC'+str(ROC_type)+'_curve'+postfix+'.png'
     print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
@@ -128,7 +129,7 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
             pass
         plt.xlim([x_min, 100])
         plt.ylim([1,   y_max])
-        LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]] for value in eff_class0]
+        LLH_scores = [10,10,10]#[1/fpr[np.argwhere(tpr >= value)[0]] for value in eff_class0]
         for n in np.arange(len(LLH_scores)):
             axes.axhline(LLH_scores[n], xmin=(eff_class0[n]-x_min/100)/(1-x_min/100), xmax=1,
                          ls='--', linewidth=0.5, color='#1f77b4')
@@ -172,7 +173,9 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
         pass
     plt.close()
 
-def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname,output_dir='outputs/'):
+def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname='pt',output_dir='outputs/',evalLLH=False):
+
+    plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2,output_dir=output_dir+"differential/")
 
     tmp_idx=0
 
@@ -211,6 +214,8 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         pfix ="_"+varname+"%d" % tmp_idx
         if tmp_idx!=0:                  pfix+="_Lo%.2f" % boundaries[tmp_idx-1]         #lo
         if tmp_idx!=len(bin_indices)-1: pfix+="_Hi%.2f" % boundaries[tmp_idx]           #hi
+        if evalLLH: pfix+='LLH'
+
 
         if tmp_idx!=0 and tmp_idx!=len(bin_indices)-1:
             x_center = (boundaries[tmp_idx-1] + boundaries[tmp_idx])/2
@@ -235,7 +240,7 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 
         if not(~np.isnan(new_y_prob).any() and ~np.isinf(new_y_prob).any()): print("Nan or Inf detected")
 
-        plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir)
+        plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir+'differential/')
         #plot_distributions_KM(new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
 
         if fill_rej:
@@ -259,16 +264,16 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 #    print(bkg_rejs_fEff[.9])
 #    print(bkg_errs_fEff[.9])
 #
-    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_fEff,bkg_errs_fEff, sigEffs,varname,output_dir,boundaries[-1],cType="Flat" ,makeOutput=True)
-    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_gEff,bkg_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobB",makeOutput=True)
-    plot_rej_vsX_curves(x_centers,x_errs, sig_effs_gEff,sig_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobS",makeOutput=True)
+    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_fEff,bkg_errs_fEff, sigEffs,varname,output_dir,boundaries[-1],cType="Flat" ,makeOutput=True,evalLLH=evalLLH)
+    plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_gEff,bkg_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobB",makeOutput=True,evalLLH=evalLLH)
+    plot_rej_vsX_curves(x_centers,x_errs, sig_effs_gEff,sig_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobS",makeOutput=True,evalLLH=evalLLH)
 
     return
 
 def plot_rej_vsX_curves(x_centers,x_errs,
                         bkg_rejs,bkg_errs,
                         sigEffs,varname,output_dir,x_up,
-                        cType='Flat',makeOutput=False):
+                        cType='Flat',makeOutput=False,evalLLH=False):
     plt.close()
     style.use('classic')
     #ax = plt.figure().add_subplot(111)
@@ -301,7 +306,12 @@ def plot_rej_vsX_curves(x_centers,x_errs,
     plt.ylabel(ystring,fontsize=15)
     if varname.find('pt')!=-1: plt.xlabel(varname+' [GeV]',fontsize=15)
     else:                      plt.xlabel(varname,         fontsize=15)
-    plt.title(cType+" efficiency plot. sig-eff: ",fontweight='bold')
+    
+    title_str = cType
+    if evalLLH: title_str+= "LLH"
+    title_str += " efficiency plot. sig-eff: "
+    plt.title(title_str,fontweight='bold') #plt.title(cType+" efficiency plot. sig-eff: ",fontweight='bold')
+
 
     #KM: some sort of legend
     plt.text(0.75, 1.02, '70%', transform=plt.gca().transAxes, color='b', fontsize=15)
@@ -310,13 +320,17 @@ def plot_rej_vsX_curves(x_centers,x_errs,
 
     output_name=output_dir+"rej_vs_"
     if cType.find('GlobS')!=-1: output_name=output_dir+"eff_vs_"
-    output_name+=varname+"_"+cType+".png"
+    output_name+=varname+"_"+cType
+    if evalLLH: output_name+="LLH"
+    output_name+=".png"    #output_name+=varname+"_"+cType+".png"
     print(output_name)
     plt.savefig(output_name)
     #plt.close()
 
     if makeOutput: #pickle.dump(errGraphs, open(output_dir+cType+'_graphs.pickle', 'wb'))
-        outfilename=output_dir+cType+'_graphs.pkl'
+        outfilename=output_dir+cType
+        if evalLLH: outfilename+="LLH"
+        outfilename+='_graphs.pkl'    #outfilename=output_dir+cType+'_graphs.pkl'
         print('Writing pickle file:', outfilename)
         pickle.dump(errGraphs,open(outfilename, 'wb'))
         pass

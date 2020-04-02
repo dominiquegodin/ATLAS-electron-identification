@@ -32,9 +32,11 @@ parser.add_argument( '--resampling'  ,  default = 'OFF'               )
 parser.add_argument( '--weight_type' ,  default =  None               )
 parser.add_argument( '--metrics'     ,  default = 'val_accuracy'      )
 parser.add_argument( '--checkpoint'  ,  default = 'checkpoint.h5'     )
+parser.add_argument( '--output_dir'  ,  default='outputs/'            )
+parser.add_argument( '--input'       ,  default = ''                  )
 parser.add_argument( '--weight_file' ,  default =  None               )
-parser.add_argument( '--pickle_file' ,  default = 'scaler.pkl'        )
-parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        )
+parser.add_argument( '--pickle_file' ,  default = 'scaler.pkl'        ) #input for the quantile transform
+parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        ) #output of the q-tranform
 parser.add_argument( '--cuts'        ,  default =  None               )
 args = parser.parse_args()
 #for key, val in vars(args).items(): vars(args)[key]= int(val) if type(val)==float else val
@@ -48,9 +50,12 @@ if '.h5' not in args.weight_file: args.weight_file = None
 
 # DATAFILE PATH AND SAMPLES SIZES
 if not os.path.isdir('outputs'): os.mkdir('outputs')
-checkpoint_file = 'outputs/' + args.checkpoint
+checkpoint_file = args.output_dir + args.checkpoint
 #data_file       = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
 data_file       = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
+if args.input!='': data_file= args.input
+if not os.path.isdir(args.output_dir): os.mkdir(args.output_dir)
+
 n_max           = len(h5py.File(data_file, 'r')['eventNumber'])
 args.n_train    = [0               , min(n_max, args.n_train                 )]
 args.n_valid    = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, n_max)]
@@ -67,7 +72,7 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 #             'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'  , 'p_mean_ndof', 'p_mean_pixhits',
 #             'p_mean_scthits', 'p_mean_trthits', 'p_mean_sigmad0']
 others    = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
-             'p_e', 'p_eta', 'p_et_calo']
+             'p_e', 'p_eta', 'p_et_calo','p_LHValue']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
@@ -109,8 +114,8 @@ with strategy.scope():
     model = multi_CNN(args.n_classes,args.NN_type,valid_sample,args.l2,args.dropout,args.alpha,**train_var)
     print(); model.summary()
     if args.weight_file != None:
-        print('\nCLASSIFIER: loading pre-trained weights from: outputs/' + args.weight_file)
-        model.load_weights('outputs/' + args.weight_file)
+        print('\nCLASSIFIER: loading pre-trained weights from: ' + args.weight_file)
+        model.load_weights(args.weight_file)
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
 
@@ -125,12 +130,12 @@ if args.n_epochs >= 1:
     #for idx in list(zip(args.n_train[:-1], args.n_train[1:])):
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
     arguments = (data_file, valid_sample, all_var, scalars, args.n_train, args.n_tracks, args.n_classes,
-                 args.resampling, args.scaling, args.scaler_file, args.pickle_file, args.weight_file, args.cuts)
+                 args.resampling, args.scaling, args.output_dir+args.scaler_file, args.pickle_file, args.weight_file, args.cuts)
     train_sample, valid_sample, train_labels = train_data(*arguments)
     compo_matrix(valid_labels, train_labels=train_labels); print()
     checkpoint = cb.ModelCheckpoint(checkpoint_file, save_best_only=True, monitor=args.metrics, verbose=1)
     early_stop = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
-    sample_weight = sample_weights(train_sample, train_labels, args.n_classes, args.weight_type)
+    sample_weight = sample_weights(train_sample, train_labels, args.n_classes, args.weight_type,output_dir=args.output_dir)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[checkpoint, early_stop], epochs=args.n_epochs, verbose=2,
                           class_weight=None if args.n_classes==2 else class_weights(train_labels),
@@ -151,9 +156,9 @@ if args.n_classes > 2 and True:
 if args.plotting == 'ON':
     #from plots import separate_distributions
     #processes = [mp.Process(target=separate_distributions,args=(valid_labels, valid_probs, valid_sample))]
-    processes  = [mp.Process(target=plot_distributions_DG, args=(valid_labels,valid_probs,))]
-    if args.n_epochs > 1: processes += [mp.Process(target=plot_history, args=(training,))]
-    arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,) for ROC_type in [1,2,3]]
+    processes  = [mp.Process(target=plot_distributions_DG, args=(valid_labels,valid_probs,args.output_dir,))]
+    if args.n_epochs > 1: processes += [mp.Process(target=plot_history, args=(training,'accuracy',args.output_dir+"history.png",))]
+    arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,args.output_dir) for ROC_type in [1,2,3]]
     processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
     for job in processes: job.start()
     for job in processes: job.join()
@@ -162,13 +167,19 @@ if args.plotting == 'ON':
 # DIFFERENTIAL PLOTS
 if args.plotting == 'ON' and args.differential == 'ON' and args.n_classes == 2:
     eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
-    pt_boundaries   = [10, 20, 30, 40, 60, 80, 120, 180, 300, 500]
+    pt_boundaries=  [10, 20, 30, 40, 60, 100, 200, 500] #60, 80, 120, 180, 300, 500]
     eta, pt         = valid_sample['p_eta'], valid_sample['p_et_calo']
     eta_bin_indices = get_bin_indices(eta, eta_boundaries)
     pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
-    plot_distributions_KM(valid_labels, eta, 'eta')
-    plot_distributions_KM(valid_labels, pt , 'pt')
+    plot_distributions_KM(valid_labels, eta, 'eta',output_dir=args.output_dir)
+    plot_distributions_KM(valid_labels, pt , 'pt',output_dir=args.output_dir)
+
+    tmp_llh      = valid_sample['p_LHValue']
+    tmp_llh_pair = np.zeros(len(tmp_llh))
+    prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
+
     print('\nEvaluating differential performance in eta')
-    differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, 'eta')
+    differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, varname='eta',output_dir=args.output_dir)
     print('\nEvaluating differential performance in pt')
-    differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries , pt_bin_indices , 'pt')
+    differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries, pt_bin_indices, varname='pt',output_dir=args.output_dir)
+    differential_plots(valid_sample, valid_labels, prob_LLH   , pt_boundaries, pt_bin_indices, varname="pt",output_dir=args.output_dir,evalLLH=True)
