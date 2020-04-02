@@ -72,7 +72,7 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 #             'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'  , 'p_mean_ndof', 'p_mean_pixhits',
 #             'p_mean_scthits', 'p_mean_trthits', 'p_mean_sigmad0']
 others    = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
-             'p_e', 'p_eta', 'p_et_calo']
+             'p_e', 'p_eta', 'p_et_calo','p_LHValue']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
@@ -114,8 +114,8 @@ with strategy.scope():
     model = multi_CNN(args.n_classes,args.NN_type,valid_sample,args.l2,args.dropout,args.alpha,**train_var)
     print(); model.summary()
     if args.weight_file != None:
-        print('\nCLASSIFIER: loading pre-trained weights from: outputs/' + args.weight_file)
-        model.load_weights('outputs/' + args.weight_file)
+        print('\nCLASSIFIER: loading pre-trained weights from: ' + args.weight_file)
+        model.load_weights(args.weight_file)
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
 
@@ -167,13 +167,19 @@ if args.plotting == 'ON':
 # DIFFERENTIAL PLOTS
 if args.plotting == 'ON' and args.differential == 'ON' and args.n_classes == 2:
     eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
-    pt_boundaries   = [10, 20, 30, 40, 60, 80, 120, 180, 300, 500]
+    pt_boundaries=  [10, 20, 30, 40, 60, 100, 200, 500] #60, 80, 120, 180, 300, 500]
     eta, pt         = valid_sample['p_eta'], valid_sample['p_et_calo']
     eta_bin_indices = get_bin_indices(eta, eta_boundaries)
     pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
     plot_distributions_KM(valid_labels, eta, 'eta',output_dir=args.output_dir)
     plot_distributions_KM(valid_labels, pt , 'pt',output_dir=args.output_dir)
+
+    tmp_llh      = valid_sample['p_LHValue']
+    tmp_llh_pair = np.zeros(len(tmp_llh))
+    prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
+
     print('\nEvaluating differential performance in eta')
-    differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, 'eta',output_dir=args.output_dir)
+    differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, varname='eta',output_dir=args.output_dir)
     print('\nEvaluating differential performance in pt')
-    differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries , pt_bin_indices , 'pt',output_dir=args.output_dir)
+    differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries, pt_bin_indices, varname='pt',output_dir=args.output_dir)
+    differential_plots(valid_sample, valid_labels, prob_LLH   , pt_boundaries, pt_bin_indices, varname="pt",output_dir=args.output_dir,evalLLH=True)
