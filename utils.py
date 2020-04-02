@@ -312,7 +312,7 @@ def apply_scaler(train_sample, valid_sample, scalars, scaler_file):
 
 def load_scaler(sample, scalars, scaler_file):
     print('CLASSIFIER: loading fitted data from scaler: outputs/' + scaler_file)
-    scaler         = pickle.load(open('outputs/' + scaler_file, 'rb'))
+    scaler         = pickle.load(open(scaler_file, 'rb'))
     start_time     = time.time()
     scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
