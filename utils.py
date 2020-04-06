@@ -68,7 +68,7 @@ def get_bin_indices(p_var,boundaries):
     return bin_indices
 
 #def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
-def sample_weights(train_data,train_labels,nClass,weight_type,ref_var='pt',output_dir='outputs/'):
+def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='outputs/',ref_var='pt'):
 #    if weight_type=="none": return None
     if weight_type==None: return None
 
@@ -98,7 +98,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,ref_var='pt',outpu
         #(binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(train_labels)),label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
 
-        plt.savefig(output_dir+ref_var+"_bfrReweighting.png")
+        plt.savefig(output_dir+'/'+ref_var+"_bfrReweighting.png")
     plt.clf() #clear figure
 
     weights=list() #KM: currently implemented for the 2-class case only
@@ -154,7 +154,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,ref_var='pt',outpu
         #weights = final_weights[ train_labels==i_class ]/len(train_labels)
         #plt.hist(variable[i_class],bins=binning, weights=weights, label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
-    plt.savefig(output_dir+ref_var+"_aftReweighting.png")
+    plt.savefig(output_dir+'/'+ref_var+"_aftReweighting.png")
     plt.clf() #clear plot
 
     return final_weights
@@ -168,20 +168,20 @@ def sample_weights(train_data,train_labels,nClass,weight_type,ref_var='pt',outpu
 
 
 def valid_data(data_file, all_var, scalars, idx, n_tracks, n_classes,
-               scaling, pickle_file, weight_file, cuts):
+               scaling, scaler_in, weight_file, cuts):
     start_time   = time.time()
     valid_sample = make_sample(data_file, all_var, idx, n_tracks)
     valid_labels = make_labels(valid_sample, n_classes)
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     valid_sample, valid_labels = sample_cuts(valid_sample, valid_labels, cuts)
-    #sample_checks(valid_sample, valid_labels, scalars, pickle_file); sys.exit()
+    #sample_checks(valid_sample, valid_labels, scalars, scaler_in); sys.exit()
     if weight_file != None and scaling:
-        valid_sample = load_scaler(valid_sample, scalars, pickle_file)
+        valid_sample = load_scaler(valid_sample, scalars, scaler_in)
     return valid_sample, valid_labels
 
 
 def train_data(data_file, valid_sample, all_var, scalars, idx, n_tracks, n_classes,
-               resampling, scaling, scaler_file, pickle_file, weight_file, cuts):
+               resampling, scaling, scaler_out, scaler_in, weight_file, cuts):
     start_time   = time.time()
     train_sample = make_sample(data_file, all_var, idx, n_tracks)
     train_labels = make_labels(train_sample, n_classes)
@@ -191,9 +191,9 @@ def train_data(data_file, valid_sample, all_var, scalars, idx, n_tracks, n_class
     if resampling == 'ON':
         train_sample, train_labels = balance_sample(train_sample, train_labels, n_classes)
     if weight_file == None and scaling:
-        train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_file)
+        train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
     if weight_file != None and scaling:
-        train_sample = load_scaler(train_sample, scalars, pickle_file)
+        train_sample = load_scaler(train_sample, scalars, scaler_in)
     return train_sample, valid_sample, train_labels
 
 
@@ -293,7 +293,7 @@ def balance_sample(sample, labels, n_classes):
     return sample, np.take(labels, label_rows)
 
 
-def apply_scaler(train_sample, valid_sample, scalars, scaler_file):
+def apply_scaler(train_sample, valid_sample, scalars, scaler_out):
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
     start_time    = time.time()
     train_scalars = np.hstack([np.expand_dims(train_sample[key], axis=1) for key in scalars])
@@ -305,14 +305,14 @@ def apply_scaler(train_sample, valid_sample, scalars, scaler_file):
         train_sample[scalars[n]] = train_scalars[:,n]
         valid_sample[scalars[n]] = valid_scalars[:,n]
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print('CLASSIFIER: saving fitted data in scaler: ' + scaler_file + '\n')
-    pickle.dump(scaler, open(scaler_file, 'wb'))
+    print('CLASSIFIER: saving transformed scalars in ' + scaler_out + '\n')
+    pickle.dump(scaler, open(scaler_out, 'wb'))
     return train_sample, valid_sample
 
 
-def load_scaler(sample, scalars, scaler_file):
-    print('CLASSIFIER: loading fitted data from scaler: outputs/' + scaler_file)
-    scaler         = pickle.load(open(scaler_file, 'rb'))
+def load_scaler(sample, scalars, scaler_in):
+    print('CLASSIFIER: loading transformed scalars from ' + scaler_in)
+    scaler         = pickle.load(open(scaler_in, 'rb'))
     start_time     = time.time()
     scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
@@ -339,6 +339,7 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
     valid_sizes = mp_get_sizes(valid_labels, n_classes)
     train_sizes = n_classes*['n/a'] if train_labels == [] else mp_get_sizes(train_labels, n_classes)
     classes     = ['CLASS '+str(n) for n in np.arange(n_classes)]
+    print()
     if valid_probs == []:
         print('+--------------------------------------+')
         print('| CLASS DISTRIBUTIONS                  |')
@@ -394,7 +395,7 @@ def scan_sample(sample):
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
 
 
-def sample_checks(sample, labels, scalars, pickle_file):
+def sample_checks(sample, labels, scalars, scaler_in):
     for key in sample: print(key, sample[key].shape)
     scan_sample(sample)
     # TRACKS DISTRIBUTIONS
@@ -406,7 +407,7 @@ def sample_checks(sample, labels, scalars, pickle_file):
     # SCALARS DISTRIBUTIONS
     #from plots import plot_scalars
     #sample_trans = sample.copy()
-    #sample_trans = load_scaler(sample_trans, scalars, pickle_file)#[0]
+    #sample_trans = load_scaler(sample_trans, scalars, scaler_in)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
 
@@ -436,7 +437,7 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
     var_list = np.concatenate(var_list)
     sample.update({key:var_list[:,var_dict[key]] for key in var_dict})
     for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
-    #sample.update({'true_m':np.float16(get_truth_m(sample))})
+    sample.update({'true_m':np.float16(get_truth_m(sample))})
     for key in tracks + ['p_truth_E']: sample.pop(key)
     with h5py.File(output_path+'temp_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
         for key in sample:

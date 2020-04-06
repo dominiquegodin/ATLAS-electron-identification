@@ -31,12 +31,12 @@ parser.add_argument( '--scaling'     ,  default = 'ON'                )
 parser.add_argument( '--resampling'  ,  default = 'OFF'               )
 parser.add_argument( '--weight_type' ,  default =  None               )
 parser.add_argument( '--metrics'     ,  default = 'val_accuracy'      )
-parser.add_argument( '--checkpoint'  ,  default = 'checkpoint.h5'     )
-parser.add_argument( '--output_dir'  ,  default='outputs/'            )
+parser.add_argument( '--checkpoint'  ,  default = 'checkpoint.h5'     ) #to be removed
+parser.add_argument( '--output_dir'  ,  default = 'outputs'           )
 parser.add_argument( '--input'       ,  default = ''                  )
 parser.add_argument( '--weight_file' ,  default =  None               )
-parser.add_argument( '--pickle_file' ,  default = 'scaler.pkl'        ) #input for the quantile transform
-parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        ) #output of the q-tranform
+parser.add_argument( '--scaler_in'   ,  default = 'scaler.pkl'        ) #to be removed
+parser.add_argument( '--scaler_out'  ,  default = 'scaler.pkl'        ) #to be removed
 parser.add_argument( '--cuts'        ,  default =  None               )
 args = parser.parse_args()
 #for key, val in vars(args).items(): vars(args)[key]= int(val) if type(val)==float else val
@@ -49,8 +49,8 @@ if '.h5' not in args.weight_file: args.weight_file = None
 
 
 # DATAFILE PATH AND SAMPLES SIZES
-if not os.path.isdir('outputs'): os.mkdir('outputs')
-checkpoint_file = args.output_dir + args.checkpoint
+if not os.path.isdir(args.output_dir): os.mkdir(args.output_dir)
+checkpoint_file = args.output_dir + '/' + args.checkpoint
 #data_file       = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
 data_file       = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
 if args.input!='': data_file= args.input
@@ -100,7 +100,7 @@ args.scaling = args.scaling == 'ON' and scalars != []
 # TEST SAMPLE GENERATION
 print('\nCLASSIFIER: loading test sample', args.n_valid, end=' ... ', flush=True)
 arguments = (data_file, all_var, scalars, args.n_valid, args.n_tracks, args.n_classes,
-             args.scaling, args.pickle_file, args.weight_file, args.cuts)
+             args.scaling, args.scaler_in, args.weight_file, args.cuts)
 valid_sample, valid_labels = valid_data(*arguments)
 
 
@@ -130,16 +130,17 @@ if args.n_epochs >= 1:
     #for idx in list(zip(args.n_train[:-1], args.n_train[1:])):
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
     arguments = (data_file, valid_sample, all_var, scalars, args.n_train, args.n_tracks, args.n_classes,
-                 args.resampling, args.scaling, args.output_dir+args.scaler_file, args.pickle_file, args.weight_file, args.cuts)
+                 args.resampling, args.scaling, args.output_dir+'/'+args.scaler_out, args.scaler_in,
+                 args.weight_file, args.cuts)
     train_sample, valid_sample, train_labels = train_data(*arguments)
     compo_matrix(valid_labels, train_labels=train_labels); print()
     checkpoint = cb.ModelCheckpoint(checkpoint_file, save_best_only=True, monitor=args.metrics, verbose=1)
     early_stop = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
-    sample_weight = sample_weights(train_sample, train_labels, args.n_classes, args.weight_type,output_dir=args.output_dir)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[checkpoint, early_stop], epochs=args.n_epochs, verbose=2,
                           class_weight=None if args.n_classes==2 else class_weights(train_labels),
-                          sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size) )
+                          sample_weight=sample_weights(train_sample, train_labels, args.n_classes,
+                          args.weight_type, args.output_dir), batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(checkpoint_file)
 
 
@@ -157,11 +158,12 @@ if args.plotting == 'ON':
     #from plots import separate_distributions
     #processes = [mp.Process(target=separate_distributions,args=(valid_labels, valid_probs, valid_sample))]
     processes  = [mp.Process(target=plot_distributions_DG, args=(valid_labels,valid_probs,args.output_dir,))]
-    if args.n_epochs > 1: processes += [mp.Process(target=plot_history, args=(training,'accuracy',args.output_dir+"history.png",))]
+    if args.n_epochs > 1: processes += [mp.Process(target=plot_history, args=(training,args.output_dir,))]
     arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,args.output_dir) for ROC_type in [1,2,3]]
     processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
     for job in processes: job.start()
     for job in processes: job.join()
+    print()
 
 
 # DIFFERENTIAL PLOTS
@@ -179,7 +181,10 @@ if args.plotting == 'ON' and args.differential == 'ON' and args.n_classes == 2:
     prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
 
     print('\nEvaluating differential performance in eta')
-    differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, varname='eta',output_dir=args.output_dir)
+    differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries,
+                       eta_bin_indices, varname='eta', output_dir=args.output_dir)
     print('\nEvaluating differential performance in pt')
-    differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries, pt_bin_indices, varname='pt',output_dir=args.output_dir)
-    differential_plots(valid_sample, valid_labels, prob_LLH   , pt_boundaries, pt_bin_indices, varname="pt",output_dir=args.output_dir,evalLLH=True)
+    differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries,
+                       pt_bin_indices,  varname='pt',  output_dir=args.output_dir)
+    differential_plots(valid_sample, valid_labels, prob_LLH   , pt_boundaries,
+                       pt_bin_indices,  varname="pt",  output_dir=args.output_dir, evalLLH=True)
