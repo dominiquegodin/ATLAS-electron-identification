@@ -22,9 +22,10 @@ def get_LLH(sample, y_true):
     return eff_class0, eff_class1
 
 
-def plot_history(history, key='accuracy', file_name='outputs/history.png'):
+def plot_history(history, output_dir, key='accuracy'):
     if len(history.epoch) < 2: return
-    print('CLASSIFIER: saving training accuracy history in:', file_name)
+    file_name = output_dir+'/history.png'
+    print('Saving training accuracy history to:', file_name)
     plt.figure(figsize=(12,8))
     pylab.grid(True)
     val = plt.plot(np.array(history.epoch)+1, 100*np.array(history.history[key]), label='Training')
@@ -35,16 +36,16 @@ def plot_history(history, key='accuracy', file_name='outputs/history.png'):
     plt.xlim([1, max(history.epoch)+1])
     plt.xticks( np.append(1,np.arange(5,max(history.epoch)+2,step=5)) )
     plt.xlabel('Epochs',fontsize=25)
-    plt.ylim( max(80,min_acc),max_acc )
+    plt.ylim( max(70,min_acc),max_acc )
     plt.yticks( np.arange(max(80,min_acc),max_acc+1,step=1) )
     plt.ylabel(key.title()+' (%)',fontsize=25)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
     plt.savefig(file_name)
 
 
-def plot_distributions_DG(y_true, y_prob, output_dir='outputs/',tag=''):
-    file_name = output_dir+'/distributions'+tag+'.png'
-    print('CLASSIFIER: saving test sample distributions in:', file_name)
+def plot_distributions_DG(y_true, y_prob, output_dir):
+    file_name = output_dir+'/distributions.png'
+    print('Saving test sample distributions to:', file_name)
     if max(y_true)+1 == 2:
         #label_dict = {0:'signal', 1:'background'}
         label_dict = {0:'iso electron', 1:'all others'}
@@ -71,11 +72,11 @@ def plot_distributions_DG(y_true, y_prob, output_dir='outputs/',tag=''):
     plt.savefig(file_name)
 
 
-def separate_distributions(y_true, y_prob, sample, tag=''):
+def separate_distributions(sample, y_true, y_prob, output_dir='outputs'):
     from utils import make_labels
-    file_name = 'outputs/distributions'+tag+'.png'
     labels = make_labels(sample, n_classes=6)
-    print('CLASSIFIER: saving test sample distributions in:', file_name)
+    file_name = output_dir+'/distributions.png'
+    print('Saving test sample distributions to:', file_name)
     label_dict = {0:'iso electron', 1:'charge flip', 2:'photon conversion', 3:'b/c hadron decay',
                   4:'light flavor decay (bkg $\gamma$ + e$^\pm$)', 5:'light flavor decay (bkg hadron)'}
     plt.figure(figsize=(12,8))
@@ -105,9 +106,9 @@ def separate_distributions(y_true, y_prob, sample, tag=''):
     plt.savefig(file_name)
 
 
-def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir='outputs', tag=''):
-    file_name = output_dir+'/ROC'+str(ROC_type)+'_curve'+tag+'.png'
-    print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
+def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
+    file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
+    print('Saving test sample ROC'+str(ROC_type)+' curve to:   ', file_name)
     eff_class0, eff_class1 = get_LLH(sample, y_true)
     fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
     signal_ratio        = sum(y_true==0)/len(y_true)
@@ -222,8 +223,9 @@ def plot_image(cal_image, n_classes, e_class, images, image):
     return
 
 
-def cal_images(files, images, file_name='outputs/cal_images.png'):
-    print('\nCLASSIFIER: saving calorimeter images in:', file_name,'\n')
+def cal_images(files, images, output_dir):
+    file_name = output_dir+'/distributions.png'
+    print('\nSaving calorimeter images to:', file_name,'\n')
     fig = plt.figure(figsize=(8,12))
     for e_class in np.arange( 0, len(files) ):
         input_file = h5py.File( files[e_class], 'r' )
@@ -298,7 +300,7 @@ def plot_tracks(tracks, labels, variable):
         plt.text(0.99, 0.05, '(sample: '+str(len(n_e))+' e)', {'color': 'black', 'fontsize': 12},
                  ha='right', va= 'center', transform=axes.transAxes)
         plt.legend(loc='upper right', fontsize=13)
-    file_name = 'outputs/tracks_number.png'; print('Printing:', file_name)
+    file_name = 'outputs/plots/tracks_number.png'; print('Printing:', file_name)
     plt.savefig(file_name)
     fig     = plt.figure(figsize=(22,6)); n = 1
     metrics = {'mean':(var_mean, 'Average'), 'max':(var_max, 'Maximum absolute'),
@@ -321,5 +323,5 @@ def plot_tracks(tracks, labels, variable):
         plt.text(0.01, 0.97, '(sample: '+str(n_e)+' e)', {'color': 'black', 'fontsize': 12},
                  ha='left', va= 'center', transform=axes.transAxes)
         plt.legend(loc='upper right', fontsize=13)
-    file_name = 'outputs/tracks_'+str(variable)+'.png'; print('Printing:', file_name)
+    file_name = 'outputs/plots/tracks_'+str(variable)+'.png'; print('Printing:', file_name)
     plt.savefig(file_name)

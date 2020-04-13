@@ -70,7 +70,7 @@ for h5_file in data_files:
     sample = pool.map(func, np.arange(n_tasks))
     sum_e += batch_size
     print ('(', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
-pool.close(); pool.join();
+pool.close(); pool.join()
 
 
 # MERGING FILES
