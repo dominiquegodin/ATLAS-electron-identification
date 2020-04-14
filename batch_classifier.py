@@ -186,7 +186,7 @@ if args.cross_valid == 'OFF':
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
-if args.n_folds > 1:
+if args.n_folds <= 1:
     print('Saving validation results to', args.output_dir+'/'+'valid_results.pkl', '\n')
     valid_sample = {key:valid_sample[key] for key in others}
     pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+'valid_results.pkl','wb'))

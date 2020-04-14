@@ -359,7 +359,7 @@ def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_f
 
 def valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, output_dir, plotting):
     compo_matrix(valid_labels, train_labels, valid_probs)
-    if max(valid_labels) > 1 and True:
+    if max(valid_labels) > 1 and False:
         valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs)
         compo_matrix(valid_labels, valid_probs=valid_probs)
     if plotting == 'ON':
