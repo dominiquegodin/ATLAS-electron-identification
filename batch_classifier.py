@@ -37,7 +37,7 @@ parser.add_argument( '--resampling'  ,  default = 'OFF'               )
 parser.add_argument( '--scaling'     ,  default = 'ON'                )
 parser.add_argument( '--cross_valid' ,  default = 'OFF'               )
 parser.add_argument( '--plotting'    ,  default = 'ON'                )
-#parser.add_argument( '--input'       ,  default = ''                  )
+parser.add_argument( '--input'       ,  default = ''                  )
 parser.add_argument( '--output_dir'  ,  default = 'outputs'           )
 parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        )
 parser.add_argument( '--checkpoint'  ,  default = ''                  )
@@ -73,12 +73,12 @@ args.scaler_file = args.scaler_file if '.pkl' in args.scaler_file else ''
 args.checkpoint  = args.checkpoint  if '.h5'  in args.checkpoint  else ''
 scaler_file      =  args.output_dir+'/'+args.scaler_file
 checkpoint       =  args.output_dir+'/'+args.checkpoint
-#if args.input!='': data_file= args.input
+
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     if not os.path.isdir(path): os.mkdir(path)
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
 data_file = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
-
+if args.input!='': data_file= args.input
 
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3',
