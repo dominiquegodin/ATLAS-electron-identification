@@ -1,12 +1,12 @@
 # IMPORT PACKAGES AND FUNCTIONS
 import tensorflow as tf, tensorflow.keras.callbacks as cb
-import numpy      as np, multiprocessing as mp, os, sys, h5py
+import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle
 from   argparse   import ArgumentParser
 from   tabulate   import tabulate
-from   utils      import valid_data, train_data, compo_matrix, class_weights, binarization
+from   itertools  import accumulate
+from   utils      import make_sample, sample_composition, balance_sample, apply_scaler, load_scaler
+from   utils      import compo_matrix, class_weights, cross_validation, valid_results, sample_analysis
 from   utils      import sample_weights, get_bin_indices
-from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
-from   plots_KM   import plot_distributions_KM, differential_plots
 from   models     import multi_CNN
 
 
@@ -14,51 +14,70 @@ from   models     import multi_CNN
 parser = ArgumentParser()
 parser.add_argument( '--n_train'     ,  default =  1e5,  type = float )
 parser.add_argument( '--n_valid'     ,  default =  1e5,  type = float )
-parser.add_argument( '--batch_size'  ,  default =  1e3,  type = float )
+parser.add_argument( '--batch_size'  ,  default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    ,  default =  100,  type = int   )
 parser.add_argument( '--n_classes'   ,  default =    2,  type = int   )
-parser.add_argument( '--n_tracks'    ,  default =   10,  type = int   )
+parser.add_argument( '--n_tracks'    ,  default =    5,  type = int   )
+parser.add_argument( '--n_folds'     ,  default =    1,  type = int   )
+parser.add_argument( '--fold_number' ,  default =    0,  type = int   )
 parser.add_argument( '--n_gpus'      ,  default =    4,  type = int   )
+parser.add_argument( '--verbose'     ,  default =    1,  type = int   )
 parser.add_argument( '--l2'          ,  default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     ,  default = 0.05,  type = float )
 parser.add_argument( '--alpha'       ,  default =    0,  type = float )
+parser.add_argument( '--CNN_neurons' ,  default = [200, 200]          )
+parser.add_argument( '--FCN_neurons' ,  default = [200, 200]          )
+parser.add_argument( '--weight_type' ,  default = None                )
 parser.add_argument( '--NN_type'     ,  default = 'CNN'               )
 parser.add_argument( '--images'      ,  default = 'ON'                )
 parser.add_argument( '--scalars'     ,  default = 'ON'                )
-parser.add_argument( '--plotting'    ,  default = 'ON'                )
-parser.add_argument( '--differential',  default = 'ON'                )
-parser.add_argument( '--scaling'     ,  default = 'ON'                )
-parser.add_argument( '--resampling'  ,  default = 'OFF'               )
-parser.add_argument( '--weight_type' ,  default =  None               )
+parser.add_argument( '--cuts'        ,  default = ''                  )
 parser.add_argument( '--metrics'     ,  default = 'val_accuracy'      )
-parser.add_argument( '--checkpoint'  ,  default = 'checkpoint.h5'     )
-parser.add_argument( '--output_dir'  ,  default='outputs/'            )
-parser.add_argument( '--input'       ,  default = ''                  )
-parser.add_argument( '--weight_file' ,  default =  None               )
-parser.add_argument( '--pickle_file' ,  default = 'scaler.pkl'        ) #input for the quantile transform
-parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        ) #output of the q-tranform
-parser.add_argument( '--cuts'        ,  default =  None               )
+parser.add_argument( '--resampling'  ,  default = 'OFF'               )
+parser.add_argument( '--scaling'     ,  default = 'ON'                )
+parser.add_argument( '--cross_valid' ,  default = 'OFF'               )
+parser.add_argument( '--plotting'    ,  default = 'ON'                )
+#parser.add_argument( '--input'       ,  default = ''                  )
+parser.add_argument( '--output_dir'  ,  default = 'outputs'           )
+parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        )
+parser.add_argument( '--checkpoint'  ,  default = ''                  )
+parser.add_argument( '--result_file' ,  default = ''                  )
 args = parser.parse_args()
+
+
+# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
+if '.pkl' in args.result_file:
+    result_file = args.output_dir+'/'+args.result_file
+    if os.path.isfile(result_file):
+        print('\nLOADING VALIDATION RESULTS FROM', result_file, '\n')
+        sample, labels, probs = pickle.load(open(result_file, 'rb'))
+        valid_results(sample, labels, probs, [], None, args.output_dir, args.plotting)
+    sys.exit()
+
+
+# PROGRAM ARGUMENTS VERIFICATIONS
+for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
 #for key, val in vars(args).items(): vars(args)[key]= int(val) if type(val)==float else val
 #for key, val in vars(args).items(): exec(key + '= val')
-for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
 if args.weight_type not in ['flattening', 'match2s', 'match2b']: args.weight_type = None
-if '.h5' not in args.weight_file and args.n_epochs < 1:
-    print('\nCLASSIFIER: no valid weight file -> exiting program\n'); sys.exit()
-if '.h5' not in args.weight_file: args.weight_file = None
+if '.h5' not in args.checkpoint and args.n_epochs < 1:
+    print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
+if args.cross_valid == 'ON' and args.n_folds <= 1:
+    print('\nERROR: n_folds must be greater than 1 for cross-validation -> exiting program\n'); sys.exit()
+if args.n_folds > 1 and args.fold_number >= args.n_folds:
+    print('\nERROR: fold_number must be smaller than n_folds -> exiting program\n'); sys.exit()
 
 
-# DATAFILE PATH AND SAMPLES SIZES
-if not os.path.isdir('outputs'): os.mkdir('outputs')
-checkpoint_file = args.output_dir + args.checkpoint
-#data_file       = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
-data_file       = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
-if args.input!='': data_file= args.input
-if not os.path.isdir(args.output_dir): os.mkdir(args.output_dir)
-
-n_max           = len(h5py.File(data_file, 'r')['eventNumber'])
-args.n_train    = [0               , min(n_max, args.n_train                 )]
-args.n_valid    = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, n_max)]
+# DATAFILE AND PATHS
+args.scaler_file = args.scaler_file if '.pkl' in args.scaler_file else ''
+args.checkpoint  = args.checkpoint  if '.h5'  in args.checkpoint  else ''
+scaler_file      =  args.output_dir+'/'+args.scaler_file
+checkpoint       =  args.output_dir+'/'+args.checkpoint
+#if args.input!='': data_file= args.input
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+    if not os.path.isdir(path): os.mkdir(path)
+#data_file = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
+data_file = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
 
 
 # TRAINING VARIABLES
@@ -72,114 +91,102 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 #             'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'  , 'p_mean_ndof', 'p_mean_pixhits',
 #             'p_mean_scthits', 'p_mean_trthits', 'p_mean_sigmad0']
 others    = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
-             'p_e', 'p_eta', 'p_et_calo','p_LHValue']
+             'p_eta', 'p_et_calo','p_LHValue']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
-# ARGUMENTS AND VARIABLES SUMMARY
-print('\nCLASSIFIER OPTIONS:'); print(tabulate(vars(args).items(), tablefmt='psql'))
+# ARCHITECTURE SELECTION AND MULTI-GPU DISTRIBUTION
+n_gpus    = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
+devices   = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
+tf.debugging.set_log_device_placement(False)
+strategy  = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
+sample, _ = make_sample(data_file, all_var, [0,1], args.n_tracks, args.n_classes)
+with strategy.scope():
+    if tf.__version__ >= '2.1.0': tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
+    model = multi_CNN(args.n_classes, args.NN_type, sample, args.l2, args.dropout,
+                      args.alpha, args.CNN_neurons, args.FCN_neurons, **train_var)
+    model.summary()
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+
+# SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
+sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
+args.n_train = [0, min(sample_size, args.n_train)] if args.cross_valid == 'OFF' else [0,0]
+args.n_valid = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, sample_size )]
+if args.cross_valid == 'OFF' and args.n_folds > 1:
+    args.n_valid = args.n_train
+    args.cuts   += 'sample["eventNumber"]%'+str(args.n_folds)+' == '+str(args.fold_number)
+#args.cuts += '(sample["p_et_calo"] >= 20)'
+#args.cuts += '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
+#args.cuts += '(abs(sample["p_eta"]) > 0.6)'
+
+
+# ARGUMENTS AND VARIABLES TABLES
+args.NN_type = 'FCN' if train_var['images'] == [] else args.NN_type
+args.scaling = (args.scaling == 'ON' and scalars != [])
+print('\nPROGRAM ARGUMENTS:'); print(tabulate(vars(args).items(), tablefmt='psql'))
 print('\nTRAINING VARIABLES:')
 headers = [          key  for key in train_var if train_var[key]!=[]]
 table   = [train_var[key] for key in train_var if train_var[key]!=[]]
 length  = max([len(n) for n in table])
 table   = list(map(list, zip(*[n+(length-len(n))*[''] for n in table])))
-print(tabulate(table, headers=headers, tablefmt='psql'))
-if train_var['images'] == []: args.NN_type = 'FCN'
-args.scaling = args.scaling == 'ON' and scalars != []
+print(tabulate(table, headers=headers, tablefmt='psql')); print()
 
 
-# APPLIED CUTS ON PHYSICS VARIABLES
-#args.cuts = '(sample["p_et_calo"] >= 20)'
-#args.cuts = '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
-#args.cuts = '(abs(sample["p_eta"]) <= 0.6)'
-#args.cuts = '(abs(sample["p_eta"]) >  0.6)'
-
-
-# TEST SAMPLE GENERATION
-print('\nCLASSIFIER: loading test sample', args.n_valid, end=' ... ', flush=True)
-arguments = (data_file, all_var, scalars, args.n_valid, args.n_tracks, args.n_classes,
-             args.scaling, args.pickle_file, args.weight_file, args.cuts)
-valid_sample, valid_labels = valid_data(*arguments)
-
-
-# ARCHITECTURE SELECTION AND MULTI-GPU DISTRIBUTION
-n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
-devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
-tf.debugging.set_log_device_placement(False)
-strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
-with strategy.scope():
-    if tf.__version__ >= '2.1.0': tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
-    model = multi_CNN(args.n_classes,args.NN_type,valid_sample,args.l2,args.dropout,args.alpha,**train_var)
-    print(); model.summary()
-    if args.weight_file != None:
-        print('\nCLASSIFIER: loading pre-trained weights from: ' + args.weight_file)
-        model.load_weights(args.weight_file)
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+# GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
+print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
+func_args = data_file, all_var, args.n_valid, args.n_tracks, args.n_classes, args.cuts
+valid_sample, valid_labels = make_sample(*func_args)
+#sample_analysis(valid_sample, valid_labels, scalars, scaler_file); sys.exit()
+if args.cross_valid == 'OFF' and args.checkpoint != '':
+    print('CLASSIFIER: loading pre-trained weights from', checkpoint, '\n')
+    model.load_weights(checkpoint)
+    if args.scaling: valid_sample = load_scaler(valid_sample, scalars, scaler_file)
 
 
 # TRAINING LOOP
-if args.n_epochs >= 1:
-    print('\nCLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
-    print(  'CLASSIFIER:  test sample:'   , format(args.n_valid[1] -args.n_valid[0], '8.0f'), 'e')
-    print('\nCLASSIFIER: using TensorFlow', tf.__version__                                       )
-    print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)'                                     )
-    print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' '           )
-    print([group for group in train_var if train_var[group] != [ ]]                              )
-    #for idx in list(zip(args.n_train[:-1], args.n_train[1:])):
+if args.cross_valid == 'OFF' and args.n_epochs >= 1:
+    print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
+    print(  'CLASSIFIER: valid sample:'   , format(args.n_valid[1] -args.n_valid[0], '8.0f'), 'e')
+    print('\nCLASSIFIER: using TensorFlow', tf.__version__ )
+    print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
+    print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
+    print([group for group in train_var if train_var[group] != [ ]])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
-    arguments = (data_file, valid_sample, all_var, scalars, args.n_train, args.n_tracks, args.n_classes,
-                 args.resampling, args.scaling, args.output_dir+args.scaler_file, args.pickle_file, args.weight_file, args.cuts)
-    train_sample, valid_sample, train_labels = train_data(*arguments)
+    weight_file = args.output_dir+'/checkpoint.h5'; scaler_out = args.output_dir+'/scaler.pkl'
+    if args.n_folds > 1:
+        weight_file = args.output_dir+'/checkpoint_'+str(args.fold_number)+'.h5'
+        scaler_out  = args.output_dir+'/scaler_'    +str(args.fold_number)+'.pkl'
+        args.cuts   = 'sample["eventNumber"]%' + str(args.n_folds)+' != '+str(args.fold_number)
+    func_args = (data_file, all_var, args.n_train, args.n_tracks, args.n_classes, args.cuts)
+    train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
+    if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
+    if args.scaling:
+        if args.checkpoint != '': train_sample = load_scaler(train_sample, scalars, scaler_file)
+        else: train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
     compo_matrix(valid_labels, train_labels=train_labels); print()
-    checkpoint = cb.ModelCheckpoint(checkpoint_file, save_best_only=True, monitor=args.metrics, verbose=1)
-    early_stop = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
-    sample_weight = sample_weights(train_sample, train_labels, args.n_classes, args.weight_type,output_dir=args.output_dir)
+    check_point = cb.ModelCheckpoint(weight_file,     save_best_only=True, monitor=args.metrics, verbose=1)
+    early_stop  = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
-                          callbacks=[checkpoint, early_stop], epochs=args.n_epochs, verbose=2,
+                          callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
                           class_weight=None if args.n_classes==2 else class_weights(train_labels),
-                          sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size) )
-    model.load_weights(checkpoint_file)
+                          sample_weight=sample_weights(train_sample, train_labels, args.n_classes,
+                          args.weight_type, args.output_dir), batch_size=max(1,n_gpus)*int(args.batch_size) )
+    model.load_weights(weight_file)
+else: train_labels = []; training = None
 
 
 # RESULTS AND PLOTTING SECTION
-print('\nCLASSIFIER: test sample', args.n_valid, 'class predictions')
-valid_probs = model.predict(valid_sample, batch_size=20000, verbose=2); print()
-compo_matrix(valid_labels, [] if args.n_epochs < 1 else train_labels, valid_probs)
-print('TEST SAMPLE ACCURACY:', format(100*valid_accuracy(valid_labels, valid_probs), '.2f'), '%\n')
-if args.n_classes > 2 and True:
-    print('CLASSIFIER: binarized confusion matrix (multi-class)')
-    valid_sample, valid_labels, valid_probs = binarization(valid_sample,valid_labels,valid_probs)#,[0],[1])
-    compo_matrix(valid_labels, valid_probs=valid_probs)
-    print('TEST SAMPLE ACCURACY:', format(100*valid_accuracy(valid_labels, valid_probs), '.2f'), '%\n')
-if args.plotting == 'ON':
-    #from plots import separate_distributions
-    #processes = [mp.Process(target=separate_distributions,args=(valid_labels, valid_probs, valid_sample))]
-    processes  = [mp.Process(target=plot_distributions_DG, args=(valid_labels,valid_probs,args.output_dir,))]
-    if args.n_epochs > 1: processes += [mp.Process(target=plot_history, args=(training,'accuracy',args.output_dir+"history.png",))]
-    arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type,args.output_dir) for ROC_type in [1,2,3]]
-    processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-    for job in processes: job.start()
-    for job in processes: job.join()
-
-
-# DIFFERENTIAL PLOTS
-if args.plotting == 'ON' and args.differential == 'ON' and args.n_classes == 2:
-    eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
-    pt_boundaries=  [10, 20, 30, 40, 60, 100, 200, 500] #60, 80, 120, 180, 300, 500]
-    eta, pt         = valid_sample['p_eta'], valid_sample['p_et_calo']
-    eta_bin_indices = get_bin_indices(eta, eta_boundaries)
-    pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
-    plot_distributions_KM(valid_labels, eta, 'eta',output_dir=args.output_dir)
-    plot_distributions_KM(valid_labels, pt , 'pt',output_dir=args.output_dir)
-
-    tmp_llh      = valid_sample['p_LHValue']
-    tmp_llh_pair = np.zeros(len(tmp_llh))
-    prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
-
-    print('\nEvaluating differential performance in eta')
-    differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries, eta_bin_indices, varname='eta',output_dir=args.output_dir)
-    print('\nEvaluating differential performance in pt')
-    differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries, pt_bin_indices, varname='pt',output_dir=args.output_dir)
-    differential_plots(valid_sample, valid_labels, prob_LLH   , pt_boundaries, pt_bin_indices, varname="pt",output_dir=args.output_dir,evalLLH=True)
+if args.cross_valid == 'ON':
+    valid_probs = cross_validation(valid_sample, valid_labels, scalars, model, args.output_dir, args.n_folds)
+    print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
+if args.cross_valid == 'OFF':
+    print('\nValidation sample', args.n_valid, 'class predictions:')
+    valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
+valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
+if args.n_folds <= 1:
+    print('Saving validation results to', args.output_dir+'/'+'valid_results.pkl', '\n')
+    valid_sample = {key:valid_sample[key] for key in others}
+    pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+'valid_results.pkl','wb'))
