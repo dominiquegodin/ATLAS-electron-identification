@@ -145,6 +145,10 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
         axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
         plt.ylabel('1/(Background Efficiency)',fontsize=20)
         val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='Signal vs Bkg ' + postfix[1:]+(" %d e"%len(y_true)), color='#1f77b4',)
+
+        x_array = tpr[len_0:]
+        y_array = 1/fpr[len_0:]
+
         plt.scatter( 100*best_tpr, 1/best_fpr, s=30, marker='D', c=val[0].get_color(),
                      label="{0:<15s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)) )
         for LLH in zip( eff_class0, eff_class1, colors, labels ):
@@ -152,6 +156,7 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
                 plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker='o', c=LLH[2], label='('+\
                              str(format(100*LLH[0],'.1f'))+'%, '+str(format(1/LLH[1],'.0f'))+\
                              ')'+r'$\rightarrow$'+LLH[3] )
+                
         plt.legend(loc='upper right', fontsize=15, numpoints=3)
         plt.savefig(file_name)
     if ROC_type == 3:
@@ -177,9 +182,14 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
         pass
     plt.close()
 
-def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname='pt',output_dir='outputs/',evalLLH=False):
+    #print([x_array.size, y_array.size])
+    return [x_array, y_array]
 
-    plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2,output_dir=output_dir+"/differential/")
+def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname='pt',output_dir='outputs/',evalLLH=False,makeOutput=True):
+
+    roc_curves = dict()
+
+    roc_curves["roc_inclusive"]= plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2,output_dir=output_dir+"/differential/")
 
     tmp_idx=0
 
@@ -244,7 +254,12 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 
         if not(~np.isnan(new_y_prob).any() and ~np.isinf(new_y_prob).any()): print("Nan or Inf detected")
 
-        plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir+'/differential/')
+        roc_name="roc"+pfix
+        if "LLH" in roc_name: 
+            roc_name=roc_name[0:len(roc_name)-3]
+            pass
+        roc_curves[roc_name] = plot_ROC_curves(new_test_LLH, new_test_labels, new_y_prob, ROC_type=2, postfix=pfix,output_dir=output_dir+'/differential/')
+
         #plot_distributions_KM(new_test_labels,new_y_prob,output_dir=output_dir+'differential/',postfix=pfix)
 
         if fill_rej:
@@ -271,6 +286,14 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
     plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_fEff,bkg_errs_fEff, sigEffs,varname,output_dir,boundaries[-1],cType="Flat" ,makeOutput=True,evalLLH=evalLLH)
     plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_gEff,bkg_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobB",makeOutput=True,evalLLH=evalLLH)
     plot_rej_vsX_curves(x_centers,x_errs, sig_effs_gEff,sig_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobS",makeOutput=True,evalLLH=evalLLH)
+
+    #print(roc_curves)
+    if makeOutput:
+        outfilename = output_dir+"roc"
+        if evalLLH: outfilename+= "LLH"
+        outfilename+="_vs_"+varname+".pkl"
+        print('Writing ROC pickle file:', outfilename)
+        pickle.dump(roc_curves,open(outfilename, 'wb'))
 
     return
 
