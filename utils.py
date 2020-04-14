@@ -306,7 +306,6 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         for job in processes: job.start()
         for job in processes: job.join()
         return [return_dict[n] for n in np.arange(n_classes)]
-    #valid_sizes = [100*sum(valid_labels==n)/len(valid_labels) for n in np.arange(n_classes)]
     valid_sizes = mp_get_sizes(valid_labels, n_classes)
     train_sizes = n_classes*['n/a'] if train_labels == [] else mp_get_sizes(train_labels, n_classes)
     classes     = ['CLASS '+str(n) for n in np.arange(n_classes)]
@@ -336,13 +335,11 @@ def class_weights(labels):
     return {m:len(labels)/sum(labels==m)/n_classes for m in np.arange(n_classes)}
 
 
-def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
+def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
     valid_probs  = np.full(valid_labels.shape + (max(valid_labels)+1,), -1.)
     event_number = valid_sample['eventNumber']
     for fold_number in np.arange(n_folds):
         print('FOLD', fold_number, 'EVALUATION ('+str(n_folds)+'-fold cross-validation)')
-        #weight_file = output_dir+'/checkpoint_'+'{:=02}'.format(fold_number)+'.h5'
-        #scaler_file = output_dir+'/scaler_'    +'{:=02}'.format(fold_number)+'.pkl'
         weight_file = output_dir+'/checkpoint_'+str(fold_number)+'.h5'
         scaler_file = output_dir+'/scaler_'    +str(fold_number)+'.pkl'
         print('CLASSIFIER: loading pre-trained weights from', weight_file)
@@ -363,7 +360,7 @@ def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds,
 def valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, output_dir, plotting):
     compo_matrix(valid_labels, train_labels, valid_probs)
     if max(valid_labels) > 1 and True:
-        valid_sample, valid_labels, valid_probs = binarization(valid_sample,valid_labels,valid_probs)
+        valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs)
         compo_matrix(valid_labels, valid_probs=valid_probs)
     if plotting == 'ON':
         #from plots_DG import separate_distributions
@@ -374,7 +371,7 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, trainin
         if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
         for job in processes: job.start()
         for job in processes: job.join()
-        print(); #sys.exit()
+        print(); #return
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and max(valid_labels) == 1:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
@@ -400,8 +397,6 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, trainin
 def binarization(sample, labels, probs, class_1='others', class_0=[0]):
     from functools import reduce
     if class_1=='others' or class_1==class_0: class_1 = set(np.arange(max(labels)+1)) -set(class_0)
-    #print('BINARIZATION: CLASS 0 =', set(class_0) if len(class_0)>1 else class_0[0], end=' ')
-    #print('vs CLASS 1 ='           , set(class_1) if len(class_1)>1 else class_1[0] )
     print('BINARIZATION: CLASS 0 =', set(class_0), 'vs CLASS 1 =', set(class_1))
     labels  = np.array([0 if label in class_0 else 1 if label in class_1 else -1 for label in labels])
     prob_0  = reduce(np.add,[probs[:,n] for n in class_0])[labels!=-1]

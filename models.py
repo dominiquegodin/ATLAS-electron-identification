@@ -15,7 +15,8 @@ def multi_CNN(n_classes, NN_type, sample, l2, dropout, alpha,
         image_inputs  = [Reshape(sample[n].shape[1:]+(1,))(input_dict[n]) for n in shape_dict[shape]]
         image_outputs = concatenate(image_inputs, axis=3) if len(image_inputs)>1 else image_inputs[0]
         if NN_type == 'CNN':
-            field = (3,3) if shape == (56,11) else (2,3) if shape == (7,11) else (2,3)
+            #field = (3,3) if shape == (56,11) else (2,3) if shape == (7,11) else (2,3)
+            field = (3,3) if shape == (56,11) else (2,3) if shape == (7,11) else (1,1)
             for n_neurons in CNN_neurons:
                 image_outputs = Conv2D(n_neurons, field, kernel_regularizer=regularizer)(image_outputs)
                 image_outputs = LeakyReLU(alpha=alpha)                                  (image_outputs)

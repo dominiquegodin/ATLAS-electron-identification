@@ -5,7 +5,7 @@ from   argparse   import ArgumentParser
 from   tabulate   import tabulate
 from   itertools  import accumulate
 from   utils      import make_sample, sample_composition, balance_sample, apply_scaler, load_scaler
-from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
+from   utils      import compo_matrix, class_weights, cross_validation, valid_results, sample_analysis
 from   utils      import sample_weights, get_bin_indices
 from   models     import multi_CNN
 
@@ -17,33 +17,42 @@ parser.add_argument( '--n_valid'     ,  default =  1e5,  type = float )
 parser.add_argument( '--batch_size'  ,  default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    ,  default =  100,  type = int   )
 parser.add_argument( '--n_classes'   ,  default =    2,  type = int   )
-parser.add_argument( '--n_tracks'    ,  default =   10,  type = int   )
-parser.add_argument( '--n_gpus'      ,  default =    4,  type = int   )
+parser.add_argument( '--n_tracks'    ,  default =    5,  type = int   )
 parser.add_argument( '--n_folds'     ,  default =    1,  type = int   )
 parser.add_argument( '--fold_number' ,  default =    0,  type = int   )
+parser.add_argument( '--n_gpus'      ,  default =    4,  type = int   )
 parser.add_argument( '--verbose'     ,  default =    1,  type = int   )
 parser.add_argument( '--l2'          ,  default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     ,  default = 0.05,  type = float )
 parser.add_argument( '--alpha'       ,  default =    0,  type = float )
 parser.add_argument( '--CNN_neurons' ,  default = [200, 200]          )
 parser.add_argument( '--FCN_neurons' ,  default = [200, 200]          )
+parser.add_argument( '--weight_type' ,  default = None                )
 parser.add_argument( '--NN_type'     ,  default = 'CNN'               )
 parser.add_argument( '--images'      ,  default = 'ON'                )
 parser.add_argument( '--scalars'     ,  default = 'ON'                )
-parser.add_argument( '--plotting'    ,  default = 'ON'                )
+parser.add_argument( '--cuts'        ,  default = ''                  )
+parser.add_argument( '--metrics'     ,  default = 'val_accuracy'      )
 parser.add_argument( '--resampling'  ,  default = 'OFF'               )
 parser.add_argument( '--scaling'     ,  default = 'ON'                )
 parser.add_argument( '--cross_valid' ,  default = 'OFF'               )
-parser.add_argument( '--result_file' ,  default = ''                  )
-parser.add_argument( '--metrics'     ,  default = 'val_accuracy'      )
-parser.add_argument( '--weight_type' ,  default =  None               )
+parser.add_argument( '--plotting'    ,  default = 'ON'                )
 #parser.add_argument( '--input'       ,  default = ''                  )
 parser.add_argument( '--output_dir'  ,  default = 'outputs'           )
 parser.add_argument( '--scaler_file' ,  default = 'scaler.pkl'        )
-parser.add_argument( '--checkpoint'  ,  default =  ''                 )
-parser.add_argument( '--cuts'        ,  default =  ''                 )
-parser.add_argument( '--Beluga_node' ,  default =  'OFF'              )
+parser.add_argument( '--checkpoint'  ,  default = ''                  )
+parser.add_argument( '--result_file' ,  default = ''                  )
 args = parser.parse_args()
+
+
+# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
+if '.pkl' in args.result_file:
+    result_file = args.output_dir+'/'+args.result_file
+    if os.path.isfile(result_file):
+        print('\nLOADING VALIDATION RESULTS FROM', result_file, '\n')
+        sample, labels, probs = pickle.load(open(result_file, 'rb'))
+        valid_results(sample, labels, probs, [], None, args.output_dir, args.plotting)
+    sys.exit()
 
 
 # PROGRAM ARGUMENTS VERIFICATIONS
@@ -59,27 +68,16 @@ if args.n_folds > 1 and args.fold_number >= args.n_folds:
     print('\nERROR: fold_number must be smaller than n_folds -> exiting program\n'); sys.exit()
 
 
-# DATAFILE PATH AND SAMPLES SIZES
-data_file   = '/project/def-arguinj/dgodin' if args.Beluga_node == 'ON' else '/opt/tmp/godin'
-data_file  += '/el_data/2020-03-24/el_data.h5'
-output_dir  = 'outputs/'+args.output_dir
-checkpoint  =  output_dir+'/'+args.checkpoint
-#result_file = output_dir+'/'+args.result_file if '.pkl' in args.result_file else ''
-#scaler_file = output_dir+'/'+args.scaler_file if '.pkl' in args.scaler_file else ''
-#checkpoint  = output_dir+'/'+args.checkpoint  if '.h5'  in args.checkpoint  else ''
-args.result_file = args.result_file if '.pkl' in args.result_file else ''
+# DATAFILE AND PATHS
 args.scaler_file = args.scaler_file if '.pkl' in args.scaler_file else ''
 args.checkpoint  = args.checkpoint  if '.h5'  in args.checkpoint  else ''
+scaler_file      =  args.output_dir+'/'+args.scaler_file
+checkpoint       =  args.output_dir+'/'+args.checkpoint
 #if args.input!='': data_file= args.input
-for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     if not os.path.isdir(path): os.mkdir(path)
-
-
-# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
-if os.path.isfile(output_dir+'/'+args.result_file):
-    print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+args.result_file, '...\n')
-    valid_sample, valid_labels, valid_probs = pickle.load(open(output_dir+'/'+args.result_file, 'rb'))
-    valid_results(valid_sample, valid_labels, valid_probs, [], None, output_dir, args.plotting); sys.exit()
+#data_file = '/project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5'
+data_file = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
 
 
 # TRAINING VARIABLES
@@ -109,13 +107,13 @@ with strategy.scope():
     if tf.__version__ >= '2.1.0': tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
     model = multi_CNN(args.n_classes, args.NN_type, sample, args.l2, args.dropout,
                       args.alpha, args.CNN_neurons, args.FCN_neurons, **train_var)
+    model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-model.summary()
 
 
-# SAMPLES SIZES AND APPLIED CUTS
+# SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
 sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
-args.n_train = [0, min(sample_size, args.n_train)] if args.cross_valid == 'OFF' else [0, 0]
+args.n_train = [0, min(sample_size, args.n_train)] if args.cross_valid == 'OFF' else [0,0]
 args.n_valid = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, sample_size )]
 if args.cross_valid == 'OFF' and args.n_folds > 1:
     args.n_valid = args.n_train
@@ -141,11 +139,11 @@ print(tabulate(table, headers=headers, tablefmt='psql')); print()
 print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
 func_args = data_file, all_var, args.n_valid, args.n_tracks, args.n_classes, args.cuts
 valid_sample, valid_labels = make_sample(*func_args)
-#sample_analysis(valid_sample, valid_labels, scalars, args.scaler_file); sys.exit()
+#sample_analysis(valid_sample, valid_labels, scalars, scaler_file); sys.exit()
 if args.cross_valid == 'OFF' and args.checkpoint != '':
     print('CLASSIFIER: loading pre-trained weights from', checkpoint, '\n')
     model.load_weights(checkpoint)
-    if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.scaler_file)
+    if args.scaling: valid_sample = load_scaler(valid_sample, scalars, scaler_file)
 
 
 # TRAINING LOOP
@@ -157,16 +155,16 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
     print([group for group in train_var if train_var[group] != [ ]])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
-    weight_file = output_dir+'/checkpoint.h5'; scaler_out = output_dir+'/scaler.pkl'
+    weight_file = args.output_dir+'/checkpoint.h5'; scaler_out = args.output_dir+'/scaler.pkl'
     if args.n_folds > 1:
-        weight_file = output_dir+'/checkpoint_'+str(args.fold_number)+'.h5'
-        scaler_out  = output_dir+'/scaler_'    +str(args.fold_number)+'.pkl'
+        weight_file = args.output_dir+'/checkpoint_'+str(args.fold_number)+'.h5'
+        scaler_out  = args.output_dir+'/scaler_'    +str(args.fold_number)+'.pkl'
         args.cuts   = 'sample["eventNumber"]%' + str(args.n_folds)+' != '+str(args.fold_number)
     func_args = (data_file, all_var, args.n_train, args.n_tracks, args.n_classes, args.cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
     if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
     if args.scaling:
-        if args.checkpoint != '': train_sample = load_scaler(train_sample, scalars, args.scaler_file)
+        if args.checkpoint != '': train_sample = load_scaler(train_sample, scalars, scaler_file)
         else: train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
     compo_matrix(valid_labels, train_labels=train_labels); print()
     check_point = cb.ModelCheckpoint(weight_file,     save_best_only=True, monitor=args.metrics, verbose=1)
@@ -175,19 +173,20 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
                           class_weight=None if args.n_classes==2 else class_weights(train_labels),
                           sample_weight=sample_weights(train_sample, train_labels, args.n_classes,
-                          args.weight_type, output_dir), batch_size=max(1,n_gpus)*int(args.batch_size) )
+                          args.weight_type, args.output_dir), batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(weight_file)
 else: train_labels = []; training = None
 
 
 # RESULTS AND PLOTTING SECTION
 if args.cross_valid == 'ON':
-    valid_probs = cross_valid(valid_sample, valid_labels, scalars, model, output_dir, args.n_folds)
+    valid_probs = cross_validation(valid_sample, valid_labels, scalars, model, args.output_dir, args.n_folds)
     print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
 if args.cross_valid == 'OFF':
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, output_dir, args.plotting)
-print('Saving validation results to', output_dir+'/'+'valid_results.pkl', '\n')
-valid_sample = {key:valid_sample[key] for key in others}
-pickle.dump((valid_sample, valid_labels, valid_probs), open(output_dir+'/'+'valid_results.pkl', 'wb'))
+valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
+if args.n_folds > 1:
+    print('Saving validation results to', args.output_dir+'/'+'valid_results.pkl', '\n')
+    valid_sample = {key:valid_sample[key] for key in others}
+    pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+'valid_results.pkl','wb'))

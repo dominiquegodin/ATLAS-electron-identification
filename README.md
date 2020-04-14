@@ -36,47 +36,61 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 
 # Using Slurm jobs manager (LPS or Beluga)
-1) sbatch slurm.sh  
-(run classifier.sh script and sent jobs to Slurm batch system)  
+1) sbatch sbatch.sh  
+(run classifier.sh script and send jobs to Slurm batch system)  
+2) sbatch --array=0-9 sbatch.sh  
+(send array jobs with ID 0 to 9 to Slurm batch system)  
 2) squeue or sview  
 (report status of job) 
 3) scancel $job_id  
 (cancel job) 
 4) srun --jobid $job_id --pty watch -n 2 nvidia-smi  
 (monitor jobs GPU usage at 2s interval)  
-4) salloc --time=00:30:00 --gres=gpu:1 --mem=16G --x11 --account=def-arguinj  
+5) salloc --time=00:30:00 --gres=gpu:1 --mem=16G --x11 --account=def-arguinj  
 (use Slurm interactively and request appropriate ressources on Beluga)
 
 
 # classifier.py Options
---n_train     = number of training electrons (default=1e5)
+--n_train     : number of training electrons (default=1e5)
 
---n_valid     = number of testing electrons (default=1e5)
+--n_valid     : number of testing electrons (default=1e5)
 
---batch_size  = size of training batches (default=1000)
+--batch_size  : size of training batches (default=5000)
 
---n_epochs    = number of training epochs (default=100)
+--n_epochs    : number of training epochs (default=100)
 
---n_classes   = number of classes (default=2)
+--n_classes   : number of classes (default=2)
 
---n_gpus      = number of gpus for multiprocessing (default=4)
+--n_tracks    : number of tracks (default=10)
 
---NN_type     = CNN or FCN specify the type of neural networks (default=CNN)
+--n_folds     : number of folds for k-fold cross_validation
 
---plotting    = ON plots accuracy history, distributions separation and ROC curves (default=OFF)
+--n_gpus      : number of gpus for distributed training (default=4)
 
---weight_file = name of h5 weight file from a previous training checkpoint (requires .h5 extension)  
+--NN_type     : CNN or FCN specify the type of neural networks (default=CNN)
 
---scaling     = ON applies Quantile transform to scalar variables (fit performed on train sample
+--cross_valid : performs k-fold cross-validation
+
+--plotting    : plots accuracy history when ON, distributions separation and ROC curves
+
+--checkpoint  : name of h5 weight file from a previous training checkpoint (requires .h5 extension)  
+
+--scaling     : applies Quantile transform to scalar variables when ON (fit performed on train sample
 	        and applied to whole sample)  
 
---checkpoint  = name of h5 checkpoint file used for saving and updating the model best weights
+--weight_type : name of weighting method, either of 'none' (default),
+	       'match2b', 'match2s', 'flattening' should be given
 
---weight_type = name of weighting method, either of 'none' (default), 'match2b', 'match2s', 'flattening' should be given
+--cuts        : applied cuts on physics variables 
 
---cuts        = applied cuts on physics variables 
+--output_dir  : name of output directory, which should be useful when you run jobs in parallel
 
---output_dir  = name of output directory, which should be useful when you run jobs in parallel
+--scaler_file : name of the pickle file (.pkl) containing scaling transform for scalars variables
+
+--checkpoint  : name of h5 checkpoint file used for saving and updating the model best weights
+
+--result_file : name of the pickle file (.pkl) containing validation results
+
 
 # Explanations
 1) For each epoch where the validation performance (either accuracy or loss function) has reached its best so far, the training model will automatically be saved to a h5 file checkpoint. 
