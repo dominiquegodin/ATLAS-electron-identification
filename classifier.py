@@ -37,7 +37,7 @@ parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--cross_valid' , default = 'OFF'               )
 parser.add_argument( '--plotting'    , default = 'ON'                )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
-#parser.add_argument( '--input'       , default = ''                  )
+parser.add_argument( '--data_file'   , default = ''                  )
 parser.add_argument( '--output_dir'  , default = 'outputs'           )
 parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
 parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
@@ -71,7 +71,7 @@ for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')
     if not os.path.isdir(path): os.mkdir(path)
 data_file = '/opt/tmp/godin/el_data/2020-04-21/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5'
-#if args.input!='': data_file= args.input
+if args.data_file != '': data_file= args.dat_file
 
 
 # TRAINING VARIABLES
