@@ -7,7 +7,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (login to atlas16 for GPU's avaibility)	  
 2) cd /opt/tmp/$USER  
 (change to user directory)  
-3) ln -s /opt/tmp/godin/el_data/2020-03-24/el_data.h5 .  
+3) ln -s /opt/tmp/godin/el_data/2020-04-21/el_data.h5 .  
 (link data file to user directory)  
 4) git clone https://github.com/dominiquegodin/el_classifier.git  
 (clone framework from GitHub)  
@@ -16,7 +16,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 6) singularity shell --nv --bind /opt /opt/tmp/godin/sing_images/tf-2.1.0-gpu-py3_sing-2.6.sif  
 (activate the virtual environment of TensorFlow2.1.0+Python3.6.8 Singularity image)  
 (use the flag --nv or not to wether run on GPUs or CPUs)
-7) python batch_classifier.py [OPTIONS]  
+7) python classifier.py [OPTIONS]  
 (start training; see options below)
 8) nvidia-smi  
 (for monitoring NVIDIA GPU devices, e.g. memory and power usage, temperature, fan speed, etc.)
@@ -27,7 +27,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 (login to Beluga cluster)	  
 2) cd /home/$USER  
 (change to user directory)  
-3) ln -s /project/def-arguinj/dgodin/el_data/2020-03-24/el_data.h5 .  
+3) ln -s /project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5 .  
 (link data file to user directory)  
 4) git clone https://github.com/dominiquegodin/el_classifier.git  
 (clone framework from GitHub)  
@@ -67,36 +67,40 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --n_gpus      : number of gpus for distributed training (default=4)
 
---NN_type     : CNN or FCN specify the type of neural networks (default=CNN)
+--weight_type : name of weighting method, either of 'none' (default),
+	       'match2b', 'match2s', 'flattening' should be given 
 
---cross_valid : performs k-fold cross-validation
+--train_cuts  : applied cuts on training samples 
 
---plotting    : plots accuracy history when ON, distributions separation and ROC curves
+--valid_cuts  : applied cuts on validation samples 
 
---checkpoint  : name of h5 weight file from a previous training checkpoint (requires .h5 extension)  
+--NN_type     : CNN or FCN specify the type of neural networks (default=CNN) 
 
 --scaling     : applies Quantile transform to scalar variables when ON (fit performed on train sample
 	        and applied to whole sample)  
 
---weight_type : name of weighting method, either of 'none' (default),
-	       'match2b', 'match2s', 'flattening' should be given
+--cross_valid : performs k-fold cross-validation 
 
---cuts        : applied cuts on physics variables 
+--plotting    : plots accuracy history when ON, distributions separation and ROC curves 
 
---output_dir  : name of output directory, which should be useful when you run jobs in parallel
+--output_dir  : name of output directory (useful fo running jobs in parallel) 
 
---scaler_file : name of the pickle file (.pkl) containing scaling transform for scalars variables
+--model_in    : hdf5 model file from a previous training checkpoint (requires .h5 extension)  
 
---checkpoint  : name of h5 checkpoint file used for saving and updating the model best weights
+--model_out   : name of hdf5 checkpoint file used for saving and updating the model best weights 
 
---result_file : name of the pickle file (.pkl) containing validation results
+--scaler_in   : name of the pickle file (.pkl) containing scaling transform (quantile) for scalars variables 
+
+--results_in  : name of the pickle file (.pkl) containing validation results 
 
 
 # Explanations
-1) For each epoch where the validation performance (either accuracy or loss function) has reached its best so far, the training model will automatically be saved to a h5 file checkpoint. 
-2) An early stopping callback allows the training to stop automatically when the validation performance has stop improving for a pre-determined number of epochs (default=10).  
-3) Finished or aborted trainings can be resumed from where they were stopped by using previously trained weights of other same-model
-h5 file checkpoints (see --weight_file option).
+1) The model and weights are automatically saved to a hdf5 checkpoint for each epoch where the performance
+   (either accuracy or loss function) has improved. 
+2) An early stopping callback allows the training to stop automatically when the validation performance
+   has stop improving for a pre-determined number of epochs (default=10).  
+3) Finished or aborted trainings can be resumed from where they were stopped by using previously trained weights
+   from other same-model hdf5 checkpoints (see --model_in option).
 4) All plots, weights and models are saved by default in the "outputs" directory.
-5) To use pre-trained weights for generating plots without training, just specifiy n_epochs = 0.
-6) In order to optimize data transfer rate, datasets should physically be present on the same server of the GPU's. Significant access speed gain is achieved by simply linking to "/opt/tmp/godin/el_data" as shown above. 
+5) To use pre-trained weights and generate plots without re-training, n_epochs = 0 must be specify.
+6) In order to optimize data transfer rate, the datafile should be present on the same server of the GPU's.

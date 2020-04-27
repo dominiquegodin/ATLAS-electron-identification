@@ -80,6 +80,7 @@ for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')
 data_file = '/opt/tmp/godin/el_data/2020-03-24/el_data.h5'
 if args.input!='': data_file= args.input
 
+
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3',
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
