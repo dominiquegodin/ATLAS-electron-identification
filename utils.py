@@ -186,18 +186,12 @@ def make_sample(data_file, all_var, idx, n_tracks, n_classes, cuts='', p='p_', u
     return sample_cuts(sample, make_labels(sample, n_classes), cuts)
 
 
-def make_labels(sample, n_classes, MC_truth=False):
+def make_labels(sample, n_classes):
     MC_type, IFF_type = sample['p_TruthType'], sample['p_iffTruth']
-    if n_classes == 2 and MC_truth:
-        return   np.where(np.logical_or ( MC_type == 2,  MC_type == 4),  0, 1       )
-    #elif n_classes == 2:
-    #    labels = np.where(IFF_type<=1                                 , -1, IFF_type)
-    #    labels = np.where(IFF_type>=4                                 ,  1, labels  )
-    #    return   np.where(np.logical_or (IFF_type == 2, IFF_type == 3),  0, labels  )
-    elif n_classes == 2:
+    if n_classes == 2:
         labels = np.where(IFF_type <= 1                                 , -1, IFF_type)
-        labels = np.where(IFF_type >= 3                                 ,  1, labels  )
-        return   np.where(IFF_type == 2                                 ,  0, labels  )
+        labels = np.where(IFF_type == 2                                 ,  0, labels  )
+        return   np.where(IFF_type >= 3                                 ,  1, labels  )
     elif n_classes == 6:
         labels = np.where(np.logical_or (IFF_type <= 1, IFF_type == 4)  , -1, IFF_type)
         labels = np.where(np.logical_or (IFF_type == 6, IFF_type == 7)  , -1, labels  )
@@ -369,6 +363,19 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, trainin
         compo_matrix(valid_labels, train_labels, valid_probs)
     if plotting == 'ON':
         '''
+        multi_class=5
+        multi_labels = make_labels(valid_sample, n_classes=6)
+        probs  = valid_probs[np.logical_or(multi_labels==0, multi_labels==multi_class)]
+        sample = {key:valid_sample[key][np.logical_or(multi_labels==0, multi_labels==multi_class)]
+                  for key in valid_sample}
+        labels = valid_labels[np.logical_or(multi_labels==0, multi_labels==multi_class)]
+        #print(probs.shape, labels.shape)
+        #for key in sample: print(key, sample[key].shape)
+        #plot_ROC_curves(sample, labels, probs, ROC_type=2, output_dir=output_dir)
+        plot_ROC_curves(valid_sample, valid_labels, valid_probs, ROC_type=2, output_dir=output_dir)
+        sys.exit()
+        '''
+        '''
         def mp_plots(sample, labels, probs, output_dir, bkg_class):
             folder = output_dir+'/'+'class_0_vs_'+str(bkg_class)
             if not os.path.isdir(folder): os.mkdir(folder)
@@ -389,9 +396,8 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, trainin
         for job in processes: job.join()
         sys.exit()
         '''
-        #from plots_DG import separate_distributions
-        #processes = [mp.Process(target=separate_distributions,args=(valid_sample, valid_labels, valid_probs))]
-        processes  = [mp.Process(target=plot_distributions_DG, args=(valid_labels, valid_probs, output_dir,))]
+        arguments  = (valid_sample, valid_labels, valid_probs, output_dir)
+        processes  = [mp.Process(target=plot_distributions_DG, args=arguments)]
         arguments  = [(valid_sample, valid_labels, valid_probs, ROC_type, output_dir) for ROC_type in [1,2,3]]
         processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
@@ -460,7 +466,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #from plots_DG import cal_images
     #images = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
     #          'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    #cal_images(sample, labels, images, output_dir, mode='mean')
+    #cal_images(sample, labels, images, output_dir, mode='random')
     # TRACKS DISTRIBUTIONS
     #from plots_DG import plot_tracks
     #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]

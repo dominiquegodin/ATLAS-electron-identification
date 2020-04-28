@@ -88,9 +88,9 @@ all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
 # ARCHITECTURE SELECTION AND MULTI-GPU DISTRIBUTION
-CNN = {(56,11) :{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[(2,2),(2,2)]},
-        (7,11) :{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1),(1,1)]},
-       'tracks':{'maps':[200,200], 'kernels':[ (1,1) ,(1,1)  ], 'pools':[(1,1),(1,1)]}}
+CNN = {(56,11) :{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
+        (7,11) :{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
 devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
 tf.debugging.set_log_device_placement(False)

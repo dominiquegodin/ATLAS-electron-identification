@@ -43,22 +43,30 @@ def plot_history(history, output_dir, key='accuracy'):
     plt.savefig(file_name)
 
 
-def plot_distributions_DG(y_true, y_prob, output_dir):
+def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False):
     file_name = output_dir+'/distributions.png'
     print('Saving test sample distributions to:', file_name)
-    if max(y_true)+1 == 2:
-        label_dict = {0:'iso electron', 1:'background'}
-    if max(y_true)+1 == 6:
-        label_dict = {0:'iso electron', 1:'charge flip', 2:'photon conversion', 3:'b/c hadron',
-                      4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
+    label_dict = {0:'iso electron', 1:'charge flip', 2:'photon conversion', 3:'b/c hadron',
+                  4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
+    label_dict = label_dict if separation else {0:'iso electron', 1:'background'}
+    n_classes  = len(label_dict)
     def logit(x, delta=1e-16):
         x = np.float64(x); x = np.minimum(x,1-delta); x = np.maximum(x,delta)
         return np.log10(x) - np.log10(1-x)
-    def make_histogram(y_prob, y_true, bins):
+    def class_histo(y_prob, y_true, bins):
         for n in np.arange(y_prob.shape[1]):
             class_probs   = y_prob[:,0][y_true==n]
             class_weights = len(class_probs)*[100/len(y_true)]
             #class_weights = len(class_probs)*[100/len(class_probs)]
+            pylab.hist( class_probs, bins=bins, label='class '+str(n) + ': ' + label_dict[n],
+                        histtype='step', weights=class_weights, log=True, lw=2 )
+    def separate_histo(sample, y_prob, y_true, bins):
+        from utils import make_labels
+        multi_labels = make_labels(sample, n_classes)
+        for n in np.arange(n_classes):
+            true_class    = 0 if n == 0 else 1
+            class_probs   = y_prob[:,0][np.logical_and(y_true==true_class, multi_labels==n)]
+            class_weights = len(class_probs)*[100/len(y_true)]
             pylab.hist( class_probs, bins=bins, label='class '+str(n) + ': ' + label_dict[n],
                         histtype='step', weights=class_weights, log=True, lw=2 )
     plt.figure(figsize=(12,16))
@@ -67,10 +75,11 @@ def plot_distributions_DG(y_true, y_prob, output_dir):
     pylab.ylim(1e-3,1e2)
     plt.xticks(np.arange(0,101,step=10))
     bin_step = 0.5; bins = np.arange(0, 100+bin_step, bin_step)
-    make_histogram(100*y_prob, y_true, bins)
+    if separation: separate_histo(sample, 100*y_prob, y_true, bins)
+    else         : class_histo(100*y_prob, y_true, bins)
     plt.xlabel('Signal probability (%)', fontsize=25)
     plt.ylabel('Distribution (% per '+ str(bin_step) +' % bin)', fontsize=25)
-    plt.legend(loc='upper center', fontsize=17 if max(y_true)+1==2 else 14, numpoints=3)
+    plt.legend(loc='upper center', fontsize=17 if n_classes==2 else 14, numpoints=3)
     plt.subplot(2, 1, 2); pylab.grid(True)
     x_min=-10; x_max=10; pylab.xlim(x_min, x_max)
     pylab.ylim(1e-3,1e1)
@@ -81,45 +90,13 @@ def plot_distributions_DG(y_true, y_prob, output_dir):
     plt.xticks(logit(np.array(pos)), lab, rotation=20)
     bin_step = 0.1; bins = np.arange(x_min-1, x_max+1, bin_step)
     y_prob[:,0] = logit(y_prob[:,0])
-    make_histogram(y_prob, y_true, bins)
+    if separation: separate_histo(sample, y_prob, y_true, bins)
+    else         : class_histo(y_prob, y_true, bins)
     plt.xlabel('Signal probability', fontsize=25)
     plt.ylabel('Distribution (% per '+ str(bin_step) +' logit bin)', fontsize=25)
-    plt.legend(loc='upper center', fontsize=17 if max(y_true)+1==2 else 14, numpoints=3)
+    location = 'upper center' if n_classes==2 else 'upper left'
+    plt.legend(loc=location, fontsize=17 if n_classes==2 else 14, numpoints=3)
     plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.2)
-    plt.savefig(file_name)
-
-
-def separate_distributions(sample, y_true, y_prob, output_dir='outputs'):
-    file_name = output_dir+'/distributions.png'
-    print('Saving test sample distributions to:', file_name)
-    from utils import make_labels
-    labels = make_labels(sample, n_classes=6)
-    label_dict = {0:'iso electron', 1:'charge flip', 2:'photon conversion', 3:'b/c hadron decay',
-                  4:'light flavor decay (bkg $\gamma$ + e$^\pm$)', 5:'light flavor decay (bkg hadron)'}
-    plt.figure(figsize=(12,8))
-    pylab.grid(True)
-    pylab.xlim(0,100)
-    pylab.ylim(1e-5,1e2)
-    plt.xticks(np.arange(0,101,step=10))
-    for n in [0,1]:
-        class_probs   = 100*y_prob[:,0][np.logical_and(y_true==0, labels==n)]
-        class_weights = len(class_probs)*[100/len(y_true)]
-        bin_step = 0.5
-        bins     = np.arange(0, 100+bin_step, bin_step)
-        histtype ='step'
-        pylab.hist( class_probs, bins=bins, label='Class '+str(n) + ': ' + label_dict[n],
-                    histtype=histtype, weights=class_weights, log=True, lw=2 )
-    for n in [2,3,4,5]:
-        class_probs   = 100*y_prob[:,0][np.logical_and(y_true==1, labels==n)]
-        class_weights = len(class_probs)*[100/len(y_true)]
-        bin_step = 0.5
-        bins     = np.arange(0, 100+bin_step, bin_step)
-        histtype ='step'
-        pylab.hist( class_probs, bins=bins, label='Class '+str(n) + ': ' + label_dict[n],
-                    histtype=histtype, weights=class_weights, log=True, lw=2 )
-    plt.xlabel('Signal Probability (%)',fontsize=25)
-    plt.ylabel('Distribution (% per '+ str(bin_step) +' % bin)', fontsize=25)
-    plt.legend(loc='upper center', fontsize=15, numpoints=3)
     plt.savefig(file_name)
 
 
@@ -271,8 +248,7 @@ def plot_image(cal_image, n_classes, e_class, images, key):
     n_images = len(images)
     plot_idx = n_classes*e_layer + e_class+1
     plt.subplot(n_images, n_classes, plot_idx)
-    title   = class_dict[e_class]+'\n('+layer_dict[key]+')'
-    #title   = layer_dict[key]+'\n('+class_dict[e_class]+')'
+    title   = class_dict[e_class]+'\n('+layer_dict[key]+')' #layer_dict[key]+'\n('+class_dict[e_class]+')'
     limits  = [-0.13499031, 0.1349903, -0.088, 0.088]
     x_label = '$\phi$'                             if e_layer == n_images-1 else ''
     x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer == n_images-1 else []
@@ -281,7 +257,7 @@ def plot_image(cal_image, n_classes, e_class, images, key):
     plt.title(title,fontweight='normal', fontsize=12)
     plt.xlabel(x_label,fontsize=15); plt.xticks(x_ticks)
     plt.ylabel(y_label,fontsize=15); plt.yticks(y_ticks)
-    plt.imshow(100*np.float32(cal_image).transpose(), cmap='Reds', extent=limits)
+    plt.imshow(100*np.float32(cal_image), cmap='Reds', extent=limits)
     plt.colorbar(pad=0.02)
 
 
