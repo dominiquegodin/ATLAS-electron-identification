@@ -21,14 +21,14 @@ parser.add_argument( '--n_tracks'    , default =   10,  type = int   )
 parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
-parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
+#parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
 parser.add_argument( '--l2'          , default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     , default = 0.05,  type = float )
-parser.add_argument( '--CNN_maps'    , default = [200, 200], type = int, nargs='+')
+#parser.add_argument( '--CNN_maps'    , default = [200, 200], type = int, nargs='+')
 parser.add_argument( '--FCN_neurons' , default = [200, 200], type = int, nargs='+')
 parser.add_argument( '--weight_type' , default = None                )
-parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--train_cuts'  , default = ''                  )
+parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
@@ -39,10 +39,10 @@ parser.add_argument( '--plotting'    , default = 'ON'                )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
 parser.add_argument( '--data_file'   , default = ''                  )
 parser.add_argument( '--output_dir'  , default = 'outputs'           )
-parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
-parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--model_in'    , default = ''                  )
 parser.add_argument( '--model_out'   , default = 'model.h5'          )
+parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
+parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = 'results.pkl'       )
 args = parser.parse_args()
@@ -88,8 +88,8 @@ all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
 # ARCHITECTURE SELECTION AND MULTI-GPU DISTRIBUTION
-CNN = {(56,11) :{'maps':[200,200], 'kernels':[ (9,3) , (3,2) ], 'pools':[(2,2),(2,2)]},
-        (7,11) :{'maps':[200,200], 'kernels':[(2,2,7),(2,2,1)], 'pools':[(1,1),(1,1)]},
+CNN = {(56,11) :{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[(2,2),(2,2)]},
+        (7,11) :{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1),(1,1)]},
        'tracks':{'maps':[200,200], 'kernels':[ (1,1) ,(1,1)  ], 'pools':[(1,1),(1,1)]}}
 n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
 devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
@@ -110,7 +110,7 @@ args.n_valid = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, sample_size
 if args.cross_valid == 'OFF' and args.n_folds > 1: args.n_valid = args.n_train
 #args.valid_cuts += ' & (sample["p_et_calo"] >= 20)'
 #args.valid_cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
-#args.valid_cuts += ' & (abs(sample["p_eta"]) > 0.6)'
+#args.valid_cuts += ' & (abs(sample["p_eta"] > 0.6)'
 
 
 # ARGUMENTS AND VARIABLES TABLES
@@ -131,7 +131,6 @@ table   = list(map(list, zip(*[n+(length-len(n))*[''] for n in table])))
 print(tabulate(table, headers=headers, tablefmt='psql')); print()
 
 
-print(args.valid_cuts); print()
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
 print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
 func_args = (data_file, all_var, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
@@ -152,18 +151,17 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
     print([group for group in train_var if train_var[group] != [ ]])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
-    model_out  = args.output_dir+'/'+args.model_out
-    scaler_out = args.output_dir+'/'+args.scaler_out
     func_args  = (data_file, all_var, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
     if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
-    if args.scaling:
-        if args.model_in != '':
-            train_sample = load_scaler(train_sample, scalars, args.output_dir+'/'+args.scaler_in)
-        else:
-            train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
+    if args.scaling and args.model_in != '':
+        train_sample = load_scaler(train_sample, scalars, args.output_dir+'/'+args.scaler_in)
+    if args.scaling and args.model_in == '':
+        scaler_out = args.output_dir+'/'+args.scaler_out
+        train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
     compo_matrix(valid_labels, train_labels=train_labels); print()
-    check_point = cb.ModelCheckpoint(model_out, save_best_only    =True, monitor=args.metrics, verbose=1)
+    model_out   = args.output_dir+'/'+args.model_out
+    check_point = cb.ModelCheckpoint(model_out, save_best_only      =True, monitor=args.metrics, verbose=1)
     early_stop  = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,

@@ -345,14 +345,14 @@ def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_f
     event_number = valid_sample['eventNumber']
     for fold_number in np.arange(n_folds):
         print('FOLD', fold_number, 'EVALUATION ('+str(n_folds)+'-fold cross-validation)')
-        weight_file = output_dir+'/weights_'+str(fold_number)+'.h5'
-        scaler_file = output_dir+'/scaling_'+str(fold_number)+'.pkl'
+        weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
+        scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
         print('CLASSIFIER: loading pre-trained weights from', weight_file)
         model.load_weights(weight_file); start_time = time.time()
         indices =               np.where(event_number%n_folds==fold_number)[0]
         labels  =           valid_labels[event_number%n_folds==fold_number]
         sample  = {key:valid_sample[key][event_number%n_folds==fold_number] for key in valid_sample}
-        sample  = load_scaler(sample, scalars, scaler_file)
+        if os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
         print('CLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
         probs = model.predict(sample, batch_size=20000, verbose=verbose)
         #compo_matrix(labels, valid_probs=probs)
