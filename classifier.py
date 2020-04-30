@@ -80,24 +80,27 @@ images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
-others    = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
-             'p_eta', 'p_et_calo','p_LHValue']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
-all_var   = {**train_var, 'others':others}; scalars = train_var['scalars']
+other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
+             'p_eta', 'p_et_calo','p_LHValue']
+total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
 
 
-# ARCHITECTURE SELECTION AND MULTI-GPU DISTRIBUTION
+# CNN ARCHITECTURES
 CNN = {(56,11) :{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
         (7,11) :{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
        'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
+
+
+# MULTI-GPU DISTRIBUTION
 n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
 devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
 tf.debugging.set_log_device_placement(False)
-strategy  = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
+strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
 with strategy.scope():
     if tf.__version__ >= '2.1.0': tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
-    sample, _ = make_sample(data_file, all_var, [0,1], args.n_tracks, args.n_classes)
+    sample, _ = make_sample(data_file, total_var, [0,1], args.n_tracks, args.n_classes)
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
     model     = multi_CNN(*func_args, **train_var); model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
@@ -120,7 +123,7 @@ args.results_in = args.results_in if '.h5'  in args.results_in else ''
 args.NN_type    = 'FCN' if train_var['images'] == [] else args.NN_type
 args.scaling    = (args.scaling == 'ON' and scalars != [])
 if args.NN_type == 'CNN':
-    print('\nCNN ARCHITECTURE:')
+    print('\nCNN ARCHITECTURES:')
     for shape in CNN: print(format(str(shape),'>8s')+':', str(CNN[shape]))
 print('\nPROGRAM ARGUMENTS:'); print(tabulate(vars(args).items(), tablefmt='psql'))
 print('\nTRAINING VARIABLES:')
@@ -133,7 +136,7 @@ print(tabulate(table, headers=headers, tablefmt='psql')); print()
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
 print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
-func_args = (data_file, all_var, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
+func_args = (data_file, total_var, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
 valid_sample, valid_labels = make_sample(*func_args)
 #sample_analysis(valid_sample, valid_labels, scalars, args.scaler_in, args.output_dir); sys.exit()
 if args.cross_valid == 'OFF' and args.model_in != '':
@@ -151,7 +154,7 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
     print([group for group in train_var if train_var[group] != [ ]])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
-    func_args  = (data_file, all_var, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
+    func_args = (data_file, total_var, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
     if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
     if args.scaling and args.model_in != '':
@@ -182,5 +185,5 @@ if args.cross_valid == 'OFF':
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting,
               args.cross_valid)
 print('Saving validation results to', args.output_dir+'/'+args.results_out, '\n')
-valid_sample = {key:valid_sample[key] for key in others}
+valid_sample = {key:valid_sample[key] for key in other_var}
 pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))

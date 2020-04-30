@@ -77,7 +77,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False):
     bin_step = 0.5; bins = np.arange(0, 100+bin_step, bin_step)
     if separation: separate_histo(sample, 100*y_prob, y_true, bins)
     else         : class_histo(100*y_prob, y_true, bins)
-    plt.xlabel('Signal probability (%)', fontsize=25)
+    plt.xlabel('Signal Probability (%)', fontsize=25)
     plt.ylabel('Distribution (% per '+ str(bin_step) +' % bin)', fontsize=25)
     plt.legend(loc='upper center', fontsize=17 if n_classes==2 else 14, numpoints=3)
     plt.subplot(2, 1, 2); pylab.grid(True)
@@ -86,13 +86,15 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False):
     pos  =               [       10**float(n) for n in np.arange(x_min,0)]
     lab  =               ['$10^{'+str(n)+'}$' for n in np.arange(x_min,0)]
     pos += [ 0.5     ] + [                1-n for n in pos[::-1][:x_max] ]
+    #pos += [ 0.5     ] + [     1-10**float(n)       for n in np.arange(-1,-x_max-1,-1)]
     lab += ['0.50   '] + [       '$1\!-\!$'+n for n in lab[::-1][:x_max] ]
+    #lab += ['0.50   '] + ['$1\!-\!10^{'+str(n)+'}$' for n in np.arange(-1,-x_max-1,-1)]
     plt.xticks(logit(np.array(pos)), lab, rotation=20)
     bin_step = 0.1; bins = np.arange(x_min-1, x_max+1, bin_step)
     y_prob[:,0] = logit(y_prob[:,0])
     if separation: separate_histo(sample, y_prob, y_true, bins)
     else         : class_histo(y_prob, y_true, bins)
-    plt.xlabel('Signal probability', fontsize=25)
+    plt.xlabel('Signal Probability', fontsize=25)
     plt.ylabel('Distribution (% per '+ str(bin_step) +' logit bin)', fontsize=25)
     location = 'upper center' if n_classes==2 else 'upper left'
     plt.legend(loc=location, fontsize=17 if n_classes==2 else 14, numpoints=3)
@@ -116,8 +118,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     axes.xaxis.set_ticks(np.arange(0, 101, 10))
     plt.xlabel('Signal Efficiency (%)',fontsize=25)
     if ROC_type == 1:
-        plt.xlim([0, 100.25])
-        plt.ylim([0, 100.5])
+        plt.xlim([0, 100.25]); plt.ylim([0, 100.5])
         axes.yaxis.set_ticks(np.arange(0, 101, 10))
         plt.ylabel('Background Rejection (%)',fontsize=25)
         plt.text(22, 34, 'AUC: '+str(format(metrics.auc(fpr,tpr),'.4f')),
@@ -135,8 +136,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         len_0 = np.sum(fpr==0)
         x_min = min(60, 10*np.floor(10*eff_class0[0]))
         y_max = 100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min/100)[0]], 1/eff_class1[0])/100)
-        plt.xlim([x_min, 100])
-        plt.ylim([1,   y_max])
+        plt.xlim([x_min, 100]); plt.ylim([1, y_max])
         LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]] for value in eff_class0]
         for n in np.arange(len(LLH_scores)):
             axes.axhline(LLH_scores[n], xmin=(eff_class0[n]-x_min/100)/(1-x_min/100), xmax=1,
@@ -177,7 +177,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         best_threshold = threshold[np.argmax(accuracy)]
         plt.xlim([0, 100])
         plt.ylim([60, 100])
-        plt.xlabel('Signal probability as threshold (%)', fontsize=25)
+        plt.xlabel('Signal Probability as Threshold (%)', fontsize=25)
         plt.ylabel('(%)',fontsize=25)
         plt.plot( 100*threshold[1:], 100*tpr[1:], color='tab:blue', label='Signal efficiency', lw=2)
         plt.plot( 100*threshold[1:], 100*(1-fpr[1:]), color='tab:orange', label='Background rejection', lw=2)
@@ -195,7 +195,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         plt.ylim([80, 100.0])
         plt.xticks(np.arange(60,101,step=5))
         plt.yticks(np.arange(80,101,step=5))
-        plt.xlabel('Signal efficiency (%)',fontsize=25)
+        plt.xlabel('Signal Efficiency (%)',fontsize=25)
         plt.ylabel('(%)',fontsize=25)
         plt.plot(100*tpr[1:], 100*(1-fpr[1:]), label='Background rejection', color='darkorange', lw=2)
         val = plt.plot(100*tpr[1:], 100*accuracy[1:], label='Accuracy', color='black', lw=2, zorder=10)
@@ -205,38 +205,44 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     plt.savefig(file_name)
 
 
-def cal_images(sample, labels, images, output_dir, mode='random'):
+def cal_images(sample, labels, layers, output_dir, mode='random', norm=None):
     import multiprocessing as mp
-    def get_image(sample, labels, e_class, key, mode, return_dict):
+    def get_image(sample, labels, e_class, key, mode, image_dict):
         start_time = time.time()
         if mode == 'random':
-            image = sample[key][np.random.choice(np.where(labels==e_class)[0])]
-        if mode == 'mean':
-            image = np.mean(sample[key][labels==e_class], axis=0)
-        if mode == 'std':
-            image = np.std(sample[key][labels==e_class], axis=0)
+            while True:
+                image = abs(sample[key][np.random.choice(np.where(labels==e_class)[0])])
+                if np.max(image) !=0: break
+        if mode == 'mean': image = np.mean(sample[key][labels==e_class], axis=0)
+        if mode == 'std' : image = np.std (sample[key][labels==e_class], axis=0)
         print('plotting layer '+format(key,length+'s')+' for class '+str(e_class), end='', flush=True)
         print(' (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-        return_dict[(e_class,key)] = image
-    images    = [image for image in images if image in sample.keys()]
-    n_classes = max(labels)+1; length = str(max(len(n) for n in images))
-    manager   =  mp.Manager(); return_dict = manager.dict()
-    processes = [mp.Process(target=get_image, args=(sample, labels, e_class, key, mode, return_dict))
-                 for e_class in np.arange(n_classes) for key in images]
-    print('PLOTTING CALORIMETER IMAGES (mode: '+mode+')')
+        image_dict[(e_class,key)] = image
+    layers    = [layer for layer in layers if layer in sample.keys()]
+    n_classes = max(labels)+1; length = str(max(len(n) for n in layers))
+    manager   =  mp.Manager(); image_dict = manager.dict()
+    processes = [mp.Process(target=get_image, args=(sample, labels, e_class, key, mode, image_dict))
+                 for e_class in np.arange(n_classes) for key in layers]
+    print('PLOTTING CALORIMETER IMAGES (mode='+mode+', norm='+str(norm)+')')
     for job in processes: job.start()
     for job in processes: job.join()
     file_name = output_dir+'/cal_images.png'
     print('SAVING IMAGES TO:', file_name, '\n')
     fig = plt.figure(figsize=(7,14)) if n_classes == 2 else plt.figure(figsize=(18,14))
     for e_class in np.arange(n_classes):
-        for key in images: plot_image(return_dict[(e_class,key)], n_classes, e_class, images, key)
+        for key in layers:
+            image_dict[(e_class,key)] -= min(0,np.min(image_dict[(e_class,key)]))
+            if norm == 'layer':
+                vmax = max([np.max(image_dict[(e_class,key)]) for e_class in np.arange(n_classes)])
+            elif norm == 'class': vmax = max([np.max(image_dict[(e_class,key)]) for key in layers])
+            else                : vmax = np.max(image_dict[(e_class,key)])
+            plot_image(100*image_dict[(e_class,key)], n_classes, e_class, layers, key, 100*vmax)
     wspace = -0.1 if n_classes == 2 else 0.2
     fig.subplots_adjust(left=0.05, top=0.95, bottom=0.05, right=0.95, hspace=0.6, wspace=wspace)
     fig.savefig(file_name); sys.exit()
 
 
-def plot_image(cal_image, n_classes, e_class, images, key):
+def plot_image(image, n_classes, e_class, layers, key, vmax):
     class_dict = {0:'iso electron',  1:'charge flip' , 2:'photon conversion', 3:'b/c hadron',
                   4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
     layer_dict = {'em_barrel_Lr0'     :'presampler'            , 'em_barrel_Lr1'  :'EM cal $1^{st}$ layer' ,
@@ -244,21 +250,22 @@ def plot_image(cal_image, n_classes, e_class, images, key):
                   'em_barrel_Lr3'     :'EM cal $3^{rd}$ layer' , 'tile_barrel_Lr1':'had cal $1^{st}$ layer',
                   'tile_barrel_Lr2'   :'had cal $2^{nd}$ layer', 'tile_barrel_Lr3':'had cal $3^{rd}$ layer'}
     if n_classes ==2: class_dict[1] = 'background'
-    e_layer  = images.index(key)
-    n_images = len(images)
+    e_layer  = layers.index(key)
+    n_layers = len(layers)
     plot_idx = n_classes*e_layer + e_class+1
-    plt.subplot(n_images, n_classes, plot_idx)
+    plt.subplot(n_layers, n_classes, plot_idx)
     title   = class_dict[e_class]+'\n('+layer_dict[key]+')' #layer_dict[key]+'\n('+class_dict[e_class]+')'
     limits  = [-0.13499031, 0.1349903, -0.088, 0.088]
-    x_label = '$\phi$'                             if e_layer == n_images-1 else ''
-    x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer == n_images-1 else []
+    x_label = '$\phi$'                             if e_layer == n_layers-1 else ''
+    x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer == n_layers-1 else []
     y_label = '$\eta$'                             if e_class == 0          else ''
     y_ticks = [limits[2],-0.05,0.0,0.05,limits[3]] if e_class == 0          else []
     plt.title(title,fontweight='normal', fontsize=12)
     plt.xlabel(x_label,fontsize=15); plt.xticks(x_ticks)
     plt.ylabel(y_label,fontsize=15); plt.yticks(y_ticks)
-    plt.imshow(100*np.float32(cal_image), cmap='Reds', extent=limits)
-    plt.colorbar(pad=0.02)
+    plt.imshow(np.float32(image), cmap='Reds', interpolation='bilinear', extent=limits,
+               vmax=1 if np.max(image)==0 else vmax)#, norm=colors.LogNorm(1e-3,vmax))
+    plt.colorbar(pad=0.02) #plt.colorbar(extend='both')
 
 
 def plot_scalars(sample, sample_trans, variable):

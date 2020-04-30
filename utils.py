@@ -169,8 +169,8 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def make_sample(data_file, all_var, idx, n_tracks, n_classes, cuts='', p='p_', upscale=False):
-    var_list = np.sum(list(all_var.values())); start_time = time.time()
+def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_', upscale=False):
+    var_list = np.sum(list(total_var.values())); start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in var_list if key != 'tracks_image'}
         if 'tracks_image' in var_list or 'tracks' in var_list:
@@ -181,7 +181,7 @@ def make_sample(data_file, all_var, idx, n_tracks, n_classes, cuts='', p='p_', u
     if 'tracks'       in var_list: sample['tracks'] = tracks_data
     if tf.__version__ < '2.1.0': sample = {key:np.float32(sample[key]) for key in sample}
     if upscale:
-        for n in all_var['images']: sample[n] = resize_images(np.float32(sample[n]), target_shape=(56,11))
+        for n in total_var['images']: sample[n] = resize_images(np.float32(sample[n]),target_shape=(56,11))
     if idx[1]-idx[0] > 1: print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     return sample_cuts(sample, make_labels(sample, n_classes), cuts)
 
@@ -337,15 +337,16 @@ def class_weights(labels):
 def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
     valid_probs  = np.full(valid_labels.shape + (max(valid_labels)+1,), -1.)
     event_number = valid_sample['eventNumber']
-    for fold_number in np.arange(n_folds):
+    for fold_number in np.arange(1,n_folds+1):
         print('FOLD', fold_number, 'EVALUATION ('+str(n_folds)+'-fold cross-validation)')
         weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
         scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
         print('CLASSIFIER: loading pre-trained weights from', weight_file)
+        #model = tf.keras.models.load_model(weight_file)
         model.load_weights(weight_file); start_time = time.time()
-        indices =               np.where(event_number%n_folds==fold_number)[0]
-        labels  =           valid_labels[event_number%n_folds==fold_number]
-        sample  = {key:valid_sample[key][event_number%n_folds==fold_number] for key in valid_sample}
+        indices =               np.where(event_number%n_folds==fold_number-1)[0]
+        labels  =           valid_labels[event_number%n_folds==fold_number-1]
+        sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
         if os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
         print('CLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
         probs = model.predict(sample, batch_size=20000, verbose=verbose)
@@ -461,12 +462,12 @@ def verify_sample(sample):
 
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #for key in sample: print(key, sample[key].shape)
-    verify_sample(sample); sys.exit()
+    #verify_sample(sample); sys.exit()
     # CALORIMETER IMAGES
-    #from plots_DG import cal_images
-    #images = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
-    #          'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    #cal_images(sample, labels, images, output_dir, mode='random')
+    from plots_DG import cal_images
+    layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
+              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+    cal_images(sample, labels, layers, output_dir, mode='mean')
     # TRACKS DISTRIBUTIONS
     #from plots_DG import plot_tracks
     #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]

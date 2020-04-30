@@ -16,7 +16,7 @@ python classifier.py --n_train=1e6   --n_valid=1e6  --batch_size=5e3  --n_epochs
 #                     --scaler_out  scaler_${VAR}-tracks.pkl   --results_out results_${VAR}-tracks.pkl
 
 
-# K-FOLD TRAINING (array mode)
+# CROSS-VALIDATION TRAINING (array mode)
 #n_folds=10
 #for ((fold = 1; fold <= $n_folds;  fold++)) do
 #python classifier.py  --n_train=15e6                         --batch_size=5e3  --n_epochs=100  --n_classes=2  \
@@ -27,14 +27,10 @@ python classifier.py --n_train=1e6   --n_valid=1e6  --batch_size=5e3  --n_epochs
 #                      --output_dir  outputs/n_tracks/cross-valid/2c_10m_kernel-1x1/${VAR}-tracks  \
 #                      --scaler_out   scaler_${fold}.pkl  \
 #                      --model_out     model_${fold}.h5   \
-#                      --results_out results_${fold}.h5
+#                      --results_out results_${fold}.pkl
 #done
-
-
-# CROSS-VALIDATION (array mode)
-#n_folds=10
 #python classifier.py  --n_valid=15e6  --n_classes=2   --n_tracks=${VAR}  --n_folds=${n_folds}  --verbose=2  \
-#                      --NN_type=CNN   --scalars=OFF   --plotting=ON      --cross_valid=ON                   \
+#                      --NN_type=CNN   --scalars=OFF   --plotting=OFF     --cross_valid=ON                   \
 #                      --output_dir outputs/n_tracks/cross-valid/2c_10m_kernel-1x1/${VAR}-tracks
 
 
