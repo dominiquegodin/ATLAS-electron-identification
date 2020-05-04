@@ -169,7 +169,30 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_', upscale=False):
+def process_images(sample, image_list, n_tasks=16):
+    def rotation(images, indices, return_dict):
+        images = images[indices[0]:indices[1]].T
+        #images  = abs(images)                               # negatives to positives
+        #images -= np.minimum(0, np.min(images, axis=(0,1))) # shift to positive domain
+        images = np.maximum(0, images)                       # clips negative values
+        mean_1 = np.mean(images[:images.shape[0]//2   ], axis=(0,1))
+        mean_2 = np.mean(images[ images.shape[0]//2:-1], axis=(0,1))
+        return_dict[indices] = np.where(mean_1 > mean_2, images[::-1,::-1,:], images).T
+    n_samples = len(sample['eventNumber'])
+    idx_list  = [task*(n_samples//n_tasks) for task in np.arange(n_tasks)] + [n_samples]
+    idx_list  = list( zip(idx_list[:-1], idx_list[1:]) ); start_time = time.time()
+    print('CLASSIFIER: preprocessing images for best axis', end=' ... ', flush=True)
+    for cal_image in [key for key in image_list if 'tracks' not in key]:
+        images    = sample[cal_image]; manager = mp.Manager(); return_dict = manager.dict()
+        processes = [mp.Process(target=rotation, args=(images, idx, return_dict)) for idx in idx_list]
+        for job in processes: job.start()
+        for job in processes: job.join()
+        sample[cal_image] = np.concatenate([return_dict[idx] for idx in idx_list])
+    print(' ('+format(time.time()-start_time,'.1f'), '\b'+' s)\n')
+    return sample
+
+
+def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_', process=False):
     var_list = np.sum(list(total_var.values())); start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in var_list if key != 'tracks_image'}
@@ -180,32 +203,36 @@ def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_',
     if 'tracks_image' in var_list: sample.update({'tracks_image':tracks_data})
     if 'tracks'       in var_list: sample['tracks'] = tracks_data
     if tf.__version__ < '2.1.0': sample = {key:np.float32(sample[key]) for key in sample}
-    if upscale:
+    if False:
         for n in total_var['images']: sample[n] = resize_images(np.float32(sample[n]),target_shape=(56,11))
-    if idx[1]-idx[0] > 1: print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    return sample_cuts(sample, make_labels(sample, n_classes), cuts)
+    labels = make_labels(sample, n_classes)
+    if idx[1]-idx[0] > 1:
+        print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
+        sample, labels = sample_cuts(sample, labels, cuts)
+        if process: sample = process_images(sample, total_var['images'])
+    return sample, labels
 
 
 def make_labels(sample, n_classes):
     MC_type, IFF_type = sample['p_TruthType'], sample['p_iffTruth']
     if n_classes == 2:
-        labels = np.where(IFF_type <= 1                                 , -1, IFF_type)
-        labels = np.where(IFF_type == 2                                 ,  0, labels  )
-        return   np.where(IFF_type >= 3                                 ,  1, labels  )
+        labels = np.where(IFF_type <= 1                               , -1, IFF_type)
+        labels = np.where(IFF_type == 2                               ,  0, labels  )
+        return   np.where(IFF_type >= 3                               ,  1, labels  )
     elif n_classes == 6:
-        labels = np.where(np.logical_or (IFF_type <= 1, IFF_type == 4)  , -1, IFF_type)
-        labels = np.where(np.logical_or (IFF_type == 6, IFF_type == 7)  , -1, labels  )
-        labels = np.where(IFF_type == 2                                 ,  0, labels  )
-        labels = np.where(IFF_type == 3                                 ,  1, labels  )
-        labels = np.where(IFF_type == 5                                 ,  2, labels  )
-        labels = np.where(np.logical_or (IFF_type == 8, IFF_type == 9)  ,  3, labels  )
-        labels = np.where(np.logical_and(IFF_type ==10,  MC_type == 4)  ,  4, labels  )
-        labels = np.where(np.logical_and(IFF_type ==10,  MC_type ==16)  ,  4, labels  )
-        labels = np.where(np.logical_and(IFF_type ==10,  MC_type ==17)  ,  5, labels  )
-        return   np.where(  labels == 10                                , -1, labels  )
+        labels = np.where(np.logical_or (IFF_type <= 1, IFF_type == 4), -1, IFF_type)
+        labels = np.where(np.logical_or (IFF_type == 6, IFF_type == 7), -1, labels  )
+        labels = np.where(IFF_type == 2                               ,  0, labels  )
+        labels = np.where(IFF_type == 3                               ,  1, labels  )
+        labels = np.where(IFF_type == 5                               ,  2, labels  )
+        labels = np.where(np.logical_or (IFF_type == 8, IFF_type == 9),  3, labels  )
+        labels = np.where(np.logical_and(IFF_type ==10,  MC_type == 4),  4, labels  )
+        labels = np.where(np.logical_and(IFF_type ==10,  MC_type ==16),  4, labels  )
+        labels = np.where(np.logical_and(IFF_type ==10,  MC_type ==17),  5, labels  )
+        return   np.where(  labels == 10                              , -1, labels  )
     elif n_classes == 9:
-        labels = np.where(IFF_type == 9                                 ,  4, IFF_type)
-        return   np.where(IFF_type ==10                                 ,  6, labels  )
+        labels = np.where(IFF_type == 9                               ,  4, IFF_type)
+        return   np.where(IFF_type ==10                               ,  6, labels  )
     else: print('\nERROR:', n_classes, 'classes not supported -> exiting program\n'); sys.exit()
 
 
@@ -287,7 +314,7 @@ def load_scaler(sample, scalars, scaler_file):
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
     scalars_scaled = scaler.transform(scalars_scaled)
     for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_scaled[:,n]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
     return sample
 
 
@@ -329,12 +356,16 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print('VALIDATION SAMPLE ACCURACY:', format(valid_accuracy,'.2f'),'%\n')
 
 
-def class_weights(labels):
-    n_classes = max(labels) + 1
-    return {m:len(labels)/np.sum(labels==m)/n_classes for m in np.arange(n_classes)}
+def class_weights(labels, bkg_to_sig=1):
+    n_e = len(labels); n_classes = max(labels) + 1
+    ratios = {0:1, 1:bkg_to_sig} if n_classes==2 else {n:1 for n in np.arange(n_classes)}
+    return {n: n_e/np.sum(labels==n) * ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
 def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
+    print('\n########################################################################'  )
+    print(  '#### STARTING CROSS-VALIDATION #########################################'  )
+    print(  '########################################################################\n')
     valid_probs  = np.full(valid_labels.shape + (max(valid_labels)+1,), -1.)
     event_number = valid_sample['eventNumber']
     for fold_number in np.arange(1,n_folds+1):
@@ -357,9 +388,9 @@ def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_f
     return valid_probs
 
 
-def valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, output_dir, plotting, cross_valid):
+def valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, output_dir, plotting):
     compo_matrix(valid_labels, train_labels, valid_probs)
-    if max(valid_labels) > 1 and cross_valid == 'OFF':
+    if max(valid_labels) > 1:
         valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs)
         compo_matrix(valid_labels, train_labels, valid_probs)
     if plotting == 'ON':

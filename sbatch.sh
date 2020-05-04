@@ -1,11 +1,11 @@
 #!/bin/bash
 ##SBATCH --account=def-arguinj
-##SBATCH --time=24:00:00    # time (DD-HH:MM)
+##SBATCH --time=12:00:00    # time (DD-HH:MM)
 ##SBATCH --mem=186G         # memory (per node)
 #SBATCH --gres=gpu:4       # Number of GPU(s) per node
 #SBATCH --job-name=el-id
 #SBATCH --output=outputs/log_files/%x_%A_%a.out
-#SBATCH --array=0
+#SBATCH --array=1
 export VAR=$SLURM_ARRAY_TASK_ID
 
 
