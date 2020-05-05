@@ -524,21 +524,22 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
     with h5py.File(h5_file, 'r') as data:
         sample = {key:data['train'][key][idx[0]:idx[1]] for key in images + tracks + scalars + integers}
     for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
-    sample.update({'em_barrel_Lr1_fine':sample['em_barrel_Lr1']})
+    if 'em_barrel_Lr1' in sample: sample.update({'em_barrel_Lr1_fine':sample['em_barrel_Lr1']})
     for key in images: sample[key] = resize_images(sample[key])
     #for key in set(images)-set(['em_barrel_Lr1']): sample[key] = resize_images(sample[key])
     for key in images+scalars: sample[key] = np.float16(sample[key])
-    tracks_list = [np.expand_dims(get_tracks(sample,n,50     ), axis=0) for n in np.arange(batch_size)]
-    sample.update({'tracks'  :np.concatenate(tracks_list)})
-    tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_'), axis=0) for n in np.arange(batch_size)]
-    sample.update({'p_tracks':np.concatenate(tracks_list)})
-    tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_',True), axis=0) for n in np.arange(batch_size)]
-    tracks_list = np.concatenate(tracks_list)
-    tracks_dict = {'p_mean_efrac'  :0 , 'p_mean_deta'   :1 , 'p_mean_dphi'   :2 , 'p_mean_d0'          :3 ,
-                   'p_mean_z0'     :4 , 'p_mean_charge' :5 , 'p_mean_vertex' :6 , 'p_mean_chi2'        :7 ,
-                   'p_mean_ndof'   :8 , 'p_mean_pixhits':9 , 'p_mean_scthits':10, 'p_mean_trthits'     :11,
-                   'p_mean_sigmad0':12, 'p_qd0Sig'      :13, 'p_nTracks'     :14, 'p_sct_weight_charge':15}
-    sample.update({key:tracks_list[:,tracks_dict[key]] for key in tracks_dict})
+    if len(tracks) > 0:
+        tracks_list = [np.expand_dims(get_tracks(sample,n,50     ), axis=0) for n in np.arange(batch_size)]
+        sample.update({'tracks'  :np.concatenate(tracks_list)})
+        tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_'), axis=0) for n in np.arange(batch_size)]
+        sample.update({'p_tracks':np.concatenate(tracks_list)})
+        tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_',True), axis=0) for n in np.arange(batch_size)]
+        tracks_list = np.concatenate(tracks_list)
+        tracks_dict = {'p_mean_efrac'  :0 , 'p_mean_deta'   :1 , 'p_mean_dphi'   :2 , 'p_mean_d0'          :3 ,
+                    'p_mean_z0'     :4 , 'p_mean_charge' :5 , 'p_mean_vertex' :6 , 'p_mean_chi2'        :7 ,
+                    'p_mean_ndof'   :8 , 'p_mean_pixhits':9 , 'p_mean_scthits':10, 'p_mean_trthits'     :11,
+                    'p_mean_sigmad0':12, 'p_qd0Sig'      :13, 'p_nTracks'     :14, 'p_sct_weight_charge':15}
+        sample.update({key:tracks_list[:,tracks_dict[key]] for key in tracks_dict})
     for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
     sample.update({'true_m':np.float16(get_truth_m(sample))})
     for key in tracks + ['p_truth_E']: sample.pop(key)

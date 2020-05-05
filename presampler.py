@@ -10,14 +10,16 @@ parser = ArgumentParser()
 parser.add_argument( '--n_e'         , default = None        , type=float )
 parser.add_argument( '--n_tasks'     , default = 12          , type=int   )
 parser.add_argument( '--n_files'     , default = 10          , type=int   )
+parser.add_argument( '--input_file'  , default = ''                       )
 parser.add_argument( '--output_file' , default = 'el_data.h5'             )
 parser.add_argument( '--sampling'    , default = 'ON'                     )
 parser.add_argument( '--merging'     , default = 'ON'                     )
+parser.add_argument( '--endcap'      , default = 'OFF'                    )
 args = parser.parse_args()
 
 
 # DATAFILES DEFINITIONS
-file_path   = '/opt/tmp/godin/el_data/2019-06-20/'
+file_path   = '/opt/tmp/godin/el_data/2019-06-20/' if args.input_file == '' else args.input_file
 if not os.path.isdir(file_path+'output'): os.mkdir(file_path+'output')
 output_path = file_path + 'output/'
 data_files  = [file_path+h5_file for h5_file in os.listdir(file_path) if '.h5' in h5_file]
@@ -49,6 +51,10 @@ scalars =  ['p_truth_pt'      , 'p_truth_phi'     , 'p_truth_eta'     , 'p_truth
 integers = ['p_TruthType'     , 'p_iffTruth'      , 'p_nTracks'       , 'mcChannelNumber'  , 'eventNumber',
             'p_LHTight'       , 'p_LHMedium'      , 'p_LHLoose'       , 'p_numberOfSCTHits', 'p_charge'   ]
 
+if args.endcap != 'OFF':
+      images = ['em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3'    ,
+              'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3'    ]
+      tracks = []
 
 # REMOVING TEMPORARY FILES (if any)
 temp_files = [h5_file for h5_file in os.listdir(output_path) if 'temp' in h5_file]
