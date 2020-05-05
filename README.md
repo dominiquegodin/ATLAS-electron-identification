@@ -104,3 +104,33 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 4) All plots, weights and models are saved by default in the "outputs" directory.
 5) To use pre-trained weights and generate plots without re-training, n_epochs = 0 must be specify.
 6) In order to optimize data transfer rate, the datafile should be present on the same server of the GPU's.
+
+
+# Setting up suitable python environment on Compute Canada nodes
+See https://docs.computecanada.ca/wiki/Python .
+
+### First time 
+Create the environment:
+```
+module load python/3.6
+module load scipy-stack
+virtualenv --no-download ~/ENV
+
+### install needed packages...
+pip install --no-index --upgrade pip
+pip install h5py
+pip install --no-index tensorflow_cpu
+pip install --no-index tensorflow_gpu
+pip install -U scikit-learn
+pip install tabulate
+pip install scikit-image
+```
+
+### Subsequent times
+Just load the environment:
+```
+module load python/3.6
+module load scipy-stack
+source ~/ENV/bin/activate
+```
+Voila! To get out of it, `deactivate`.
