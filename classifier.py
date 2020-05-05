@@ -53,7 +53,7 @@ if args.results_in != '':
     if os.path.isfile(args.output_dir+'/'+args.results_in):
         print('\nLOADING VALIDATION RESULTS FROM', args.output_dir+'/'+args.results_in, '\n')
         sample, labels, probs = pickle.load(open(args.output_dir+'/'+args.results_in, 'rb'))
-        valid_results(sample, labels, probs, labels, None, args.output_dir, args.plotting, args.cross_valid)
+        valid_results(sample, labels, probs, labels, None, args.output_dir, args.plotting)
     sys.exit()
 
 
@@ -68,7 +68,9 @@ if args.cross_valid == 'ON' and args.n_folds <= 1:
 
 # DATAFILE
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    if not os.path.isdir(path): os.mkdir(path)
+    if not os.path.isdir(path):
+        try: os.mkdir(path)
+        except FileExistsError: pass
 data_file = '/opt/tmp/godin/el_data/2020-04-21/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5'
 if args.data_file != '': data_file= args.dat_file
@@ -102,7 +104,8 @@ with strategy.scope():
     if tf.__version__ >= '2.1.0': tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
     sample, _ = make_sample(data_file, total_var, [0,1], args.n_tracks, args.n_classes)
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
-    model     = multi_CNN(*func_args, **train_var); model.summary()
+    model     = multi_CNN(*func_args, **train_var)
+    print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
 
@@ -168,7 +171,7 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     early_stop  = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                          class_weight=None if args.n_classes==2 else class_weights(train_labels),
+                          class_weight=class_weights(train_labels),
                           sample_weight=sample_weights(train_sample, train_labels, args.n_classes,
                           args.weight_type, args.output_dir), batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
@@ -182,8 +185,7 @@ if args.cross_valid == 'ON':
 if args.cross_valid == 'OFF':
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting,
-              args.cross_valid)
-print('Saving validation results to', args.output_dir+'/'+args.results_out, '\n')
+valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
+print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
 valid_sample = {key:valid_sample[key] for key in other_var}
 pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
