@@ -7,6 +7,7 @@ from   argparse  import ArgumentParser
 
 matplotlib.use('Agg')
 
+
 # OPTIONS
 parser = ArgumentParser()
 parser.add_argument( '--n_e'         , default = 1        , type=int )
@@ -27,6 +28,10 @@ else:
     images = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', #'em_barrel_Lr1_fine',
             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
 
+averages = {}
+
+for image in images:
+    averages[image] = train[image][0]*0
 
 with PdfPages(args.output_file) as pdf:
     for i_e in range(args.n_e):
@@ -40,6 +45,25 @@ with PdfPages(args.output_file) as pdf:
             #print('drawing row %s and column %s' % (row,col))
             axs[row,col].imshow(train[image][args.start_e + i_e],cmap='hot',interpolation='nearest')
             axs[row,col].title.set_text(image)
+
+            #Update average
+            averages[image] = averages[image] + (train[image][args.start_e + i_e] * (1./args.n_e))
+
             i += 1
         pdf.savefig(fig)
         plt.close()
+
+    print('drawing averages over %s electrons' % args.n_e)
+    fig, axs = plt.subplots(4,2)
+    fig.set_size_inches(8.27,11.69)
+
+    i=0
+    for image in images:
+        row = i if i<len(images)/2 else i-4
+        col = 0 if i<len(images)/2 else 1
+        axs[row,col].imshow(averages[image],cmap='hot',interpolation='nearest')
+        axs[row,col].title.set_text('AVG %s' % image)
+        i += 1
+
+    pdf.savefig(fig)
+    plt.close()
