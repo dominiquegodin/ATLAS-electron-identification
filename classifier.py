@@ -17,7 +17,7 @@ parser.add_argument( '--n_valid'     , default =  1e5,  type = float )
 parser.add_argument( '--batch_size'  , default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    , default =  100,  type = int   )
 parser.add_argument( '--n_classes'   , default =    2,  type = int   )
-parser.add_argument( '--n_tracks'    , default =   10,  type = int   )
+parser.add_argument( '--n_tracks'    , default =    5,  type = int   )
 parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
@@ -44,7 +44,7 @@ parser.add_argument( '--model_out'   , default = 'model.h5'          )
 parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
 parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
-parser.add_argument( '--results_out' , default = 'results.pkl'       )
+parser.add_argument( '--results_out' , default = ''                  )
 args = parser.parse_args()
 
 
@@ -90,9 +90,9 @@ total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
 
 
 # CNN ARCHITECTURES
-CNN = {(56,11) :{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
-        (7,11) :{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
-       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
+CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
+        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # MULTI-GPU DISTRIBUTION
@@ -101,7 +101,8 @@ devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
 tf.debugging.set_log_device_placement(False)
 strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
 with strategy.scope():
-    if tf.__version__ >= '2.1.0': tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
+    if tf.__version__ >= '2.1.0' and len(total_var['images']) > 1:
+        tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
     sample, _ = make_sample(data_file, total_var, [0,1], args.n_tracks, args.n_classes)
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
     model     = multi_CNN(*func_args, **train_var)
@@ -186,6 +187,7 @@ if args.cross_valid == 'OFF':
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
-print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-valid_sample = {key:valid_sample[key] for key in other_var}
-pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
+if args.results_out != '':
+    print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
+    valid_sample = {key:valid_sample[key] for key in other_var}
+    pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))

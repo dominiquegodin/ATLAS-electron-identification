@@ -19,7 +19,7 @@ def LLH_rates(sample, y_true):
         y_class1 = sample[wp][y_true != 0]
         LLH_tpr.append( np.sum(y_class0 == 0)/len(y_class0) )
         LLH_fpr.append( np.sum(y_class1 == 0)/len(y_class1) )
-    return LLH_tpr, LLH_fpr
+    return LLH_fpr, LLH_tpr
 
 
 def plot_history(history, output_dir, key='accuracy'):
@@ -48,18 +48,20 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False):
     print('Saving test sample distributions to:', file_name)
     label_dict = {0:'iso electron', 1:'charge flip', 2:'photon conversion', 3:'b/c hadron',
                   4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
-    label_dict = label_dict if separation else {0:'iso electron', 1:'background'}
+    #label_dict = label_dict if separation else {0:'iso electron', 1:'background'}
+    label_dict = label_dict if separation else {0:'iso electron', 1:'b/c hadron'}
     n_classes  = len(label_dict)
     def logit(x, delta=1e-16):
         x = np.float64(x); x = np.minimum(x,1-delta); x = np.maximum(x,delta)
         return np.log10(x) - np.log10(1-x)
     def class_histo(y_prob, y_true, bins):
+        colors=['#1f77b4','red']
         for n in np.arange(y_prob.shape[1]):
             class_probs   = y_prob[:,0][y_true==n]
             class_weights = len(class_probs)*[100/len(y_true)]
             #class_weights = len(class_probs)*[100/len(class_probs)]
             pylab.hist( class_probs, bins=bins, label='class '+str(n) + ': ' + label_dict[n],
-                        histtype='step', weights=class_weights, log=True, lw=2 )
+                        histtype='step', weights=class_weights, log=True, lw=2, color=colors[n] )
     def separate_histo(sample, y_prob, y_true, bins):
         from utils import make_labels
         multi_labels = make_labels(sample, n_classes)
@@ -103,7 +105,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False):
 def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
     print('Saving test sample ROC'+str(ROC_type)+' curve to:   ', file_name)
-    LLH_tpr, LLH_fpr = LLH_rates(sample, y_true)
+    LLH_fpr, LLH_tpr = LLH_rates(sample, y_true)
     fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
     signal_ratio        = np.sum(y_true==0)/len(y_true)
     accuracy            = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
@@ -148,6 +150,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         for val in LLH_scores:
             plt.text(100.2, val, str(int(val)), {'color': '#1f77b4', 'fontsize': 10}, va="center", ha="left")
         axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
+        plt.xlabel('Signal Efficiency (%)',fontsize=25)
         plt.ylabel('1/(Background Efficiency)',fontsize=25)
         val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='Signal vs Bkg', color='#1f77b4', lw=2)
         plt.scatter( 100*best_tpr, 1/best_fpr, s=40, marker='o', c=val[0].get_color(),
@@ -159,16 +162,16 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     #'''
     if ROC_type == 3:
         best_threshold = threshold[np.argmax(accuracy)]
-        x_min=-3; x_max=3; y_min=0.5; y_max=1-1e-4;
+        x_min=-2; x_max=3; y_min=0.1; y_max=1-1e-4;
         pylab.ylim(y_min, y_max); pylab.xlim(10**x_min, 1-10**(-x_max))
-        pos  =             [        10**float(n)      for n in np.arange(x_min,0)       ]
-        pos += [ 0.5   ] + [      1-10**float(n)      for n in np.arange(-1,-x_max-1,-1)]
-        lab  = [      '0.'+n*'0'+'1' for n in np.arange(abs(x_min)-3,-1,-1)       ]
-        lab += [1, 10, 50, 90, 99] + ['99.'+n*'9'            for n in np.arange(1,x_max-1)]
+        pos  =                       [  10**float(n)  for n in np.arange(x_min,0)           ]
+        pos += [ 0.5]              + [1-10**float(n)  for n in np.arange(-1,-x_max-1,-1)    ]
+        lab  =                       [ '0.'+n*'0'+'1' for n in np.arange(abs(x_min)-3,-1,-1)]
+        lab += [1, 10, 50, 90, 99] + ['99.'+n*'9'     for n in np.arange(1,x_max-1)         ]
         plt.xscale('logit')
         plt.xticks(pos, lab)
         plt.yscale('logit')
-        plt.yticks([ 0.5, 0.9, 0.99, 0.999, 0.9999], [50, 90, 99, 99.9, 99.99])
+        plt.yticks([ 0.1, 0.5, 0.9, 0.99, 0.999, 0.9999], [10, 50, 90, 99, 99.9, 99.99])
         axes.xaxis.set_minor_formatter(plt.NullFormatter())
         axes.yaxis.set_minor_formatter(plt.NullFormatter())
         plt.xlabel('Signal Probability as Threshold (%)', fontsize=25)
@@ -176,16 +179,13 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         val_1 = plt.plot(threshold[1:], tpr[1:], color='tab:blue', label='Signal efficiency', lw=2)
         val_2 = plt.plot(threshold[1:], 1-fpr[1:], color='tab:orange', label='Background rejection', lw=2)
         val_3 = plt.plot(threshold[1:], accuracy[1:], color='black', label='Accuracy', lw=2, zorder=10)
-        #std_accuracy = valid_accuracy(y_true, y_prob)
-        #plt.scatter( 0.25, std_accuracy, s=30, marker='D', c=val[0].get_color(),
-        #             label="{0:<10s} {1:>5.2f}%".format('Standard Accuracy:', 100*std_accuracy), zorder=10 )
         for LLH in zip(LLH_tpr, LLH_fpr):
             p1 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], LLH[0],
                              s=40, marker='o', c=val_1[0].get_color())
             p2 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], 1-LLH[1],
                              s=40, marker='o', c=val_2[0].get_color())
         l1 = plt.legend([p1, p2], ["LLH sig. efficiencies", "LLH bkg. rejections"],
-                        loc='lower center', fontsize=13)
+                        loc='lower left', fontsize=13)
         plt.scatter( best_threshold, max(accuracy), s=40, marker='o', c=val_3[0].get_color(),
                      label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='upper center', fontsize=15)
@@ -200,9 +200,9 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         plt.plot( 100*threshold[1:], 100*tpr[1:], color='tab:blue', label='Signal efficiency', lw=2)
         plt.plot( 100*threshold[1:], 100*(1-fpr[1:]), color='tab:orange', label='Background rejection', lw=2)
         val = plt.plot(100*threshold[1:], 100*accuracy[1:], color='black', label='Accuracy', lw=2, zorder=10)
-        std_accuracy = 100*valid_accuracy(y_true, y_prob) #100*accuracy[np.argwhere(threshold<=0.5)[0][0]]
-        plt.scatter( 50, std_accuracy, s=30, marker='D', c=val[0].get_color(),
-                     label="{0:<10s} {1:>5.2f}%".format('Standard Accuracy:', std_accuracy), zorder=10 )
+        #std_accuracy = 100*valid_accuracy(y_true, y_prob)
+        #plt.scatter( 50, std_accuracy, s=30, marker='D', c=val[0].get_color(),
+        #             label="{0:<10s} {1:>5.2f}%".format('Standard Accuracy:', std_accuracy), zorder=10 )
         plt.scatter( 100*best_threshold, 100*max(accuracy), s=40, marker='o', c=val[0].get_color(),
                      label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
@@ -223,52 +223,68 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     plt.savefig(file_name)
 
 
-'''
-# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
-from plots_DG import get_LLH
-from sklearn  import metrics
-import matplotlib.pyplot as plt
-from   matplotlib import pylab
-file_name = args.output_dir+'/ROC2_curve.png'
-plt.figure(figsize=(12,8))
-pylab.grid(True)
-axes = plt.gca()
-axes.xaxis.set_ticks(np.arange(0, 101, 10))
-plt.xlabel('Signal Efficiency (%)',fontsize=25)
-x_min = []
-y_max = []
-def mp_roc(bkg_class, return_dict):
-    result_file = args.output_dir+'/'+'class_0_vs_'+str(bkg_class)+'/'+'results_0_vs_'+str(bkg_class)+'.out'
-    #result_file = args.output_dir+'/'+'results_'+str(bkg_class)+'-tracks.h5'
-    sample, labels, probs = pickle.load(open(result_file, 'rb'))
-    eff_0, eff_1 = get_LLH(sample, labels)
-    fpr, tpr, threshold = metrics.roc_curve(labels, probs[:,0], pos_label=0)
-    print('LOADING VALIDATION RESULTS FROM', result_file)
-    return_dict[bkg_class] =  eff_0, eff_1, fpr, tpr, threshold
-manager   = mp.Manager(); return_dict = manager.dict()
-processes = [mp.Process(target=mp_roc, args=(n, return_dict)) for n in np.arange(args.n_classes)]
-for job in processes: job.start()
-for job in processes: job.join()
-for bkg_class in np.arange(args.n_classes):
-#for bkg_class in np.arange(1,11):
-    eff_0, eff_1, fpr, tpr, threshold = return_dict[bkg_class]
-    len_0  = sum(fpr==0)
-    x_min += [min(60, 10*np.floor(10*eff_0[0]))]
-    y_max += [100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min[-1]/100)[0]], 1/eff_1[0])/100)]
-    label = str(bkg_class) if bkg_class != 0 else 'others'
-    val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='class 0 vs '+label, lw=2)
-    #val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='max tracks = '+label, lw=2)
-    for LLH in zip(eff_0, eff_1): plt.scatter(100*LLH[0], 1/LLH[1], s=40, marker='o', c=val[0].get_color())
-plt.xlim([min(x_min), 100])
-#plt.ylim([1,   max(y_max)])
-plt.ylim([1,   1e5])
-axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
-plt.yscale("log")
-plt.ylabel('1/(Background Efficiency)',fontsize=25)
-plt.legend(loc='upper right', fontsize=15, numpoints=3)
-plt.savefig(file_name)
-sys.exit()
-'''
+def combine_ROC_curves(output_dir):
+    import multiprocessing as mp, pickle
+    from scipy.interpolate import make_interp_spline
+    from utils import CNN_weights
+    def mp_roc(var, output_dir, return_dict):
+        #result_file = output_dir+'/'+'class_0_vs_'+str(bkg_class)+'/'+'results_0_vs_'+str(bkg_class)+'.out'
+        result_file = output_dir+'/'+str(var)+'-tracks'+'/'+'results.pkl'
+        #result_file = output_dir+'/'+'2c_10m_n-tracks-images'+'/'+'results_'+str(var)+'-tracks.h5'
+        sample, labels, probs = pickle.load(open(result_file, 'rb'))
+        fpr, tpr, threshold = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+        LLH_fpr, LLH_tpr = LLH_rates(sample, labels)
+        print('LOADING VALIDATION RESULTS FROM', result_file)
+        return_dict[var] = fpr, tpr, threshold, LLH_fpr, LLH_tpr
+    manager = mp.Manager(); return_dict = manager.dict()
+    var_list = [1,2,3,4,5,6,7,8,9,10]
+    var_name = 'max tracks'
+    #processes = [mp.Process(target=mp_roc, args=(n, return_dict)) for n in np.arange(args.n_classes)]
+    processes = [mp.Process(target=mp_roc, args=(var, output_dir, return_dict)) for var in var_list]
+    for job in processes: job.start()
+    for job in processes: job.join()
+    CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
+            (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+            (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
+    file_name = output_dir+'/'+'ROC2_curve.png'
+    plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+    for LLH_tpr in [0.7, 0.8, 0.9]:
+        bkg_rej   = [1/return_dict[var][0][np.argwhere(return_dict[var][1] >= LLH_tpr)[0]][0] for var in var_list]
+        n_weights = [CNN_weights((var,13), CNN[(5,13)]['maps'], CNN[(5,13)]['kernels'], 200) for var in var_list]
+        #bkg_rej   = [1e5*bkg_rej[n]/n_weights[n] for n in np.arange(len(var_list))]
+        plt.scatter(var_list, bkg_rej, s=40, marker='o')
+        var_array    = np.linspace(min(var_list), max(var_list), 1000)
+        spline       = make_interp_spline(var_list, bkg_rej, k=2)
+        plt.plot(var_array, spline(var_array), label=format(100*LLH_tpr,'.0f')+'% sig. eff.')
+    plt.xlim([min(var_list)-1, max(var_list)+1])
+    axes.xaxis.set_major_locator(MultipleLocator(1))
+    plt.ylim([0, 50])
+    plt.ylim([1100, 1500])
+    axes.yaxis.set_major_locator(MultipleLocator(5))
+    plt.xlabel('Maximum Number of Tracks',fontsize=25)
+    plt.ylabel('1/(Background Efficiency)',fontsize=25)
+    plt.legend(loc='lower center', fontsize=15, numpoints=3)
+    plt.savefig(output_dir+'/'+'var.png')
+    x_min = []; y_max = []
+    #for var in np.arange(n_classes):
+    for var in var_list:
+        fpr, tpr, threshold, LLH_fpr, LLH_tpr = return_dict[var]; len_0  = np.sum(fpr==0)
+        x_min += [min(60, 10*np.floor(10*LLH_tpr[0]))]
+        y_max += [100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min[-1]/100)[0]], 1/LLH_fpr[0])/100)]
+        #label = str(bkg_class) if bkg_class != 0 else 'others'
+        #val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='class 0 vs '+label, lw=2)
+        #for LLH in zip(LLH_tpr, LLH_fpr):
+        #    plt.scatter(100*LLH[0], 1/LLH[1], s=40, marker='o', c=val[0].get_color()) 
+        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label=var_name+': '+str(var), lw=2)
+    plt.xlim([min(x_min), 100])
+    plt.ylim([1, 80])  #plt.ylim([1, max(y_max)])
+    axes.xaxis.set_major_locator(MultipleLocator(10))
+    axes.yaxis.set_major_locator(MultipleLocator(10))
+    axes.yaxis.set_ticks( np.append([1], np.arange(10,90,10)) )
+    plt.xlabel('Signal Efficiency (%)',fontsize=25)
+    plt.ylabel('1/(Background Efficiency)',fontsize=25); #plt.yscale("log")
+    plt.legend(loc='upper right', fontsize=15, numpoints=3)
+    plt.savefig(file_name); sys.exit()
 
 
 def cal_images(sample, labels, layers, output_dir, mode='random', scale='free'):
