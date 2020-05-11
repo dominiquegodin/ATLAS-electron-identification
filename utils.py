@@ -165,7 +165,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 
 
 #################################################################################
-##### Batch_classifier.py functions #############################################
+##### classifier.py functions ###################################################
 #################################################################################
 
 
@@ -180,8 +180,6 @@ def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_',
     if 'tracks_image' in var_list: sample.update({'tracks_image':tracks_data})
     if 'tracks'       in var_list: sample['tracks'] = tracks_data
     if tf.__version__ < '2.1.0' or len(total_var['images']) <= 1:
-        #for key in [key for key in sample if key not in total_var['others']]:
-        #    sample[key] = np.float32(sample[key])
         for key in set(sample) - set(total_var['others']): sample[key] = np.float32(sample[key])
     if False:
         for n in total_var['images']: sample[n] = resize_images(np.float32(sample[n]),target_shape=(56,11))
@@ -317,7 +315,7 @@ def load_scaler(sample, scalars, scaler_file):
     print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
     scalars_scaled = scaler.transform(scalars_scaled)
     for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_scaled[:,n]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     return sample
 
 
@@ -359,9 +357,10 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print('VALIDATION SAMPLE ACCURACY:', format(valid_accuracy,'.2f'),'%\n')
 
 
-def class_weights(labels, bkg_to_sig=1):
+def class_weights(labels, bkg_to_sig=None):
     n_e = len(labels); n_classes = max(labels) + 1
-    ratios = {0:1, 1:bkg_to_sig} if n_classes==2 else {n:1 for n in np.arange(n_classes)}
+    if n_classes == 2 and bkg_to_sig == None: return None
+    ratios = {0:1, 1:bkg_to_sig} if n_classes == 2 else {n:1 for n in np.arange(n_classes)}
     return {n: n_e/np.sum(labels==n) * ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
@@ -371,7 +370,7 @@ def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_f
     print(  '########################################################################\n')
     valid_probs  = np.full(valid_labels.shape + (max(valid_labels)+1,), -1.)
     event_number = valid_sample['eventNumber']
-    for fold_number in np.arange(1,n_folds+1):
+    for fold_number in np.arange(1, n_folds+1):
         print('FOLD', fold_number, 'EVALUATION ('+str(n_folds)+'-fold cross-validation)')
         weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
         scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
@@ -398,6 +397,7 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, trainin
         compo_matrix(valid_labels, train_labels, valid_probs)
     if plotting == 'ON':
         '''
+        print(len(valid_labels))
         multi_class=3
         multi_labels = make_labels(valid_sample, n_classes=6)
         probs  = valid_probs[np.logical_or(multi_labels==0, multi_labels==multi_class)]
@@ -414,9 +414,9 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, trainin
             folder = output_dir+'/'+'class_0_vs_'+str(bkg_class)
             if not os.path.isdir(folder): os.mkdir(folder)
             sample, labels, probs = binarization(sample, labels, probs, [bkg_class])
-            pickle.dump((sample,labels,probs), open(folder+'/'+'results_0_vs_'+str(bkg_class)+'.out','wb'))
+            #pickle.dump((sample,labels,probs), open(folder+'/'+'results_0_vs_'+str(bkg_class)+'.pkl','wb'))
             processes  = [mp.Process(target=compo_matrix, args=(labels, [], probs,))]
-            processes += [mp.Process(target=plot_distributions_DG, args=(sample, labels, probs, folder,))]
+            processes += [mp.Process(target=plot_distributions_DG, args=(sample, labels, probs, folder, False))]
             arguments  = [(sample, labels, probs, ROC_type, folder) for ROC_type in [1,2,3]]
             processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
             for job in processes: job.start()
@@ -472,6 +472,7 @@ def binarization(sample, labels, probs, class_1=['others'], class_0=[0], LR=Fals
     probs_1 = np.where(probs_0!=probs_1,probs_1,0.5)
     sample  = {key:sample[key][labels!=-1] for key in sample}; labels = labels[labels!=-1]
     return sample, labels, (np.vstack([probs_0, probs_1])/(probs_0+probs_1)).T
+    #return sample, labels, np.vstack([probs_0, probs_1]).T
 
 
 def verify_sample(sample):
@@ -514,14 +515,22 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
 
-def CNN_weights(shape, n_maps, kernels, FCN_neurons):
-    n_maps = np.array([1]+n_maps); kernels = [np.array(kernel) for kernel in kernels]
-    n_par  = n_maps[-1]
-    for n in np.arange(len(shape)):
-        n_par *= shape[n] + len(n_maps[1:]) - sum(kernels[:len(n_maps)-1])[n]
-    n_par *= FCN_neurons
-    for n in np.arange(len(n_maps)-1): n_par += np.prod(kernels[n])*np.prod(n_maps[n:n+2]) +n_maps[n+1]
-    return n_par + FCN_neurons
+def n_weights(image_shape, CNN_dict, FCN_neurons, n_classes):
+    kernels = np.array(CNN_dict[image_shape]['kernels']); n_maps = CNN_dict[image_shape]['maps']
+    K = [image_shape[2] if len(image_shape)==3 else 1] + n_maps + FCN_neurons + [n_classes]
+    A = [np.prod([image_shape[n] + sum(1-kernels)[n] for n in [0,1]])]
+    A = [np.prod(kernels[n]) for n in np.arange(len(n_maps))] + A + len(FCN_neurons)*[1]
+    return sum([(K[l]*A[l]+1)*K[l+1] for l in np.arange(len(K)-1)])
+
+
+def order_kernels(image_shape, CNN_dict, FCN_neurons, n_classes, par_tuple=[]):
+    x_dims  = [(x1,x2) for x1 in np.arange(1,image_shape[0]+1) for x2 in np.arange(1,image_shape[0]-x1+2)]
+    y_dims  = [(y1,y2) for y1 in np.arange(1,image_shape[1]+1) for y2 in np.arange(1,image_shape[1]-y1+2)]
+    for kernels in [[(x[0],y[0]),(x[1],y[1])] for x in x_dims for y in y_dims]:
+        CNN_dict[image_shape]['kernels'] = kernels
+        par_tuple += [(n_weights(image_shape, CNN_dict, FCN_neurons, n_classes), kernels)]
+    return sorted(par_tuple)[::-1]
+
 
 
 

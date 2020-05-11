@@ -1,5 +1,6 @@
 import numpy as np, h5py, sys, time
 from   sklearn           import metrics
+from   scipy.spatial     import distance
 from   matplotlib        import pylab
 from   matplotlib.ticker import MultipleLocator, FormatStrFormatter, AutoMinorLocator
 import matplotlib; matplotlib.use('Agg')
@@ -43,57 +44,58 @@ def plot_history(history, output_dir, key='accuracy'):
     plt.savefig(file_name)
 
 
-def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False):
+def plot_distributions_DG(sample, y_true, y_prob, output_dir, multi_class=False):
     file_name = output_dir+'/distributions.png'
     print('Saving test sample distributions to:', file_name)
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
     label_dict = {0:'iso electron', 1:'charge flip', 2:'photon conversion', 3:'b/c hadron',
                   4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
-    #label_dict = label_dict if separation else {0:'iso electron', 1:'background'}
-    label_dict = label_dict if separation else {0:'iso electron', 1:'b/c hadron'}
-    n_classes  = len(label_dict)
+    if y_prob.shape[1] == 2 and not multi_class: label_dict = {0:'iso electron', 1:'background'}
+    n_classes = len(label_dict)
     def logit(x, delta=1e-16):
         x = np.float64(x); x = np.minimum(x,1-delta); x = np.maximum(x,delta)
         return np.log10(x) - np.log10(1-x)
-    def class_histo(y_prob, y_true, bins):
-        colors=['#1f77b4','red']
-        for n in np.arange(y_prob.shape[1]):
-            class_probs   = y_prob[:,0][y_true==n]
-            class_weights = len(class_probs)*[100/len(y_true)]
-            #class_weights = len(class_probs)*[100/len(class_probs)]
-            pylab.hist( class_probs, bins=bins, label='class '+str(n) + ': ' + label_dict[n],
-                        histtype='step', weights=class_weights, log=True, lw=2, color=colors[n] )
-    def separate_histo(sample, y_prob, y_true, bins):
-        from utils import make_labels
-        multi_labels = make_labels(sample, n_classes)
+    def print_JSD(P, Q, idx, color, text):
+        plt.text(0.945, 1.01-3*idx/100, 'JSD$_{0,\!'+text+'}$:',
+                 {'color':'black', 'fontsize':10}, va='center', ha='right', transform=axes.transAxes)
+        plt.text(0.990, 1.01-3*idx/100, format(distance.jensenshannon(P, Q), '.3f'),
+                 {'color':color  , 'fontsize':10}, va='center', ha='right', transform=axes.transAxes)
+    def class_histo(y_true, y_prob, bins, colors):
+        h = np.full((len(bins)-1,n_classes), 0.)
+        from utils import make_labels; class_labels = make_labels(sample, n_classes)
         for n in np.arange(n_classes):
-            true_class    = 0 if n == 0 else 1
-            class_probs   = y_prob[:,0][np.logical_and(y_true==true_class, multi_labels==n)]
-            class_weights = len(class_probs)*[100/len(y_true)]
-            pylab.hist( class_probs, bins=bins, label='class '+str(n) + ': ' + label_dict[n],
-                        histtype='step', weights=class_weights, log=True, lw=2 )
+            class_probs   = y_prob[:,0][class_labels==n]
+            class_weights = len(class_probs)*[100/len(y_true)] #len(class_probs)*[100/len(class_probs)]
+            h[:,n] = pylab.hist(class_probs, bins=bins, label='class '+str(n)+': '+label_dict[n],
+                                histtype='step', weights=class_weights, log=True, color=colors[n], lw=2)[0]
+        if n_classes == 2: colors = len(colors)*['black']
+        for n in np.arange(1, n_classes):
+            new_y_true = y_true[np.logical_or(y_true==0, class_labels==n)]
+            new_y_prob = y_prob[np.logical_or(y_true==0, class_labels==n)]
+            fpr, tpr, threshold = metrics.roc_curve(new_y_true, new_y_prob[:,0], pos_label=0)
+            axes.axvline(threshold[np.argmax(tpr-fpr)], ymin=0, ymax=1, ls='--', lw=1, color=colors[n])
+        for n in np.arange(1, n_classes): print_JSD(h[:,0], h[:,n], n, colors[n], str(n))
+        if n_classes > 2: print_JSD(h[:,0], np.sum(h[:,1:],axis=1), n_classes, 'black', '\mathrm{bkg}')
     plt.figure(figsize=(12,16))
-    plt.subplot(2, 1, 1); pylab.grid(True)
-    pylab.xlim(0,100); pylab.ylim(1e-3,1e2)
+    plt.subplot(2, 1, 1); pylab.grid(True); axes = plt.gca()
+    pylab.xlim(0,100); pylab.ylim(1e-5 if n_classes>2 else 1e-3, 1e2)
     plt.xticks(np.arange(0,101,step=10))
     bin_step = 0.5; bins = np.arange(0, 100+bin_step, bin_step)
-    if separation: separate_histo(sample, 100*y_prob, y_true, bins)
-    else         : class_histo(100*y_prob, y_true, bins)
+    class_histo(y_true, 100*y_prob, bins, colors)
     plt.xlabel('Signal Probability (%)', fontsize=25)
     plt.ylabel('Distribution (% per '+ str(bin_step) +' % bin)', fontsize=25)
     plt.legend(loc='upper center', fontsize=17 if n_classes==2 else 14, numpoints=3)
     plt.subplot(2, 1, 2); pylab.grid(True); axes = plt.gca()
-    x_min=-10; x_max=6; pylab.xlim(x_min, x_max); pylab.ylim(1e-3,1e1)
+    x_min=-10; x_max=6; pylab.xlim(x_min, x_max); pylab.ylim(1e-4 if n_classes>2 else 1e-3,1e1)
     pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     pos += [0.5]           + [1-10**float(n)      for n in np.arange(-1,-x_max-1,-1)]
     lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min+2,0)     ]
     lab += [1,10,50,90,99] + ['99.'+n*'9'         for n in np.arange(1,x_max-1)     ]
-    #lab  =               [      '$10^{'+str(n)+'}$' for n in np.arange(x_min,0)       ]
     #lab += ['0.50   '] + ['$1\!-\!10^{'+str(n)+'}$' for n in np.arange(-1,-x_max-1,-1)]
     plt.xticks(logit(np.array(pos)), lab, rotation=15)
     bin_step = 0.1; bins = np.arange(x_min-1, x_max+1, bin_step)
     y_prob[:,0] = logit(y_prob[:,0])
-    if separation: separate_histo(sample, y_prob, y_true, bins)
-    else         : class_histo(y_prob, y_true, bins)
+    class_histo(y_true, y_prob, bins, colors)
     plt.xlabel('Signal Probability (%)', fontsize=25)
     plt.ylabel('Distribution (% per bin '+str(bin_step)+')', fontsize=25)
     location = 'upper center' if n_classes==2 else 'upper left'
@@ -130,7 +132,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
                      label="{0:<16s} {1:>3.2f}%".format('Best Accuracy:', 100*max(accuracy)) )
         for LLH in zip(LLH_tpr, LLH_fpr, colors, labels):
             plt.scatter(LLH[0], 1-LLH[1], s=40, marker='o', c=LLH[2], label='('+format(100*LLH[0],'.1f')
-                        +'%'+format(100*(1-LLH[1]),'.1f')+')'+r'$\rightarrow$'+LLH[3])
+                        +'%, '+format(100*(1-LLH[1]),'.1f')+')'+r'$\rightarrow$'+LLH[3])
         plt.legend(loc='upper right', fontsize=15, numpoints=3)
     if ROC_type == 2:
         pylab.grid(False)
@@ -159,7 +161,6 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
             plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker='o', c=LLH[2], label='('+format(100*LLH[0],'.1f')
                          +'%, '+str(format(1/LLH[1],'>3.0f'))+')'+r'$\rightarrow$'+LLH[3] )
         plt.legend(loc='upper right', fontsize=15, numpoints=3)
-    #'''
     if ROC_type == 3:
         best_threshold = threshold[np.argmax(accuracy)]
         x_min=-2; x_max=3; y_min=0.1; y_max=1-1e-4;
@@ -223,40 +224,35 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     plt.savefig(file_name)
 
 
-def combine_ROC_curves(output_dir):
+def combine_ROC_curves(output_dir, CNN_dict):
     import multiprocessing as mp, pickle
     from scipy.interpolate import make_interp_spline
-    from utils import CNN_weights
-    def mp_roc(var, output_dir, return_dict):
+    from utils import n_weights
+    def mp_roc(idx, output_dir, return_dict):
         #result_file = output_dir+'/'+'class_0_vs_'+str(bkg_class)+'/'+'results_0_vs_'+str(bkg_class)+'.out'
-        result_file = output_dir+'/'+str(var)+'-tracks'+'/'+'results.pkl'
-        #result_file = output_dir+'/'+'2c_10m_n-tracks-images'+'/'+'results_'+str(var)+'-tracks.h5'
+        result_file = output_dir+'/'+str(idx)+'-tracks'+'/'+'results.pkl'
         sample, labels, probs = pickle.load(open(result_file, 'rb'))
         fpr, tpr, threshold = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         LLH_fpr, LLH_tpr = LLH_rates(sample, labels)
         print('LOADING VALIDATION RESULTS FROM', result_file)
-        return_dict[var] = fpr, tpr, threshold, LLH_fpr, LLH_tpr
-    manager = mp.Manager(); return_dict = manager.dict()
-    var_list = [1,2,3,4,5,6,7,8,9,10]
-    var_name = 'max tracks'
-    #processes = [mp.Process(target=mp_roc, args=(n, return_dict)) for n in np.arange(args.n_classes)]
-    processes = [mp.Process(target=mp_roc, args=(var, output_dir, return_dict)) for var in var_list]
+        return_dict[idx] = fpr, tpr, threshold, LLH_fpr, LLH_tpr
+    manager   = mp.Manager()   ; return_dict = manager.dict()
+    idx_list  = np.arange(1,11); var_name    = 'max tracks'
+    processes = [mp.Process(target=mp_roc, args=(idx, output_dir, return_dict)) for idx in idx_list]
     for job in processes: job.start()
     for job in processes: job.join()
-    CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
-            (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
-            (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
     file_name = output_dir+'/'+'ROC2_curve.png'
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     for LLH_tpr in [0.7, 0.8, 0.9]:
-        bkg_rej   = [1/return_dict[var][0][np.argwhere(return_dict[var][1] >= LLH_tpr)[0]][0] for var in var_list]
-        n_weights = [CNN_weights((var,13), CNN[(5,13)]['maps'], CNN[(5,13)]['kernels'], 200) for var in var_list]
-        #bkg_rej   = [1e5*bkg_rej[n]/n_weights[n] for n in np.arange(len(var_list))]
-        plt.scatter(var_list, bkg_rej, s=40, marker='o')
-        var_array    = np.linspace(min(var_list), max(var_list), 1000)
-        spline       = make_interp_spline(var_list, bkg_rej, k=2)
-        plt.plot(var_array, spline(var_array), label=format(100*LLH_tpr,'.0f')+'% sig. eff.')
-    plt.xlim([min(var_list)-1, max(var_list)+1])
+        bkg_rej   = [1/return_dict[idx][0][np.argwhere(return_dict[idx][1] >= LLH_tpr)[0]][0]
+                     for idx in idx_list]
+        n_weights = [n_weights((idx,13), CNN_dict, [200, 200], 2) for idx in idx_list]
+        #bkg_rej   = [1e5*bkg_rej[n]/n_weights[n] for n in np.arange(len(idx_list))]
+        plt.scatter(idx_list, bkg_rej, s=40, marker='o')
+        idx_array    = np.linspace(min(idx_list), max(idx_list), 1000)
+        spline       = make_interp_spline(idx_list, bkg_rej, k=2)
+        plt.plot(idx_array, spline(idx_array), label=format(100*LLH_tpr,'.0f')+'% sig. eff.')
+    plt.xlim([min(idx_list)-1, max(idx_list)+1])
     axes.xaxis.set_major_locator(MultipleLocator(1))
     plt.ylim([0, 50])
     plt.ylim([1100, 1500])
@@ -266,16 +262,15 @@ def combine_ROC_curves(output_dir):
     plt.legend(loc='lower center', fontsize=15, numpoints=3)
     plt.savefig(output_dir+'/'+'var.png')
     x_min = []; y_max = []
-    #for var in np.arange(n_classes):
-    for var in var_list:
-        fpr, tpr, threshold, LLH_fpr, LLH_tpr = return_dict[var]; len_0  = np.sum(fpr==0)
+    for idx in idx_list:
+        fpr, tpr, threshold, LLH_fpr, LLH_tpr = return_dict[idx]; len_0  = np.sum(fpr==0)
         x_min += [min(60, 10*np.floor(10*LLH_tpr[0]))]
         y_max += [100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min[-1]/100)[0]], 1/LLH_fpr[0])/100)]
+        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label=var_name+': '+str(idx), lw=2)
         #label = str(bkg_class) if bkg_class != 0 else 'others'
         #val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='class 0 vs '+label, lw=2)
         #for LLH in zip(LLH_tpr, LLH_fpr):
-        #    plt.scatter(100*LLH[0], 1/LLH[1], s=40, marker='o', c=val[0].get_color()) 
-        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label=var_name+': '+str(var), lw=2)
+        #    plt.scatter(100*LLH[0], 1/LLH[1], s=40, marker='o', c=val[0].get_color())
     plt.xlim([min(x_min), 100])
     plt.ylim([1, 80])  #plt.ylim([1, max(y_max)])
     axes.xaxis.set_major_locator(MultipleLocator(10))

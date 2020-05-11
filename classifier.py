@@ -48,6 +48,12 @@ parser.add_argument( '--results_out' , default = ''                  )
 args = parser.parse_args()
 
 
+# CNN ARCHITECTURES
+CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
+        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
+
+
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if args.results_in != '':
     if os.path.isfile(args.output_dir+'/'+args.results_in):
@@ -87,12 +93,6 @@ train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
 other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
              'p_eta', 'p_et_calo','p_LHValue']
 total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
-
-
-# CNN ARCHITECTURES
-CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
-        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
-        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # MULTI-GPU DISTRIBUTION
