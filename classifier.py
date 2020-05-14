@@ -21,7 +21,7 @@ parser.add_argument( '--n_tracks'    , default =    5,  type = int   )
 parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
-#parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
+parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
 parser.add_argument( '--l2'          , default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     , default = 0.05,  type = float )
 #parser.add_argument( '--CNN_maps'    , default = [200, 200], type = int, nargs='+')
@@ -149,6 +149,12 @@ if args.cross_valid == 'OFF' and args.model_in != '':
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
 
+def bkg_sample_weights(sample):
+    from utils import make_labels; labels = make_labels(sample, 6)
+    weights = class_weights(labels, 2.5)
+    return np.array([weights[n] for n in np.arange(6)])[labels]
+
+
 # TRAINING LOOP
 if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
@@ -167,14 +173,15 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
         scaler_out = args.output_dir+'/'+args.scaler_out
         train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
     compo_matrix(valid_labels, train_labels=train_labels); print()
-    model_out   = args.output_dir+'/'+args.model_out
-    check_point = cb.ModelCheckpoint(model_out, save_best_only      =True, monitor=args.metrics, verbose=1)
-    early_stop  = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
+    model_out     = args.output_dir+'/'+args.model_out
+    check_point   = cb.ModelCheckpoint(model_out, save_best_only      =True, monitor=args.metrics, verbose=1)
+    early_stop    = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
+    sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                          class_weight=class_weights(train_labels),
-                          sample_weight=sample_weights(train_sample, train_labels, args.n_classes,
-                          args.weight_type, args.output_dir), batch_size=max(1,n_gpus)*int(args.batch_size) )
+                          class_weight=class_weights(train_labels), sample_weight=sample_weight,
+                          #sample_weight = bkg_sample_weights(train_sample),
+                          batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
 else: train_labels = []; training = None
 
@@ -189,5 +196,5 @@ if args.cross_valid == 'OFF':
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    valid_sample = {key:valid_sample[key] for key in other_var}
-    pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
+    valid_sample = {key:valid_sample[key] for key in scalars+other_var}
+    pickle.dump((valid_sample, valid_labels, valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
