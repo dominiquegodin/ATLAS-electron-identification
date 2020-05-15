@@ -356,6 +356,13 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print('VALIDATION SAMPLE ACCURACY:', format(valid_accuracy,'.2f'),'%\n')
 
 
+def bkg_rejection(labels, probs, sig_eff=[90, 80, 70]):
+    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+    for val in sig_eff:
+        print('BACKGROUND REJECTION AT', val, '% EFFICIENCY', end=': ', flush=True)
+        print(format(1/fpr[np.argwhere(tpr>=val/100)[0]][0],'>4.0f'), '\n' if val==sig_eff[-1] else '')
+
+
 def class_weights(labels, bkg_to_sig=None):
     n_e = len(labels); n_classes = max(labels) + 1
     if bkg_to_sig == None and n_classes == 2: return None
@@ -428,20 +435,11 @@ def make_plots(sample, labels, probs, output_dir, bkg, separation=False, dump=Fa
     for job in processes: job.join()
 
 
-def bkg_rejection(labels, probs, sig_eff=[90, 80, 70]):
-    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
-    for val in sig_eff:
-        print('BACKGROUND REJECTION AT', val, '% EFFICIENCY', end=': ', flush=True)
-        print(format(1/fpr[np.argwhere(tpr>=val/100)[0]][0],'>4.0f'), '\n' if val==sig_eff[-1] else '')
-
-
 def valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, output_dir, plotting):
-    compo_matrix(valid_labels, train_labels, valid_probs)
-    #bkg_rejection(valid_labels, valid_probs)
+    compo_matrix(valid_labels, train_labels, valid_probs); #bkg_rejection(valid_labels, valid_probs)
     if max(valid_labels) > 1:
         valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs)
-        compo_matrix(valid_labels, [], valid_probs)
-        bkg_rejection(valid_labels, valid_probs)
+        compo_matrix(valid_labels, [], valid_probs); bkg_rejection(valid_labels, valid_probs)
     if plotting == 'ON':
         bkg_list  = ['bkg'] #+ [1, 2, 3, 4, 5]
         arguments = [(valid_sample, valid_labels, valid_probs, output_dir, bkg) for bkg in bkg_list]

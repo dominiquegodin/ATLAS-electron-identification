@@ -164,59 +164,41 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
                          +'%, '+str(format(1/LLH[1],'>3.0f'))+')'+r'$\rightarrow$'+LLH[3] )
         plt.legend(loc='upper right', fontsize=15, numpoints=3)
     if ROC_type == 3:
+        def make_plots(location):
+            plt.xlabel('Signal Probability as Threshold (%)', fontsize=25); plt.ylabel('(%)',fontsize=25)
+            val_1 = plt.plot(threshold[1:], tpr[1:],   color='tab:blue'  , label='Signal efficiency'   ,lw=2)
+            val_2 = plt.plot(threshold[1:], 1-fpr[1:], color='tab:orange', label='Background rejection',lw=2)
+            val_3 = plt.plot(threshold[1:], accuracy[1:],   color='black', label='Accuracy', zorder=10 ,lw=2)
+            for LLH in zip(LLH_tpr, LLH_fpr):
+                p1 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], LLH[0],
+                                 s=40, marker='o', c=val_1[0].get_color())
+                p2 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], 1-LLH[1],
+                                 s=40, marker='o', c=val_2[0].get_color())
+            l1 = plt.legend([p1, p2], ['LLH sig. eff.', 'LLH bkg. rej.'], loc='lower left', fontsize=13)
+            #std_accuracy = valid_accuracy(y_true, y_prob)
+            #plt.scatter( 0.5, std_accuracy, s=30, marker='D', c=val_3[0].get_color(),
+            #             label="{0:<10s} {1:>5.2f}%".format('Standard Accuracy:', std_accuracy), zorder=10 )
+            plt.scatter( best_threshold, max(accuracy), s=40, marker='o', c=val_3[0].get_color(),
+                         label='{0:<10s} {1:>5.2f}%'.format('Best Accuracy:',100*max(accuracy)), zorder=10 )
+            plt.legend(loc=location, fontsize=15, numpoints=3); plt.gca().add_artist(l1)
         best_threshold = threshold[np.argmax(accuracy)]
         plt.figure(figsize=(12,16))
         plt.subplot(2, 1, 1); pylab.grid(True); axes = plt.gca()
         plt.xlim([0, 1]);   plt.xticks(np.arange(0,1.01,0.1)   , np.arange(0,101,10))
         plt.ylim([0.6, 1]); plt.yticks(np.arange(0.6,1.01,0.05), np.arange(60,101,5))
-        plt.xlabel('Signal Probability as Threshold (%)', fontsize=25)
-        plt.ylabel('(%)',fontsize=25)
-        val_1 = plt.plot(threshold[1:], tpr[1:]     , color='tab:blue'  , label='Signal efficiency'   , lw=2)
-        val_2 = plt.plot(threshold[1:], 1-fpr[1:]   , color='tab:orange', label='Background rejection', lw=2)
-        val_3 = plt.plot(threshold[1:], accuracy[1:], color='black'     , label='Accuracy', zorder=10 , lw=2)
-        for LLH in zip(LLH_tpr, LLH_fpr):
-            p1 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], LLH[0],
-                             s=40, marker='o', c=val_1[0].get_color())
-            p2 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], 1-LLH[1],
-                             s=40, marker='o', c=val_2[0].get_color())
-        l1 = plt.legend([p1, p2], ["LLH sig. efficiencies", "LLH bkg. rejections"],
-                        loc='lower left', fontsize=13)
-        #std_accuracy = 100*valid_accuracy(y_true, y_prob)
-        #plt.scatter( 0.5, std_accuracy, s=30, marker='D', c=val_3[0].get_color(),
-        #             label="{0:<10s} {1:>5.2f}%".format('Standard Accuracy:', std_accuracy), zorder=10 )
-        plt.scatter( best_threshold, max(accuracy), s=40, marker='o', c=val_3[0].get_color(),
-                     label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
-        plt.legend(loc='lower center', fontsize=15, numpoints=3)
-        plt.gca().add_artist(l1)
+        make_plots('lower center')
         plt.subplot(2, 1, 2); pylab.grid(True); axes = plt.gca()
         x_min=-2; x_max=3; y_min=0.1; y_max=1-1e-4;
         pylab.ylim(y_min, y_max); pylab.xlim(10**x_min, 1-10**(-x_max))
         pos  =                       [  10**float(n)  for n in np.arange(x_min,0)           ]
-        pos += [ 0.5]              + [1-10**float(n)  for n in np.arange(-1,-x_max-1,-1)    ]
+        pos += [0.5]               + [1-10**float(n)  for n in np.arange(-1,-x_max-1,-1)    ]
         lab  =                       [ '0.'+n*'0'+'1' for n in np.arange(abs(x_min)-3,-1,-1)]
         lab += [1, 10, 50, 90, 99] + ['99.'+n*'9'     for n in np.arange(1,x_max-1)         ]
-        plt.xscale('logit')
-        plt.xticks(pos, lab)
-        plt.yscale('logit')
-        plt.yticks([ 0.1, 0.5, 0.9, 0.99, 0.999, 0.9999], [10, 50, 90, 99, 99.9, 99.99])
+        plt.xscale('logit'); plt.xticks(pos, lab)
+        plt.yscale('logit'); plt.yticks([0.1, 0.5, 0.9, 0.99, 0.999, 0.9999], [10, 50, 90, 99, 99.9, 99.99])
         axes.xaxis.set_minor_formatter(plt.NullFormatter())
         axes.yaxis.set_minor_formatter(plt.NullFormatter())
-        plt.xlabel('Signal Probability as Threshold (%)', fontsize=25)
-        plt.ylabel('(%)',fontsize=25)
-        val_1 = plt.plot(threshold[1:], tpr[1:]     , color='tab:blue'  , label='Signal efficiency'   , lw=2)
-        val_2 = plt.plot(threshold[1:], 1-fpr[1:]   , color='tab:orange', label='Background rejection', lw=2)
-        val_3 = plt.plot(threshold[1:], accuracy[1:], color='black'     , label='Accuracy', zorder=10 , lw=2)
-        for LLH in zip(LLH_tpr, LLH_fpr):
-            p1 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], LLH[0],
-                             s=40, marker='o', c=val_1[0].get_color())
-            p2 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], 1-LLH[1],
-                             s=40, marker='o', c=val_2[0].get_color())
-        l1 = plt.legend([p1, p2], ["LLH sig. efficiencies", "LLH bkg. rejections"],
-                        loc='lower left', fontsize=13)
-        plt.scatter( best_threshold, max(accuracy), s=40, marker='o', c=val_3[0].get_color(),
-                     label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
-        plt.legend(loc='upper center', fontsize=15)
-        plt.gca().add_artist(l1)
+        make_plots('upper center')
     if ROC_type == 4:
         best_tpr = tpr[np.argmax(accuracy)]
         plt.xlim([60, 100.0])
@@ -247,7 +229,7 @@ def combine_ROC_curves(output_dir, CNN_dict):
         print('LOADING VALIDATION RESULTS FROM', result_file)
         return_dict[idx] = fpr, tpr, threshold, LLH_fpr, LLH_tpr
     manager   = mp.Manager()   ; return_dict = manager.dict()
-    idx_list  = [1,2,3,4,5,6] #np.arange(1,11)
+    idx_list  = [1,1.7,2,3,4,5,6,7,8,9,10]
     var_name    = '$r_{sig}:r_{bkg}$'
     processes = [mp.Process(target=mp_roc, args=(idx, output_dir, return_dict)) for idx in idx_list]
     for job in processes: job.start()
@@ -257,18 +239,18 @@ def combine_ROC_curves(output_dir, CNN_dict):
     for LLH_tpr in [0.7, 0.8, 0.9]:
         bkg_rej  = [1/return_dict[idx][0][np.argwhere(return_dict[idx][1] >= LLH_tpr)[0]][0]
                     for idx in idx_list]
-        #bkg_rej /= np.mean(bkg_rej)
+        bkg_rej /= np.mean(bkg_rej)
         #n_weights = [NN_weights((5,13), CNN_dict, [200, 200], 2) for idx in idx_list]
         #bkg_rej   = [1e5*bkg_rej[n]/n_weights[n] for n in np.arange(len(idx_list))]
         plt.scatter(idx_list, bkg_rej, s=40, marker='o')
         idx_array    = np.linspace(min(idx_list), max(idx_list), 1000)
-        spline       = make_interp_spline(idx_list, bkg_rej, k=2)
+        spline       = make_interp_spline(idx_list, bkg_rej, k=3)
         plt.plot(idx_array, spline(idx_array), label=format(100*LLH_tpr,'.0f')+'% sig. eff.')
     plt.xlim([min(idx_list)-1, max(idx_list)+1])
     axes.xaxis.set_major_locator(MultipleLocator(1))
     #plt.ylim([0, 1500])
     #axes.yaxis.set_major_locator(MultipleLocator(100))
-    plt.ylim([0.95, 1.1])
+    plt.ylim([0.9, 1.1])
     axes.yaxis.set_major_locator(MultipleLocator(0.05))
     #plt.xlabel('Maximum Number of Tracks',fontsize=25)
     plt.xlabel('Ratio bkg/sig (for training)',fontsize=25)
