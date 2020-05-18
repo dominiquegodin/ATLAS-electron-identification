@@ -5,6 +5,7 @@ from   tabulate   import tabulate
 from   skimage    import transform
 from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
 from   plots_KM   import plot_distributions_KM, differential_plots
+from   io         import StringIO
 
 
 def find_bin(array,binning):
@@ -348,26 +349,27 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         else:
             headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)', 'ACC. (%)']
             table   = zip(classes, train_ratios, valid_ratios, matrix.diagonal())
-            print('+----------------------------------------------------+')
-            print('| CLASS DISTRIBUTIONS AND VALID SAMPLE ACCURACIES    |')
-    print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
+            print_dict[2]  = '+----------------------------------------------------+\n'
+            print_dict[2] += '| CLASS DISTRIBUTIONS AND VALID SAMPLE ACCURACIES    |\n'
+    #print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
+    print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
     if valid_probs != []:
         valid_accuracy = np.array(valid_ratios) @ np.array(matrix.diagonal())/100
-        print('VALIDATION SAMPLE ACCURACY:', format(valid_accuracy,'.2f'),'%\n')
+        print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
 
 
 def bkg_rejection(labels, probs, sig_eff=[90, 80, 70]):
     fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
     for val in sig_eff:
-        print('BACKGROUND REJECTION AT', val, '% EFFICIENCY', end=': ', flush=True)
-        print(format(1/fpr[np.argwhere(tpr>=val/100)[0]][0],'>4.0f'), '\n' if val==sig_eff[-1] else '')
+        print_dict[3] += 'BACKGROUND REJECTION AT '+str(val)+'%: '
+        print_dict[3] += format(1/fpr[np.argwhere(tpr>=val/100)[0]][0],'>6.0f')+'\n'
 
 
-def class_weights(labels, bkg_to_sig=None):
+def class_weights(labels, bkg_ratio=None):
     n_e = len(labels); n_classes = max(labels) + 1
-    if bkg_to_sig == None and n_classes == 2: return None
-    if bkg_to_sig == None and n_classes != 2: bkg_to_sig = 1
-    ratios = {**{0:1}, **{n:bkg_to_sig for n in np.arange(1, n_classes)}}
+    if bkg_ratio == None and n_classes == 2: return None
+    if bkg_ratio == None and n_classes != 2: bkg_ratio = 1
+    ratios = {**{0:1}, **{n:bkg_ratio for n in np.arange(1, n_classes)}}
     return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
@@ -390,7 +392,6 @@ def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_f
         if os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
         print('CLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
         probs = model.predict(sample, batch_size=20000, verbose=verbose)
-        #compo_matrix(labels, valid_probs=probs)
         print('FOLD', fold_number, 'ACCURACY:', format(100*valid_accuracy(labels, probs), '.2f'), end='')
         print(' % (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
         for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
@@ -400,7 +401,7 @@ def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_f
 def binarization(sample, labels, probs, class_1=['bkg'], class_0=[0], normalization=True, LR=False):
     from functools import reduce
     if class_1==['bkg'] or class_1==class_0: class_1 = set(np.arange(max(labels)+1)) - set(class_0)
-    print('BINARIZATION: CLASS 0 =', set(class_0), 'vs CLASS 1 =', set(class_1))
+    print_dict[1] += 'BINARIZATION: CLASS 0 = '+str(set(class_0))+' vs CLASS 1 = '+str(set(class_1))+'\n'
     ratios  = class_ratios(labels) if LR else (max(labels)+1)*[1]
     labels  = np.array([0 if label in class_0 else 1 if label in class_1 else -1 for label in labels])
     probs_0 = reduce(np.add, [ratios[n]*probs[:,n] for n in class_0])[labels!=-1]
@@ -415,60 +416,60 @@ def binarization(sample, labels, probs, class_1=['bkg'], class_0=[0], normalizat
 
 def bkg_separation(sample, labels, probs, bkg):
     if bkg == 'bkg': return sample, labels, probs
+    print_dict[1] += 'BACKGROUND SEPARATION: CLASS 0 = {0} VS CLASS 1 = {'+str(bkg)+'}\n'
     multi_labels = make_labels(sample, n_classes=6)
-    condition    = np.logical_or(multi_labels==0, multi_labels==bkg)
-    return {key:sample[key][condition] for key in sample}, labels[condition], probs[condition]
+    cuts = np.logical_or(multi_labels==0, multi_labels==bkg)
+    return {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
 
 
-def make_plots(sample, labels, probs, output_dir, bkg, separation=False, dump=False):
+def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict, separation=False):
     folder = output_dir+'/'+'class_0_vs_'+str(bkg)
     if not os.path.isdir(folder): os.mkdir(folder)
-    if max(labels) == 1: sample, labels, probs = bkg_separation(sample, labels, probs, bkg)
-    else:                sample, labels, probs = binarization(sample, labels, probs, [bkg])
-    if dump: pickle.dump((sample,labels,probs), open(folder+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
-    arguments  = (sample, labels, probs, folder, separation and bkg=='bkg', bkg)
-    processes  = [mp.Process(target=plot_distributions_DG, args=arguments)]
-    arguments  = [(sample, labels, probs, ROC_type, folder) for ROC_type in [1,2,3]]
-    processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-    #processes += [mp.Process(target=compo_matrix, args=(labels, [], probs,))]
-    for job in processes: job.start()
-    for job in processes: job.join()
-
-
-def valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, output_dir, plotting):
-    compo_matrix(valid_labels, train_labels, valid_probs); #bkg_rejection(valid_labels, valid_probs)
-    if max(valid_labels) > 1:
-        valid_sample, valid_labels, valid_probs = binarization(valid_sample, valid_labels, valid_probs)
-        compo_matrix(valid_labels, [], valid_probs); bkg_rejection(valid_labels, valid_probs)
+    if max(labels) > 1: sample, labels, probs = binarization  (sample, labels, probs, [bkg])
+    else              : sample, labels, probs = bkg_separation(sample, labels, probs,  bkg )
+    if False: pickle.dump((sample,labels,probs), open(folder+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
     if plotting == 'ON':
-        bkg_list  = ['bkg'] #+ [1, 2, 3, 4, 5]
-        arguments = [(valid_sample, valid_labels, valid_probs, output_dir, bkg) for bkg in bkg_list]
-        processes = [mp.Process(target=make_plots, args=arg) for arg in arguments]
-        #processes += [mp.Process(target=compo_matrix, args=(valid_labels, [], valid_probs,))]
-        if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
+        arguments  = (sample, labels, probs, folder, separation and bkg=='bkg', bkg)
+        processes  = [mp.Process(target=plot_distributions_DG, args=arguments)]
+        arguments  = [(sample, labels, probs, ROC_type, folder) for ROC_type in [1,2,3]]
+        processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         for job in processes: job.start()
         for job in processes: job.join()
-        print(); return
+    else: compo_matrix(labels, [], probs); #bkg_rejection(labels, probs)
+    return_dict[bkg] = print_dict
+
+
+def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, differential=False):
+    global print_dict; print_dict = {n:'' for n in np.arange(1,4)}
+    if max(labels) > 1: compo_matrix(labels, train_labels, probs); print(print_dict[2])
+    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] #+ [1, 2, 3, 4, 5]
+    arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
+    processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
+    if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
+    for job in processes: job.start()
+    for job in processes: job.join()
+    if plotting=='OFF':
+        for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
     # DIFFERENTIAL PLOTS
-    if plotting == 'ON' and max(valid_labels) == 1:
+    if plotting == 'ON' and differential:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
         pt_boundaries=  [10, 20, 30, 40, 60, 100, 200, 500] #60, 80, 120, 180, 300, 500]
-        eta, pt         = valid_sample['p_eta'], valid_sample['p_et_calo']
+        eta, pt         = sample['p_eta'], sample['p_et_calo']
         eta_bin_indices = get_bin_indices(eta, eta_boundaries)
         pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
-        plot_distributions_KM(valid_labels, eta, 'eta', output_dir=output_dir)
-        plot_distributions_KM(valid_labels, pt , 'pt' , output_dir=output_dir)
-        tmp_llh      = valid_sample['p_LHValue']
+        plot_distributions_KM(labels, eta, 'eta', output_dir=output_dir)
+        plot_distributions_KM(labels, pt , 'pt' , output_dir=output_dir)
+        tmp_llh      = sample['p_LHValue']
         tmp_llh_pair = np.zeros(len(tmp_llh))
         prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
         print('\nEvaluating differential performance in eta')
-        differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries,
+        differential_plots(sample, labels, probs, eta_boundaries,
                            eta_bin_indices, varname='eta', output_dir=output_dir)
         print('\nEvaluating differential performance in pt')
-        differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries,
+        differential_plots(sample, labels, probs, pt_boundaries,
                            pt_bin_indices,  varname='pt',  output_dir=output_dir)
-        differential_plots(valid_sample, valid_labels, prob_LLH   , pt_boundaries,
-                           pt_bin_indices,  varname="pt",  output_dir=output_dir, evalLLH=True)
+        differential_plots(sample, labels, prob_LLH   , pt_boundaries,
+                           pt_bin_indices,  varname='pt',  output_dir=output_dir, evalLLH=True)
 
 
 def verify_sample(sample):

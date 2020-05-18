@@ -45,8 +45,6 @@ def plot_history(history, output_dir, key='accuracy'):
 
 
 def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, bkg='bkg'):
-    file_name = output_dir+'/distributions.png'
-    print('Saving test sample distributions to:', file_name)
     label_dict = {0:'iso electron', 1:'charge flip'  , 2:'photon conversion'    , 3    :'b/c hadron',
                   4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)', 'bkg':'background'}
     color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            , 3    :'tab:red'   ,
@@ -103,12 +101,11 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
     location = 'upper left' if n_classes==2 else 'upper left'
     plt.legend(loc=location, fontsize=16 if n_classes==2 else 14, numpoints=3)
     plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.2)
-    plt.savefig(file_name)
+    file_name = output_dir+'/distributions.png'
+    print('Saving test sample distributions to:', file_name); plt.savefig(file_name)
 
 
 def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
-    file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
-    print('Saving test sample ROC'+str(ROC_type)+' curve to:   ', file_name)
     LLH_fpr, LLH_tpr = LLH_rates(sample, y_true)
     fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
     signal_ratio        = np.sum(y_true==0)/len(y_true)
@@ -212,7 +209,8 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         plt.scatter( 100*best_tpr, 100*max(accuracy), s=40, marker='o', c=val[0].get_color(),
                      label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
-    plt.savefig(file_name)
+    file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
+    print('Saving test sample ROC'+str(ROC_type)+' curve to:   ', file_name); plt.savefig(file_name)
 
 
 def combine_ROC_curves(output_dir, CNN_dict):

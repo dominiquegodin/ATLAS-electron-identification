@@ -54,15 +54,19 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
-if args.results_in != '':
-    if os.path.isfile(args.output_dir+'/'+args.results_in):
-        print('\nLOADING VALIDATION RESULTS FROM', args.output_dir+'/'+args.results_in, end='')
-        sample, labels, probs = pickle.load(open(args.output_dir+'/'+args.results_in, 'rb'))
-        n_e = min(len(labels),int(args.n_valid))
-        print('\nGENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS ...\n')
-        sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-        valid_results(sample, labels, probs, [], None, args.output_dir, args.plotting)
-    sys.exit()
+if os.path.isfile(args.output_dir+'/'+args.results_in):
+    print('\nLOADING VALIDATION RESULTS FROM', args.output_dir+'/'+args.results_in)
+    sample, labels, probs = pickle.load(open(args.output_dir+'/'+args.results_in, 'rb'))
+    n_e = min(len(labels), int(args.n_valid))
+    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
+    sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
+    #args.valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
+    cuts = n_e*[True] if args.valid_cuts == '' else eval(args.valid_cuts)
+    sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
+    def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
+    print(text_line(len(labels)) if len(labels) < n_e else '', '\n')
+    valid_results(sample, labels, probs, [], None, args.output_dir, args.plotting)
+if args.results_in != '': sys.exit()
 
 
 # VERIFYING PROGRAM ARGUMENTS
@@ -93,7 +97,7 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
-             'p_eta', 'p_et_calo','p_LHValue']
+             'p_eta', 'p_et_calo', 'p_LHValue']
 total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
 
 
@@ -150,12 +154,6 @@ if args.cross_valid == 'OFF' and args.model_in != '':
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
 
-def bkg_sample_weights(sample):
-    from utils import make_labels; labels = make_labels(sample, 6)
-    weights = class_weights(labels, bkg_to_sig=2)
-    return np.array([weights[n] for n in np.arange(6)])[labels]
-
-
 # TRAINING LOOP
 if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
@@ -180,8 +178,7 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                          #class_weight=class_weights(train_labels, 2), sample_weight=sample_weight,
-                          sample_weight = bkg_sample_weights(train_sample),
+                          class_weight=class_weights(train_labels, bkg_ratio=2), sample_weight=sample_weight,
                           batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
 else: train_labels = []; training = None
@@ -197,5 +194,5 @@ else:
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    valid_sample = {key:valid_sample[key] for key in other_var+scalars}
+    valid_sample = {key:valid_sample[key] for key in other_var} #+scalars}
     pickle.dump((valid_sample, valid_labels, valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
