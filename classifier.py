@@ -21,10 +21,9 @@ parser.add_argument( '--n_tracks'    , default =    5,  type = int   )
 parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
-#parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
+parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
 parser.add_argument( '--l2'          , default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     , default = 0.05,  type = float )
-#parser.add_argument( '--CNN_maps'    , default = [200, 200], type = int, nargs='+')
 parser.add_argument( '--FCN_neurons' , default = [200, 200], type = int, nargs='+')
 parser.add_argument( '--weight_type' , default = None                )
 parser.add_argument( '--train_cuts'  , default = ''                  )
@@ -57,9 +56,12 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if args.results_in != '':
     if os.path.isfile(args.output_dir+'/'+args.results_in):
-        print('\nLOADING VALIDATION RESULTS FROM', args.output_dir+'/'+args.results_in, '\n')
+        print('\nLOADING VALIDATION RESULTS FROM', args.output_dir+'/'+args.results_in, end='')
         sample, labels, probs = pickle.load(open(args.output_dir+'/'+args.results_in, 'rb'))
-        valid_results(sample, labels, probs, labels, None, args.output_dir, args.plotting)
+        n_e = min(len(labels),int(args.n_valid))
+        print('\nGENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS ...\n')
+        sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
+        valid_results(sample, labels, probs, [], None, args.output_dir, args.plotting)
     sys.exit()
 
 
@@ -115,9 +117,8 @@ sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
 args.n_train = [0, min(sample_size, args.n_train)] if args.cross_valid == 'OFF' else [0,0]
 args.n_valid = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, sample_size )]
 if args.cross_valid == 'OFF' and args.n_folds > 1: args.n_valid = args.n_train
-#args.valid_cuts += ' & (sample["p_et_calo"] >= 20)'
+#args.valid_cuts += ' & (sample["p_et_calo"] >= 20)' #' & (abs(sample["p_eta"] > 0.6)'
 #args.valid_cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
-#args.valid_cuts += ' & (abs(sample["p_eta"] > 0.6)'
 
 
 # ARGUMENTS AND VARIABLES TABLES
@@ -149,6 +150,12 @@ if args.cross_valid == 'OFF' and args.model_in != '':
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
 
+def bkg_sample_weights(sample):
+    from utils import make_labels; labels = make_labels(sample, 6)
+    weights = class_weights(labels, bkg_to_sig=2)
+    return np.array([weights[n] for n in np.arange(6)])[labels]
+
+
 # TRAINING LOOP
 if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
@@ -167,14 +174,15 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
         scaler_out = args.output_dir+'/'+args.scaler_out
         train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
     compo_matrix(valid_labels, train_labels=train_labels); print()
-    model_out   = args.output_dir+'/'+args.model_out
-    check_point = cb.ModelCheckpoint(model_out, save_best_only      =True, monitor=args.metrics, verbose=1)
-    early_stop  = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
+    model_out     = args.output_dir+'/'+args.model_out
+    check_point   = cb.ModelCheckpoint(model_out, save_best_only      =True, monitor=args.metrics, verbose=1)
+    early_stop    = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
+    sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                          class_weight=class_weights(train_labels),
-                          sample_weight=sample_weights(train_sample, train_labels, args.n_classes,
-                          args.weight_type, args.output_dir), batch_size=max(1,n_gpus)*int(args.batch_size) )
+                          #class_weight=class_weights(train_labels, 2), sample_weight=sample_weight,
+                          sample_weight = bkg_sample_weights(train_sample),
+                          batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
 else: train_labels = []; training = None
 
@@ -183,11 +191,11 @@ else: train_labels = []; training = None
 if args.cross_valid == 'ON':
     valid_probs = cross_validation(valid_sample, valid_labels, scalars, model, args.output_dir, args.n_folds)
     print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
-if args.cross_valid == 'OFF':
+else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    valid_sample = {key:valid_sample[key] for key in other_var}
-    pickle.dump((valid_sample,valid_labels,valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
+    valid_sample = {key:valid_sample[key] for key in other_var+scalars}
+    pickle.dump((valid_sample, valid_labels, valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
