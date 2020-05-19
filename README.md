@@ -3,51 +3,92 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 
 # Training at LPS  
-1) ssh -Y atlas16  
-(login to atlas16 for GPU's avaibility)	  
-2) cd /opt/tmp/$USER  
-(change to user directory)  
-3) ln -s /opt/tmp/godin/el_data/2020-04-21/el_data.h5 .  
-(link data file to user directory)  
-4) git clone https://github.com/dominiquegodin/el_classifier.git  
-(clone framework from GitHub)  
-5) cd el_classifier  
-(enter framework directory)
-6) singularity shell --nv --bind /opt /opt/tmp/godin/sing_images/tf-2.1.0-gpu-py3_sing-2.6.sif  
-(activate the virtual environment of TensorFlow2.1.0+Python3.6.8 Singularity image)  
-(use the flag --nv or not to wether run on GPUs or CPUs)
-7) python classifier.py [OPTIONS]  
-(start training; see options below)
-8) nvidia-smi  
-(for monitoring NVIDIA GPU devices, e.g. memory and power usage, temperature, fan speed, etc.)
+1) login to atlas16 for GPU's avaibility 
+   ```
+   ssh -Y atlas16
+   ```
+2) change to user directory
+   ```
+   cd /opt/tmp/$USER  
+   ```  
+3) link data file to user directory
+   ```
+   ln -s /opt/tmp/godin/el_data/2020-04-21/el_data.h5 .
+   ```  
+4) clone framework from GitHub
+   ```
+   git clone https://github.com/dominiquegodin/el_classifier.git  
+   ```  
+5) enter framework directory
+   ```
+   cd el_classifier
+   ```
+6) activate the virtual environment of TensorFlow2.1.0+Python3.6.8 Singularity image
+   ```
+   singularity shell --nv --bind /opt /opt/tmp/godin/sing_images/tf-2.1.0-gpu-py3_sing-2.6.sif
+   ```
+   use the flag --nv or not to wether run on GPUs or CPUs
+7) start training; see options below
+   ```
+   python classifier.py [OPTIONS]
+   ```
+8) for monitoring NVIDIA GPU devices, e.g. memory and power usage, temperature, fan speed, etc.
+   ```
+   nvidia-smi
+   ```
 
 
 # Training on Beluga Cluster
-1) ssh -Y $USER@beluga.calculquebec.ca  
-(login to Beluga cluster)	  
-2) cd /home/$USER  
-(change to user directory)  
-3) ln -s /project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5 .  
-(link data file to user directory)  
-4) git clone https://github.com/dominiquegodin/el_classifier.git  
-(clone framework from GitHub)  
-5) cd el_classifier  
-(enter framework directory)  
-
+1) login to Beluga cluster
+   ```
+   ssh -Y $USER@beluga.calculquebec.ca
+   ```
+2) change to user directory
+   ```
+   cd /home/$USER
+   ```
+3) link data file to user directory
+   ```
+   ln -s /project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5 .
+   ```
+4) clone framework from GitHub
+   ```
+   git clone https://github.com/dominiquegodin/el_classifier.git
+   ```
+5) enter framework directory
+   ```
+   cd el_classifier
+   ```
 
 # Using Slurm jobs manager (LPS or Beluga)
-1) sbatch sbatch.sh  
-(run classifier.sh script and send jobs to Slurm batch system)  
-2) sbatch --array=0-9 sbatch.sh  
-(send array jobs with ID 0 to 9 to Slurm batch system)  
-2) squeue or sview  
-(report status of job) 
-3) scancel $job_id  
-(cancel job) 
-4) srun --jobid $job_id --pty watch -n 2 nvidia-smi  
-(monitor jobs GPU usage at 2s interval)  
-5) salloc --time=00:30:00 --gres=gpu:1 --mem=16G --x11 --account=def-arguinj  
-(use Slurm interactively and request appropriate ressources on Beluga)
+1) run classifier.sh script and send jobs to Slurm batch system
+   ```
+   sbatch sbatch.sh
+   ```
+2) send array jobs with ID 0 to 9 to Slurm batch system
+   ```
+   sbatch --array=0-9 sbatch.sh
+   ```
+2) report status of job
+   ```
+   squeue
+   ```
+   or
+   ```
+   sview
+   ```
+3) cancel job
+   ```
+   scancel $job_id
+   ```
+4) monitor jobs GPU usage at 2s interval
+   ```
+   srun --jobid $job_id --pty watch -n 2 nvidia-smi
+   ```
+5) use Slurm interactively and request appropriate ressources on Beluga
+   ```
+   salloc --time=00:30:00 --gres=gpu:1 --mem=16G --x11 --account=def-arguinj
+   ```
 
 
 # classifier.py Options

@@ -1,5 +1,6 @@
 import tensorflow as tf, matplotlib.pyplot as plt
 import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
+from numpy import inf
 from   sklearn    import metrics, utils, preprocessing
 from   tabulate   import tabulate
 from   skimage    import transform
@@ -81,11 +82,11 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
     labels=['sig','bkg']
     colors=['blue','red']
     binContents=[0,0]
-    if nClass>2:
+    if nClass==6:
         #below 2b implemented
-        labels=['sig','bkg']
-        colors=['blue','red']
-        binContents=[0,0]
+        labels=['sig','chf','conv','hf','eg','lf']
+        colors=['blue','orange','green','red','purple','brown']
+        binContents=[0,0,0,0,0,0]
         pass
 
     variable=list()                          #only for specific label
@@ -99,24 +100,32 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
         #(binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(train_labels)),label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
 
+        if nClass>2: plt.yscale("log")
         plt.savefig(output_dir+'/'+ref_var+"_bfrReweighting.png")
     plt.clf() #clear figure
 
     weights=list() #KM: currently implemented for the 2-class case only
     if weight_type=="flattening":
-        weights.append(np.average(binContents[0])/binContents[0] )
-        weights.append(np.average(binContents[1])/binContents[1] )
+        for i in range(nClass): weights.append(np.average(binContents[i])/binContents[i] )
     elif weight_type=="match2b": #shaping sig to match the bkg, using pt,or any other designated variable
-        weights.append(binContents[1]/binContents[0])
-        weights.append(np.ones(len(binContents[1])))
+        for i in range(nClass-1): weights.append(binContents[nClass-1]/binContents[i])
+        weights.append(np.ones(len(binContents[5])))
     elif weight_type=="match2s": #shaping bkg to match the sig, using pt,or any other designated variable
         weights.append(np.ones(len(binContents[0])))
-        weights.append(binContents[0]/binContents[1])
+        for i in range (1, nClass): weights.append(binContents[0]/binContents[i])
+        pass
 
+    #KM: to replce inf with 0
+    for i in range(nClass): weights[i]=np.where(weights[i]==inf,0,weights[i]) #np.where(array1==0, 1, array1)
+        
     debug=0
     if debug:
-        print(weights[0])
-        print(weights[1])
+        tmp_i=0
+        for weight in weights: 
+            print("weights[",labels[tmp_i],"]=",weight)
+            tmp_i+=1
+        #print(weights[0])
+        #print(weights[1])
         pass
 
     #KM: Generates weights for all events
@@ -124,28 +133,39 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 
     #final_weights*=weights[train_labels][1]
 
-    sig_weight=np.full(len(variable_array),0,dtype=float)
-    bkg_weight=np.full(len(variable_array),0,dtype=float)
+    class_weight=list()
+    for i in range(nClass): class_weight.append( np.full(len(variable_array),0,dtype=float) )
+    final_weights= np.full(len(variable_array),0,dtype=float)
+    #sig_weight=np.full(len(variable_array),0,dtype=float)
+    #bkg_weight=np.full(len(variable_array),0,dtype=float)
 
+    #To produce vectors of 0 or 1 for given pt ranges
     bin_indices0or1=find_bin(variable_array,binning)
-    tmp_i=0
+    tmp_i=0 # pt bin index
     for vec01 in bin_indices0or1:
-        sig_weight += (vec01 * (train_labels==0) )* weights[0][tmp_i]
-        bkg_weight += (vec01 * (train_labels==1) )* weights[1][tmp_i]
+        #KM: this line is the most important to calculate the weights for al events
+        for i in range(nClass): class_weight[i] += (vec01 * (train_labels==i) )* weights[i][tmp_i]
+        #sig_weight += (vec01 * (train_labels==0) )* weights[0][tmp_i]
+        #bkg_weight += (vec01 * (train_labels==1) )* weights[1][tmp_i]
         tmp_i+=1
         pass
 
     if debug:
         print()
-        print(sig_weight,"\n", bkg_weight)
-        print(sig_weight+bkg_weight,(sig_weight+bkg_weight).all()==1) # w
-        print(train_labels)
+        #print(sig_weight,"\n", bkg_weight)
+        tmp_i=0
+        for i in range(nClass): 
+            print("class_weight[",tmp_i,"]=",class_weight[i])
+            tmp_i+=1
+            pass
+        #print("final_weights=",final_weights) #print(final_weights,final_weights.all()==1) # w
+        print("train_labels=",train_labels)
         pass
 
-    final_weights = sig_weight+bkg_weight
+    for i in range(nClass): final_weights+=class_weight[i]
 
     if debug:
-        print(variable_array)
+        print("variable_array=",variable_array)
         print(final_weights, len(final_weights), "any element is zero?",final_weights.any()==0)
         pass
 
@@ -155,6 +175,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
         #weights = final_weights[ train_labels==i_class ]/len(train_labels)
         #plt.hist(variable[i_class],bins=binning, weights=weights, label=labels[i_class],histtype='step',facecolor=colors[i_class])
         pass
+    if nClass>2: plt.yscale("log")
     plt.savefig(output_dir+'/'+ref_var+"_aftReweighting.png")
     plt.clf() #clear plot
 

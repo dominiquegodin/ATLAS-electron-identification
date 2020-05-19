@@ -71,7 +71,13 @@ if args.results_in != '': sys.exit()
 
 # VERIFYING PROGRAM ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b']: args.weight_type = None
+if args.weight_type not in ['flattening', 'match2s', 'match2b']: 
+    args.weight_type = None
+    print()
+    print('weight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
+    print()
+    pass
+
 if '.h5' not in args.model_in and args.n_epochs < 1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 if args.cross_valid == 'ON' and args.n_folds <= 1:
@@ -85,7 +91,7 @@ for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')
         except FileExistsError: pass
 data_file = '/opt/tmp/godin/el_data/2020-04-21/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5'
-if args.data_file != '': data_file= args.dat_file
+if args.data_file != '': data_file= args.data_file
 
 
 # TRAINING VARIABLES
