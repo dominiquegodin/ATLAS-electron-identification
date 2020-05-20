@@ -360,6 +360,7 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print('+---------------------------------------+\n| CLASS DISTRIBUTIONS'+19*' '+'|')
         headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)']
         table   = zip(classes, train_ratios, valid_ratios)
+        print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
     else:
         if n_classes > 2:
             headers = ['CLASS #', 'TRAIN', 'VALID'] + classes
@@ -372,10 +373,8 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
             table   = zip(classes, train_ratios, valid_ratios, matrix.diagonal())
             print_dict[2]  = '+----------------------------------------------------+\n'
             print_dict[2] += '| CLASS DISTRIBUTIONS AND VALID SAMPLE ACCURACIES    |\n'
-    #print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
-    print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
-    if valid_probs != []:
         valid_accuracy = np.array(valid_ratios) @ np.array(matrix.diagonal())/100
+        print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
 
 
@@ -456,7 +455,7 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
         processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         for job in processes: job.start()
         for job in processes: job.join()
-    else: compo_matrix(labels, [], probs); #bkg_rejection(labels, probs)
+    else: compo_matrix(labels, [], probs); bkg_rejection(labels, probs)
     return_dict[bkg] = print_dict
 
 

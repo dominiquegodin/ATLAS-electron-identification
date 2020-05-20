@@ -25,8 +25,6 @@ def LLH_rates(sample, y_true):
 
 def plot_history(history, output_dir, key='accuracy'):
     if history == None or len(history.epoch) < 2: return
-    file_name = output_dir+'/history.png'
-    print('Saving training accuracy history to:', file_name)
     plt.figure(figsize=(12,8))
     pylab.grid(True)
     val = plt.plot(np.array(history.epoch)+1, 100*np.array(history.history[key]), label='Training')
@@ -41,7 +39,8 @@ def plot_history(history, output_dir, key='accuracy'):
     plt.yticks( np.arange(max(80,min_acc),max_acc+1,step=1) )
     plt.ylabel(key.title()+' (%)',fontsize=25)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
-    plt.savefig(file_name)
+    file_name = output_dir+'/history.png'
+    print('Saving training accuracy history to:', file_name, '\n'); plt.savefig(file_name)
 
 
 def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, bkg='bkg'):

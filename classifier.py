@@ -34,7 +34,7 @@ parser.add_argument( '--scalars'     , default = 'ON'                )
 parser.add_argument( '--resampling'  , default = 'OFF'               )
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--cross_valid' , default = 'OFF'               )
-parser.add_argument( '--plotting'    , default = 'ON'                )
+parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
 parser.add_argument( '--data_file'   , default = ''                  )
 parser.add_argument( '--output_dir'  , default = 'outputs'           )
@@ -71,7 +71,7 @@ if args.results_in != '': sys.exit()
 
 # VERIFYING PROGRAM ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b']: 
+if args.weight_type not in ['flattening', 'match2s', 'match2b']:
     args.weight_type = None
     print()
     print('weight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
