@@ -189,6 +189,20 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
+def validation(output_dir, results_in, plotting, n_valid, valid_cuts=''):
+    print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
+    sample, labels, probs = pickle.load(open(output_dir+'/'+results_in, 'rb'))
+    n_e = min(len(labels), int(n_valid))
+    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
+    sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
+    #valid_cuts = '(probs[:,0]<=0.11)' #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
+    cuts = n_e*[True] if valid_cuts == '' else eval(valid_cuts)
+    sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
+    def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
+    print(text_line(len(labels)) if len(labels) < n_e else '', '\n')
+    valid_results(sample, labels, probs, [], None, output_dir, plotting)
+
+
 def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_', process=False):
     var_list = np.sum(list(total_var.values())); start_time = time.time()
     with h5py.File(data_file, 'r') as data:
@@ -366,8 +380,8 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
             headers = ['CLASS #', 'TRAIN', 'VALID'] + classes
             table   = [classes] + [train_ratios] + [valid_ratios] + matrix.T.tolist()
             table   = list(map(list, zip(*table)))
-            print('+'+31*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n', '\b| CLASS DISTRIBUTIONS (%)',
-                  '     ', '| VALID SAMPLE PREDICTIONS (%)      '+12*(n_classes-3)*' '+ '|')
+            print_dict[2]  = '+'+31*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n| CLASS DISTRIBUTIONS (%)'
+            print_dict[2] += '       | VALID SAMPLE PREDICTIONS (%)      '+12*(n_classes-3)*' '+ '|\n'
         else:
             headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)', 'ACC. (%)']
             table   = zip(classes, train_ratios, valid_ratios, matrix.diagonal())
@@ -378,13 +392,6 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
 
 
-def bkg_rejection(labels, probs, sig_eff=[90, 80, 70]):
-    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
-    for val in sig_eff:
-        print_dict[3] += 'BACKGROUND REJECTION AT '+str(val)+'%: '
-        print_dict[3] += format(1/fpr[np.argwhere(tpr>=val/100)[0]][0],'>6.0f')+'\n'
-
-
 def class_weights(labels, bkg_ratio=None):
     n_e = len(labels); n_classes = max(labels) + 1
     if bkg_ratio == None and n_classes == 2: return None
@@ -393,7 +400,7 @@ def class_weights(labels, bkg_ratio=None):
     return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
-def cross_validation(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
+def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
     print('\n########################################################################'  )
     print(  '#### STARTING CROSS-VALIDATION #########################################'  )
     print(  '########################################################################\n')
@@ -442,7 +449,14 @@ def bkg_separation(sample, labels, probs, bkg):
     return {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
 
 
-def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict, separation=False):
+def print_performance(labels, probs, sig_eff=[90, 80, 70]):
+    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+    for val in sig_eff:
+        print_dict[3] += 'BACKGROUND REJECTION AT '+str(val)+'%: '
+        print_dict[3] += format(1/fpr[np.argwhere(tpr>=val/100)[0]][0],'>6.0f')+'\n'
+
+
+def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict, separation=True):
     folder = output_dir+'/'+'class_0_vs_'+str(bkg)
     if not os.path.isdir(folder): os.mkdir(folder)
     if max(labels) > 1: sample, labels, probs = binarization  (sample, labels, probs, [bkg])
@@ -455,14 +469,15 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
         processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         for job in processes: job.start()
         for job in processes: job.join()
-    else: compo_matrix(labels, [], probs); bkg_rejection(labels, probs)
+    else:
+        compo_matrix(labels, [], probs); print_performance(labels, probs)
     return_dict[bkg] = print_dict
 
 
 def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, differential=False):
     global print_dict; print_dict = {n:'' for n in np.arange(1,4)}
-    if max(labels) > 1: compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] #+ [1, 2, 3, 4, 5]
+    compo_matrix(labels, train_labels, probs); print(print_dict[2])
+    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] #+[1, 2, 3, 4, 5]
     arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
