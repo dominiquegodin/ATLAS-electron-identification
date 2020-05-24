@@ -189,10 +189,16 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def validation(output_dir, results_in, plotting, n_valid, valid_cuts=''):
+def validation(output_dir, results_in, plotting, n_valid, data_file, total_var, valid_cuts=''):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
-    sample, labels, probs = pickle.load(open(output_dir+'/'+results_in, 'rb'))
-    n_e = min(len(labels), int(n_valid))
+    valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
+    if len(valid_data) > 1: sample, labels, probs   = valid_data
+    else:                                  (probs,) = valid_data
+    n_e = min(len(probs), int(n_valid))
+    if len(valid_data) == 1:
+        print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
+        sample, labels = make_sample(data_file, total_var, [0,n_valid], 0, probs.shape[1])
+        n_e = len(labels)
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
     #valid_cuts = '(probs[:,0]<=0.11)' #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
@@ -411,7 +417,6 @@ def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds,
         weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
         scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
         print('CLASSIFIER: loading pre-trained weights from', weight_file)
-        #model = tf.keras.models.load_model(weight_file)
         model.load_weights(weight_file); start_time = time.time()
         indices =               np.where(event_number%n_folds==fold_number-1)[0]
         labels  =           valid_labels[event_number%n_folds==fold_number-1]
@@ -457,12 +462,12 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
 
 
 def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict, separation=True):
-    folder = output_dir+'/'+'class_0_vs_'+str(bkg)
-    if not os.path.isdir(folder): os.mkdir(folder)
     if max(labels) > 1: sample, labels, probs = binarization  (sample, labels, probs, [bkg])
     else              : sample, labels, probs = bkg_separation(sample, labels, probs,  bkg )
-    if False: pickle.dump((sample,labels,probs), open(folder+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
+    if False: pickle.dump((sample,labels,probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
     if plotting == 'ON':
+        folder = output_dir+'/'+'class_0_vs_'+str(bkg)
+        if not os.path.isdir(folder): os.mkdir(folder)
         arguments  = (sample, labels, probs, folder, separation and bkg=='bkg', bkg)
         processes  = [mp.Process(target=plot_distributions_DG, args=arguments)]
         arguments  = [(sample, labels, probs, ROC_type, folder) for ROC_type in [1,2,3]]

@@ -46,21 +46,9 @@ parser.add_argument( '--results_out' , default = ''                  )
 args = parser.parse_args()
 
 
-# CNN ARCHITECTURES
-CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
-        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
-        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
-
-
-# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
-if os.path.isfile(args.output_dir+'/'+args.results_in):
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid)
-if args.results_in != '': sys.exit()
-
-
-# VERIFYING PROGRAM ARGUMENTS
+# VERIFYING ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b']:
+if args.weight_type not in ['flattening', 'match2s', 'match2b'] and  args.weight_type != None:
     args.weight_type = None
     print('\nweight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
@@ -69,12 +57,17 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 
 # DATAFILE
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    if not os.path.isdir(path):
-        try: os.mkdir(path)
-        except FileExistsError: pass
+    try: os.mkdir(path)
+    except FileExistsError: pass
 data_file = '/opt/tmp/godin/el_data/2020-04-21/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5'
 if args.data_file != '': data_file= args.data_file
+
+
+# CNN PARAMETERS
+CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
+        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # TRAINING VARIABLES
@@ -88,6 +81,12 @@ train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
 other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
              'p_eta', 'p_et_calo', 'p_LHValue']
 total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
+
+
+# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
+if os.path.isfile(args.output_dir+'/'+args.results_in):
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, total_var)
+if args.results_in != '': sys.exit()
 
 
 # MULTI-GPU DISTRIBUTION
@@ -183,5 +182,6 @@ else:
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    valid_sample = {key:valid_sample[key] for key in other_var} #+scalars}
-    pickle.dump((valid_sample, valid_labels, valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
+    if args.valid_cuts == '': valid_data = (valid_probs,)
+    else: valid_data = ({key:valid_sample[key] for key in other_var+scalars}, valid_labels, valid_probs)
+    pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
