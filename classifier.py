@@ -18,9 +18,11 @@ parser.add_argument( '--batch_size'  , default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    , default =  100,  type = int   )
 parser.add_argument( '--n_classes'   , default =    2,  type = int   )
 parser.add_argument( '--n_tracks'    , default =    5,  type = int   )
+parser.add_argument( '--bkg_ratio'   , default =    2,  type = int   )
 parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
+parser.add_argument( '--patience'    , default =   10,  type = int   )
 parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
 parser.add_argument( '--l2'          , default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     , default = 0.05,  type = float )
@@ -76,6 +78,7 @@ images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
+scalars  += ['p_eta'   , 'p_et_calo']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
@@ -161,13 +164,13 @@ if args.n_epochs > 0:
         train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
     compo_matrix(valid_labels, train_labels=train_labels); print()
     model_out     = args.output_dir+'/'+args.model_out
-    check_point   = cb.ModelCheckpoint(model_out, save_best_only      =True, monitor=args.metrics, verbose=1)
-    early_stop    = cb.EarlyStopping(patience=10, restore_best_weights=True, monitor=args.metrics, verbose=1)
+    check_point   = cb.ModelCheckpoint(model_out, save_best_only =True, monitor=args.metrics, verbose=1)
+    early_stop    = cb.EarlyStopping(patience=args.patience, restore_best_weights=True, monitor=args.metrics)
     sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                          class_weight=class_weights(train_labels, bkg_ratio=2), sample_weight=sample_weight,
-                          batch_size=max(1,n_gpus)*int(args.batch_size) )
+                          class_weight=class_weights(train_labels, bkg_ratio=args.bkg_ratio),
+                          sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
 else: train_labels = []; training = None
 

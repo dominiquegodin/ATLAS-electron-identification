@@ -2,15 +2,15 @@
 
 
 # CROSS-VALIDATION TRAINING (array jobs)
-n_e=15e6; n_epochs=100; n_classes=2; n_tracks=5; n_folds=10; verbose=2; scalars=ON; NN_type=CNN
+n_e=15e6; n_epochs=100; n_classes=2; n_tracks=5; n_folds=10; verbose=2; scalars=ON; images=ON; NN_type=CNN
 fold=$VAR; output_dir=outputs/test
 python classifier.py  --n_train=$n_e          --n_valid=0           --batch_size=5e3     --n_epochs=$n_epochs  \
                       --n_classes=$n_classes  --n_tracks=$n_tracks  --verbose=$verbose   --dropout=0.05        \
-                      --scalars=$scalars      --NN_type=$NN_type    --weight_type='flattening'                 \
+                      --images=$images        --scalars=$scalars    --NN_type=$NN_type   --weight_type=None    \
                       --train_cuts '(sample["eventNumber"]%'${n_folds}'!='$(($fold-1))')'                      \
                       --valid_cuts '(sample["eventNumber"]%'${n_folds}'=='$(($fold-1))')'                      \
                       --output_dir=$output_dir  --scaler_out scaler_${fold}.pkl --model_out model_${fold}.h5   \
-
+                      --results_out results_${fold}.pkl  #--sbatch_var=$SCRIPT_VAR
 
 exit
 
@@ -35,20 +35,20 @@ python classifier.py --n_train=10e6      --n_valid=15e6       --batch_size=5e3  
 
 
 # CROSS-VALIDATION TRAINING (array jobs)
-n_e=15e6; n_epochs=100; n_classes=2; n_tracks=$VAR; n_folds=10; verbose=2; scalars=ON; NN_type=CNN
+n_e=15e6; n_epochs=100; n_classes=2; n_tracks=$VAR; n_folds=10; verbose=2; scalars=ON; images=ON; NN_type=CNN
 fold=$VAR; output_dir=outputs/test/${VAR}-track    #${SCRIPT_VAR}_to_1
 for ((fold = 1; fold <= $n_folds; fold++)) do #for fold in 1 2 3 4 5 do
 python classifier.py  --n_train=$n_e          --n_valid=0           --batch_size=5e3     --n_epochs=$n_epochs  \
                       --n_classes=$n_classes  --n_tracks=$n_tracks  --verbose=$verbose   --dropout=0.05        \
-                      --scalars=$scalars      --NN_type=$NN_type    --weight_type='flattening'                 \
+                      --images=$images        --scalars=$scalars    --NN_type=$NN_type   --weight_type=None   \
                       --train_cuts '(sample["eventNumber"]%'${n_folds}'!='$(($fold-1))')'                      \
                       --valid_cuts '(sample["eventNumber"]%'${n_folds}'=='$(($fold-1))')'                      \
                       --output_dir=$output_dir  --scaler_out scaler_${fold}.pkl --model_out model_${fold}.h5   \
                       --results_out results_${fold}.pkl  #--sbatch_var=$SCRIPT_VAR
 done
 python classifier.py  --n_train=0           --n_valid=$n_e        --n_epochs=0        --n_classes=$n_classes   \
-                      --n_tracks=$n_tracks  --n_folds=${n_folds}  --NN_type=$NN_type  --scalars=$scalars       \
-                      --output_dir=$output_dir   --results_out=valid_probs.pkl
+                      --n_tracks=$n_tracks  --n_folds=${n_folds}  --NN_type=$NN_type  --images=$images         \
+                      --scalars=$scalars    --output_dir=$output_dir   --results_out=valid_probs.pkl
 
 
 # USING RESULTS FOR PLOTTING

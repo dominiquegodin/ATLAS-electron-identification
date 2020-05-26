@@ -202,6 +202,9 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, total_var, 
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
     #valid_cuts = '(probs[:,0]<=0.11)' #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
+    #valid_cuts  = '(sample["p_et_calo"]  < 20)'
+    #valid_cuts  = '(sample["p_et_calo"] >= 20) & (sample["p_et_calo"] <= 80)'
+    #valid_cuts  = '(sample["p_et_calo"]  > 80)'
     cuts = n_e*[True] if valid_cuts == '' else eval(valid_cuts)
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
@@ -421,7 +424,7 @@ def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds,
         indices =               np.where(event_number%n_folds==fold_number-1)[0]
         labels  =           valid_labels[event_number%n_folds==fold_number-1]
         sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
-        if os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
+        if scalars != [] and os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
         print('CLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
         probs = model.predict(sample, batch_size=20000, verbose=verbose)
         print('FOLD', fold_number, 'ACCURACY:', format(100*valid_accuracy(labels, probs), '.2f'), end='')

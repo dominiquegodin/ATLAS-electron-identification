@@ -68,7 +68,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
             h[:,n] = pylab.hist(class_probs, bins=bins, label='class '+str(n)+': '+label_dict[n],
                                 histtype='step', weights=class_weights, log=True, color=colors[n], lw=2)[0]
         if n_classes == 2: colors = len(colors)*['black']
-        if False:
+        if True:
             for n in np.arange(1, n_classes):
                 new_y_true = y_true[np.logical_or(y_true==0, class_labels==n)]
                 new_y_prob = y_prob[np.logical_or(y_true==0, class_labels==n)]
