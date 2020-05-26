@@ -4,9 +4,9 @@ import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle
 from   argparse   import ArgumentParser
 from   tabulate   import tabulate
 from   itertools  import accumulate
-from   utils      import make_sample, sample_composition, balance_sample, apply_scaler, load_scaler
-from   utils      import compo_matrix, class_weights, cross_validation, valid_results, sample_analysis
-from   utils      import sample_weights, get_bin_indices
+from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
+from   utils      import balance_sample, compo_matrix, class_weights, cross_valid, valid_results
+from   utils      import sample_analysis, sample_weights, get_bin_indices
 from   models     import multi_CNN
 
 
@@ -33,8 +33,7 @@ parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
 parser.add_argument( '--resampling'  , default = 'OFF'               )
 parser.add_argument( '--scaling'     , default = 'ON'                )
-parser.add_argument( '--cross_valid' , default = 'OFF'               )
-parser.add_argument( '--plotting'    , default = 'ON'                )
+parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
 parser.add_argument( '--data_file'   , default = ''                  )
 parser.add_argument( '--output_dir'  , default = 'outputs'           )
@@ -47,47 +46,28 @@ parser.add_argument( '--results_out' , default = ''                  )
 args = parser.parse_args()
 
 
-# CNN ARCHITECTURES
-CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
-        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
-        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
-
-
-# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
-if args.results_in != '':
-    if os.path.isfile(args.output_dir+'/'+args.results_in):
-        print('\nLOADING VALIDATION RESULTS FROM', args.output_dir+'/'+args.results_in, end='')
-        sample, labels, probs = pickle.load(open(args.output_dir+'/'+args.results_in, 'rb'))
-        n_e = min(len(labels),int(args.n_valid))
-        print('\nGENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS ...\n')
-        sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-        valid_results(sample, labels, probs, [], None, args.output_dir, args.plotting)
-    sys.exit()
-
-
-# VERIFYING PROGRAM ARGUMENTS
+# VERIFYING ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b']: 
+if args.weight_type not in ['flattening', 'match2s', 'match2b'] and  args.weight_type != None:
     args.weight_type = None
-    print()
-    print('weight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
-    print()
-    pass
-
-if '.h5' not in args.model_in and args.n_epochs < 1:
+    print('\nweight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
+if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
-if args.cross_valid == 'ON' and args.n_folds <= 1:
-    print('\nERROR: n_folds must be greater than 1 for cross-validation -> exiting program\n'); sys.exit()
 
 
 # DATAFILE
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    if not os.path.isdir(path):
-        try: os.mkdir(path)
-        except FileExistsError: pass
+    try: os.mkdir(path)
+    except FileExistsError: pass
 data_file = '/opt/tmp/godin/el_data/2020-04-21/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5'
 if args.data_file != '': data_file= args.data_file
+
+
+# CNN PARAMETERS
+CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
+        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # TRAINING VARIABLES
@@ -99,8 +79,14 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
-             'p_eta', 'p_et_calo','p_LHValue']
+             'p_eta', 'p_et_calo', 'p_LHValue']
 total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
+
+
+# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
+if os.path.isfile(args.output_dir+'/'+args.results_in):
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, total_var)
+if args.results_in != '': sys.exit()
 
 
 # MULTI-GPU DISTRIBUTION
@@ -120,9 +106,9 @@ with strategy.scope():
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
 sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
-args.n_train = [0, min(sample_size, args.n_train)] if args.cross_valid == 'OFF' else [0,0]
+args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, sample_size )]
-if args.cross_valid == 'OFF' and args.n_folds > 1: args.n_valid = args.n_train
+if args.n_valid[0] == args.n_valid[-1]: args.n_valid = args.n_train
 #args.valid_cuts += ' & (sample["p_et_calo"] >= 20)' #' & (abs(sample["p_eta"] > 0.6)'
 #args.valid_cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
 
@@ -150,20 +136,14 @@ print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
 func_args = (data_file, total_var, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
 valid_sample, valid_labels = make_sample(*func_args)
 #sample_analysis(valid_sample, valid_labels, scalars, args.scaler_in, args.output_dir); sys.exit()
-if args.cross_valid == 'OFF' and args.model_in != '':
+if args.model_in != '':
     print('CLASSIFIER: loading pre-trained weights from', args.output_dir+'/'+args.model_in, '\n')
     model.load_weights(args.output_dir+'/'+args.model_in)
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
 
-def bkg_sample_weights(sample):
-    from utils import make_labels; labels = make_labels(sample, 6)
-    weights = class_weights(labels, bkg_to_sig=2)
-    return np.array([weights[n] for n in np.arange(6)])[labels]
-
-
 # TRAINING LOOP
-if args.cross_valid == 'OFF' and args.n_epochs >= 1:
+if args.n_epochs > 0:
     print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
     print(  'CLASSIFIER: valid sample:'   , format(args.n_valid[1] -args.n_valid[0], '8.0f'), 'e')
     print('\nCLASSIFIER: using TensorFlow', tf.__version__ )
@@ -186,16 +166,15 @@ if args.cross_valid == 'OFF' and args.n_epochs >= 1:
     sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                           callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                          #class_weight=class_weights(train_labels, 2), sample_weight=sample_weight,
-                          sample_weight = bkg_sample_weights(train_sample),
+                          class_weight=class_weights(train_labels, bkg_ratio=2), sample_weight=sample_weight,
                           batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
 else: train_labels = []; training = None
 
 
 # RESULTS AND PLOTTING SECTION
-if args.cross_valid == 'ON':
-    valid_probs = cross_validation(valid_sample, valid_labels, scalars, model, args.output_dir, args.n_folds)
+if args.n_folds > 1:
+    valid_probs = cross_valid(valid_sample, valid_labels, scalars, model, args.output_dir, args.n_folds)
     print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
 else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
@@ -203,5 +182,6 @@ else:
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    valid_sample = {key:valid_sample[key] for key in other_var+scalars}
-    pickle.dump((valid_sample, valid_labels, valid_probs), open(args.output_dir+'/'+args.results_out,'wb'))
+    if args.valid_cuts == '': valid_data = (valid_probs,)
+    else: valid_data = ({key:valid_sample[key] for key in other_var+scalars}, valid_labels, valid_probs)
+    pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
