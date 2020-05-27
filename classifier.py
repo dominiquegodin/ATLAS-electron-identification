@@ -81,13 +81,14 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 scalars  += ['p_eta'   , 'p_et_calo']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
-other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHTight', 'p_LHMedium', 'p_LHLoose',
-             'p_eta', 'p_et_calo', 'p_LHValue']
+other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHValue',
+             'p_LHTight'  , 'p_LHMedium' , 'p_LHLoose' , 'p_et_calo', 'p_eta']
 total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in):
+    total_var['images'] = []; total_var['scalars'] = []
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, total_var)
 if args.results_in != '': sys.exit()
 
@@ -103,6 +104,7 @@ with strategy.scope():
     sample, _ = make_sample(data_file, total_var, [0,1], args.n_tracks, args.n_classes)
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
     model     = multi_CNN(*func_args, **train_var)
+    #model     = multi_CNN(args.n_classes, args.NN_type, sample, CNN, args.FCN_neurons, **train_var)
     print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
@@ -112,7 +114,7 @@ sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
 args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, sample_size )]
 if args.n_valid[0] == args.n_valid[-1]: args.n_valid = args.n_train
-#args.valid_cuts += ' & (sample["p_et_calo"] >= 20)' #' & (abs(sample["p_eta"] > 0.6)'
+#args.valid_cuts += ' & (abs(sample["p_eta"] > 0.6)'
 #args.valid_cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
 
 
@@ -186,5 +188,5 @@ valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, a
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.valid_cuts == '': valid_data = (valid_probs,)
-    else: valid_data = ({key:valid_sample[key] for key in other_var+scalars}, valid_labels, valid_probs)
+    else: valid_data = ({key:valid_sample[key] for key in other_var}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))

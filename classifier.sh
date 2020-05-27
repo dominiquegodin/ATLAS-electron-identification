@@ -10,7 +10,8 @@ python classifier.py  --n_train=$n_e          --n_valid=0           --batch_size
                       --train_cuts '(sample["eventNumber"]%'${n_folds}'!='$(($fold-1))')'                      \
                       --valid_cuts '(sample["eventNumber"]%'${n_folds}'=='$(($fold-1))')'                      \
                       --output_dir=$output_dir  --scaler_out scaler_${fold}.pkl --model_out model_${fold}.h5   \
-                      --results_out results_${fold}.pkl  #--sbatch_var=$SCRIPT_VAR
+                      #--results_out results_${fold}.pkl  #--sbatch_var=$SCRIPT_VAR
+
 
 exit
 
@@ -40,7 +41,7 @@ fold=$VAR; output_dir=outputs/test/${VAR}-track    #${SCRIPT_VAR}_to_1
 for ((fold = 1; fold <= $n_folds; fold++)) do #for fold in 1 2 3 4 5 do
 python classifier.py  --n_train=$n_e          --n_valid=0           --batch_size=5e3     --n_epochs=$n_epochs  \
                       --n_classes=$n_classes  --n_tracks=$n_tracks  --verbose=$verbose   --dropout=0.05        \
-                      --images=$images        --scalars=$scalars    --NN_type=$NN_type   --weight_type=None   \
+                      --images=$images        --scalars=$scalars    --NN_type=$NN_type   --weight_type=None    \
                       --train_cuts '(sample["eventNumber"]%'${n_folds}'!='$(($fold-1))')'                      \
                       --valid_cuts '(sample["eventNumber"]%'${n_folds}'=='$(($fold-1))')'                      \
                       --output_dir=$output_dir  --scaler_out scaler_${fold}.pkl --model_out model_${fold}.h5   \
@@ -52,5 +53,4 @@ python classifier.py  --n_train=0           --n_valid=$n_e        --n_epochs=0  
 
 
 # USING RESULTS FOR PLOTTING
-python classifier.py  --n_valid=15e6  --output_dir=outputs/test  --results_in=valid_probs.pkl \
-                      --plotting=ON   --images=OFF  --scalars=OFF
+python classifier.py  --n_valid=15e6  --output_dir=outputs/test  --results_in=valid_probs.pkl  --plotting=ON
