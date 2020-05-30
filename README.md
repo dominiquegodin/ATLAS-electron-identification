@@ -13,7 +13,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```  
 3) link data file to user directory
    ```
-   ln -s /opt/tmp/godin/el_data/2020-04-21/el_data.h5 .
+   ln -s /opt/tmp/godin/el_data/2020-05-28/el_data.h5 .
    ```  
 4) clone framework from GitHub
    ```
@@ -49,7 +49,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
 3) link data file to user directory
    ```
-   ln -s /project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5 .
+   ln -s /project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5 .
    ```
 4) clone framework from GitHub
    ```
@@ -65,9 +65,9 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
    sbatch sbatch.sh
    ```
-2) send array jobs with ID 0 to 9 to Slurm batch system
+2) send array jobs with ID 1 to 10 to Slurm batch system
    ```
-   sbatch --array=0-9 sbatch.sh
+   sbatch --array=1-10 sbatch.sh
    ```
 2) report status of job
    ```
@@ -87,7 +87,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
 5) use Slurm interactively and request appropriate ressources on Beluga
    ```
-   salloc --time=00:30:00 --gres=gpu:1 --mem=16G --x11 --account=def-arguinj
+   salloc --time=00:30:00 --cpus-per-task=4 --gres=gpu:1 --mem=128G --x11 --account=def-arguinj
    ```
 
 
@@ -117,7 +117,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --NN_type     : CNN or FCN specify the type of neural networks (default=CNN) 
 
---scaling     : applies Quantile transform to scalar variables when ON (fit performed on train sample
+--scaling     : applies quantile transform to scalar variables when ON (fit performed on train sample
 	        and applied to whole sample)  
 
 --cross_valid : performs k-fold cross-validation 

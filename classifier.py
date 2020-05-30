@@ -61,8 +61,8 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except FileExistsError: pass
-data_file = '/opt/tmp/godin/el_data/2020-04-21/el_data.h5'
-#data_file = '/project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5'
+data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+#data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 if args.data_file != '': data_file= args.data_file
 
 
@@ -79,17 +79,17 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
 scalars  += ['p_eta'   , 'p_et_calo']
+others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
+             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
-other_var = ['eventNumber', 'p_TruthType', 'p_iffTruth', 'p_LHValue',
-             'p_LHTight'  , 'p_LHMedium' , 'p_LHLoose' , 'p_et_calo', 'p_eta']
-total_var = {**train_var, 'others':other_var}; scalars = train_var['scalars']
+variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in):
-    total_var['images'] = []; total_var['scalars'] = []
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, total_var)
+    variables = {'others':others, 'scalars':scalars, 'images':[]}
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, variables)
 if args.results_in != '': sys.exit()
 
 
@@ -99,9 +99,9 @@ devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
 tf.debugging.set_log_device_placement(False)
 strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
 with strategy.scope():
-    if tf.__version__ >= '2.1.0' and len(total_var['images']) > 1:
+    if tf.__version__ >= '2.1.0' and len(variables['images']) > 1:
         tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
-    sample, _ = make_sample(data_file, total_var, [0,1], args.n_tracks, args.n_classes)
+    sample, _ = make_sample(data_file, variables, [0,1], args.n_tracks, args.n_classes)
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
     model     = multi_CNN(*func_args, **train_var)
     #model     = multi_CNN(args.n_classes, args.NN_type, sample, CNN, args.FCN_neurons, **train_var)
@@ -138,8 +138,9 @@ print(tabulate(table, headers=headers, tablefmt='psql')); print()
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
 print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
-func_args = (data_file, total_var, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
+func_args = (data_file, variables, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
 valid_sample, valid_labels = make_sample(*func_args)
+valid_sample.update({'eta':valid_sample['p_eta'], 'pt':valid_sample['p_et_calo']})
 #sample_analysis(valid_sample, valid_labels, scalars, args.scaler_in, args.output_dir); sys.exit()
 if args.model_in != '':
     print('CLASSIFIER: loading pre-trained weights from', args.output_dir+'/'+args.model_in, '\n')
@@ -156,23 +157,23 @@ if args.n_epochs > 0:
     print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
     print([group for group in train_var if train_var[group] != [ ]])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
-    func_args = (data_file, total_var, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
+    func_args = (data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
-    if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
-    if args.scaling and args.model_in != '':
-        train_sample = load_scaler(train_sample, scalars, args.output_dir+'/'+args.scaler_in)
-    if args.scaling and args.model_in == '':
-        scaler_out = args.output_dir+'/'+args.scaler_out
-        train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
-    compo_matrix(valid_labels, train_labels=train_labels); print()
-    model_out     = args.output_dir+'/'+args.model_out
-    check_point   = cb.ModelCheckpoint(model_out, save_best_only =True, monitor=args.metrics, verbose=1)
-    early_stop    = cb.EarlyStopping(patience=args.patience, restore_best_weights=True, monitor=args.metrics)
     sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
-    training = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
-                          callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                          class_weight=class_weights(train_labels, bkg_ratio=args.bkg_ratio),
-                          sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size) )
+    if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
+    if args.scaling:
+        if args.model_in == '':
+            scaler_out = args.output_dir+'/'+args.scaler_out
+            train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
+        else: train_sample = load_scaler(train_sample, scalars, args.output_dir+'/'+args.scaler_in)
+    compo_matrix(valid_labels, train_labels=train_labels); print()
+    model_out   = args.output_dir+'/'+args.model_out
+    check_point = cb.ModelCheckpoint(model_out, save_best_only =True, monitor=args.metrics, verbose=1)
+    early_stop  = cb.EarlyStopping(patience=args.patience, restore_best_weights=True, monitor=args.metrics)
+    training    = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
+                             callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
+                             class_weight=class_weights(train_labels, bkg_ratio=args.bkg_ratio),
+                             sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
 else: train_labels = []; training = None
 
@@ -188,5 +189,5 @@ valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, a
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.valid_cuts == '': valid_data = (valid_probs,)
-    else: valid_data = ({key:valid_sample[key] for key in other_var}, valid_labels, valid_probs)
+    else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
