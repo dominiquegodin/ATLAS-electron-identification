@@ -192,13 +192,13 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
-    n_e = min(len(probs), int(n_valid))
+    n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
     if len(valid_data) == 1:
         print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
-        sample, labels = make_sample(data_file, variables, [0,n_valid], 0, probs.shape[1])
+        sample, labels = make_sample(data_file, variables, n_valid, n_tracks=0, n_classes=probs.shape[1])
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    if False:
+    if True and len(valid_data)==1:
         print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
         pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
@@ -565,11 +565,12 @@ def NN_weights(image_shape, CNN_dict, FCN_neurons, n_classes):
     return sum([(K[l]*A[l]+1)*K[l+1] for l in np.arange(len(K)-1)])
 
 
-def order_kernels(image_shape, CNN_dict, FCN_neurons, n_classes, par_tuple=[]):
+def order_kernels(image_shape, n_maps, FCN_neurons, n_classes):
     x_dims  = [(x1,x2) for x1 in np.arange(1,image_shape[0]+1) for x2 in np.arange(1,image_shape[0]-x1+2)]
     y_dims  = [(y1,y2) for y1 in np.arange(1,image_shape[1]+1) for y2 in np.arange(1,image_shape[1]-y1+2)]
+    par_tuple = []
     for kernels in [[(x[0],y[0]),(x[1],y[1])] for x in x_dims for y in y_dims]:
-        CNN_dict[image_shape]['kernels'] = kernels
+        CNN_dict   = {image_shape:{'maps':n_maps, 'kernels':kernels}}
         par_tuple += [(NN_weights(image_shape, CNN_dict, FCN_neurons, n_classes), kernels)]
     return sorted(par_tuple)[::-1]
 

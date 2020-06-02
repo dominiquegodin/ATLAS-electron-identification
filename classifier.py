@@ -6,14 +6,14 @@ from   tabulate   import tabulate
 from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import balance_sample, compo_matrix, class_weights, cross_valid, valid_results
-from   utils      import sample_analysis, sample_weights, get_bin_indices
+from   utils      import sample_analysis, sample_weights
 from   models     import multi_CNN
 
 
 # PROGRAM ARGUMENTS
 parser = ArgumentParser()
-parser.add_argument( '--n_train'     , default =  1e5,  type = float )
-parser.add_argument( '--n_valid'     , default =  1e5,  type = float )
+parser.add_argument( '--n_train'     , default =  1e6,  type = float )
+parser.add_argument( '--n_valid'     , default =  1e6,  type = float )
 parser.add_argument( '--batch_size'  , default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    , default =  100,  type = int   )
 parser.add_argument( '--n_classes'   , default =    2,  type = int   )
@@ -73,7 +73,7 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 
 
 # TRAINING VARIABLES
-images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', 'em_barrel_Lr1_fine',
+images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3','em_barrel_Lr1_fine',
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
@@ -84,6 +84,15 @@ others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , '
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
+
+
+# SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
+sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
+args.n_train = [0, min(sample_size, args.n_train)]
+args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
+if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
+#args.valid_cuts += ' & (abs(sample["p_eta"] > 0.6)'
+#args.valid_cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
@@ -107,15 +116,6 @@ with strategy.scope():
     #model     = multi_CNN(args.n_classes, args.NN_type, sample, CNN, args.FCN_neurons, **train_var)
     print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-
-
-# SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
-sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
-args.n_train = [0, min(sample_size, args.n_train)]
-args.n_valid = [args.n_train[-1], min(args.n_train[-1]+args.n_valid, sample_size )]
-if args.n_valid[0] == args.n_valid[-1]: args.n_valid = args.n_train
-#args.valid_cuts += ' & (abs(sample["p_eta"] > 0.6)'
-#args.valid_cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
 
 
 # ARGUMENTS AND VARIABLES TABLES
@@ -188,6 +188,6 @@ else:
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    if args.valid_cuts == '': valid_data = (valid_probs,)
+    if args.n_folds > 1 and args.valid_cuts == '': valid_data = (valid_probs,)
     else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
