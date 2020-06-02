@@ -196,9 +196,10 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     if len(valid_data) == 1:
         print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
         sample, labels = make_sample(data_file, variables, n_valid, n_tracks=0, n_classes=probs.shape[1])
+        sample.update({'eta':sample['p_eta'], 'pt':sample['p_et_calo']})
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    if True and len(valid_data)==1:
+    if False and len(valid_data)==1:
         print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
         pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
