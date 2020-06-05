@@ -27,7 +27,7 @@ parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
 parser.add_argument( '--l2'          , default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     , default = 0.05,  type = float )
 parser.add_argument( '--FCN_neurons' , default = [200, 200], type = int, nargs='+')
-parser.add_argument( '--weight_type' , default = None                )
+parser.add_argument( '--weight_type' , default = 'none'              )
 parser.add_argument( '--train_cuts'  , default = ''                  )
 parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
@@ -50,9 +50,9 @@ args = parser.parse_args()
 
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b'] and  args.weight_type != None:
-    args.weight_type = None
+if args.weight_type not in ['flattening', 'match2s', 'match2b', 'none']
     print('\nweight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
+    args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 
@@ -81,6 +81,7 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 scalars  += ['p_eta'   , 'p_et_calo']
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
+others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
@@ -108,7 +109,7 @@ devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
 tf.debugging.set_log_device_placement(False)
 strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
 with strategy.scope():
-    if tf.__version__ >= '2.1.0' and len(variables['images']) > 1:
+    if tf.__version__ >= '2.1.0' and len(variables['images']) >= 1:
         tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
     sample, _ = make_sample(data_file, variables, [0,1], args.n_tracks, args.n_classes)
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)

@@ -69,8 +69,7 @@ def get_bin_indices(p_var,boundaries):
 
 #def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
 def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='outputs/',ref_var='pt'):
-#    if weight_type=="none": return None
-    if weight_type==None: return None
+    if weight_type=="none": return None
 
     print("-------------------------------")
     print("generate_weights: sample weight mode \"",weight_type,"\" designated. Generating weights.",)
@@ -224,7 +223,7 @@ def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_',
             tracks_data = np.concatenate((abs(tracks_data[...,0:5]), tracks_data[...,5:13]), axis=2)
     if 'tracks_image' in var_list: sample.update({'tracks_image':tracks_data})
     if 'tracks'       in var_list: sample['tracks'] = tracks_data
-    if tf.__version__ < '2.1.0' or len(variables['images']) <= 1:
+    if tf.__version__ < '2.1.0' or len(variables['images']) == 0:
         for key in set(sample) - set(variables['others']): sample[key] = np.float32(sample[key])
     if False:
         for n in variables['images']: sample[n] = resize_images(np.float32(sample[n]),target_shape=(56,11))
@@ -574,6 +573,31 @@ def order_kernels(image_shape, n_maps, FCN_neurons, n_classes):
         CNN_dict   = {image_shape:{'maps':n_maps, 'kernels':kernels}}
         par_tuple += [(NN_weights(image_shape, CNN_dict, FCN_neurons, n_classes), kernels)]
     return sorted(par_tuple)[::-1]
+
+
+def print_channels(sample, col, reverse=False):
+    def getkey(item): return item[col]
+    channel_dict= {301535:'Z -> ee+y 10-35'   , 301536:'Z -> mumu+y 10-35', 301899:'Z -> ee+y 35-70'   ,
+                   301900:'Z -> ee+y 70-140'  , 301901:'Z -> ee+y 140'    , 301902:'Z -> mumu+y 35-70' ,
+                   301903:'Z -> mumu+y 70-140', 301904:'Z -> mumu+y 140'  , 361020:'dijet JZ0W'        ,
+                   361021:'dijet JZ1W'        , 361022:'dijet JZ2W'       , 361023:'dijet JZ3W'        ,
+                   361024:'dijet JZ4W'        , 361025:'dijet JZ5W'       , 361026:'dijet JZ6W'        ,
+                   361027:'dijet JZ7W'        , 361028:'dijet JZ8W'       , 361029:'dijet JZ9W'        ,
+                   361100:'W+ -> ev'          , 361101:'W+ -> muv'        , 361102:'W+ -> tauv'        ,
+                   361103:'W- -> ev'          , 361104:'W- -> muv'        , 361105:'W- -> tauv'        ,
+                   361106:'Z -> ee'           , 361108:'Z -> tautau'      , 410470:'ttbar nonhad'      ,
+                   410471:'ttbar allhad'      , 410644:'s top s-chan.'    , 410645:'s top s-chan.'     ,
+                   410646:'s top Wt-chan.'    , 410647:'s top Wt-chan.'   , 410658:'s top t-chan.'     ,
+                   410659:'s top t-chan.'     , 423099:'y+jets 8-17'      , 423100:'y+jets 17-35'      ,
+                   423101:'y+jets 35-50'      , 423102:'y+jets 50-70'     , 423103:'y+jets 70-140'     ,
+                   423104:'y+jets 140-280'    , 423105:'y+jets 280-500'   , 423106:'y+jets 500-800'    ,
+                   423107:'y+jets 800-1000'   , 423108:'y+jets 1000-1500' , 423111:'y+jets 2500-3000'  ,
+                   423112:'y+jets 3000'       , 423200:'direct:Jpsie3e3'  , 423201:'direct:Jpsie3e8'   ,
+                   423202:'direct:Jpsie3e13'  , 423211:'np:bb -> Jpsie3e8', 423212:'np:bb -> Jpsie3e13',
+                   423300:'JF17'              , 423301:'JF23'             , 423302:'JF35'              }
+    channels = sample['mcChannelNumber']; headers = ['Channel', 'Process', 'Number']
+    channels = sorted([[n, channel_dict[n], int(np.sum(channels==n))] for n in set(channels)], key=getkey)
+    print(tabulate(channels[::-1] if reverse else channels, headers=headers, tablefmt='psql'))
 
 
 

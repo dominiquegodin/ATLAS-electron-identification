@@ -1,13 +1,12 @@
 #!/bin/bash
-
-
-##SBATCH --account=def-arguinj                          # uncomment on Beluga
-##SBATCH --time=0-03:00     # time (DD-HH:MM)           # uncomment on Beluga
-##SBATCH --mem=128G         # memory (per node)         # uncomment on Beluga
-##SBATCH --cpus-per-task=8  # CPU threads               # uncomment on Beluga
-#SBATCH --gres=gpu:4       # Number of GPU(s) per node
+#SBATCH --account=def-arguinj
+#SBATCH --time=0-03:00     # time limit (DD-HH:MM)
+#SBATCH --nodes=1          # number of nodes
+##SBATCH --mem=128G         # memory per node (uncomment on Beluga)
+#SBATCH --cpus-per-task=8  # number of CPU threads per node
+#SBATCH --gres=gpu:4       # number of GPU(s) per node
 #SBATCH --job-name=el-id
-#SBATCH --output=outputs/log_files/%x_%A_%a.out         # directory must exist
+#SBATCH --output=outputs/log_files/%x_%A_%a.out
 #SBATCH --array=0
 
 
