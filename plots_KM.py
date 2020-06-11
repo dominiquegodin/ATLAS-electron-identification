@@ -23,7 +23,7 @@ def plot_distributions_KM(y_true, y_prob, var_name='',output_dir='outputs/',post
     if var_name=='': var_name='distributions'
     file_name=output_dir+'/'+var_name+postfix+'.png'
 
-    print('CLASSIFIER: saving test sample distributions in:', file_name)
+    print('plots_KM: saving test sample distributions in:', file_name)
 
     if var_name=='distributions':
         probs_class0   = 100*y_prob[:,0][ y_true==0 ]
@@ -77,13 +77,13 @@ def plot_distributions_KM(y_true, y_prob, var_name='',output_dir='outputs/',post
 
 def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir='outputs/'):
 
-    print('CLASSIFIER:', output_dir)
+    #print('plots_KM:', output_dir)
 
     file_name = output_dir
     #if postfix!='':file_name+='differential/'
     if not os.path.isdir(file_name): os.mkdir(file_name)
     file_name+= 'ROC'+str(ROC_type)+'_curve'+postfix+'.png'
-    print('CLASSIFIER: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
+    print('plots_KM: saving test sample ROC'+str(ROC_type)+' curve in:   ', file_name)
     eff_class0, eff_class1 = get_LLH(test_sample, y_true)
 
     #y_prob = y_prob[np.logical_or(y_true==0, y_true==1)]
