@@ -71,7 +71,7 @@ for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')
     if not os.path.isdir(path):
         try: os.mkdir(path)
         except FileExistsError: pass
-data_file = '/opt/tmp/godin/el_data/2020-04-21/el_data.h5'
+data_file = '/project/6001319/edreyer/el_classifier/data/from_dgodin/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-04-21/el_data.h5'
 if args.data_file != '': data_file= args.dat_file
 
