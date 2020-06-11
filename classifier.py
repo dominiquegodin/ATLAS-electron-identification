@@ -61,7 +61,7 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except FileExistsError: pass
-data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+data_file = '/project/6001319/edreyer/el_classifier/data/from_dgodin/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 if args.data_file != '': data_file= args.data_file
 
