@@ -10,7 +10,7 @@ parser = ArgumentParser()
 parser.add_argument( '--n_e'         , default = None        , type=float )
 parser.add_argument( '--n_tasks'     , default = 12          , type=int   )
 parser.add_argument( '--n_files'     , default = 10          , type=int   )
-parser.add_argument( '--input_file'  , default = ''                       )
+parser.add_argument( '--input_dir'   , default = ''                       )
 parser.add_argument( '--output_file' , default = 'el_data.h5'             )
 parser.add_argument( '--sampling'    , default = 'ON'                     )
 parser.add_argument( '--merging'     , default = 'ON'                     )
@@ -19,7 +19,8 @@ args = parser.parse_args()
 
 
 # DATAFILES DEFINITIONS
-file_path   = '/opt/tmp/godin/el_data/2019-06-20/' if args.input_file == '' else args.input_file
+file_path   = '/opt/tmp/godin/el_data/2019-06-20/' if args.input_dir == '' else args.input_dir
+if not (file_path[-1]=="/"): file_path += "/"
 if not os.path.isdir(file_path+'output'): os.mkdir(file_path+'output')
 output_path = file_path + 'output/'
 data_files  = [file_path+h5_file for h5_file in os.listdir(file_path) if '.h5' in h5_file]
