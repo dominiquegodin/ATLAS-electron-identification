@@ -45,9 +45,10 @@ scalars =  ['p_truth_pt'      , 'p_truth_phi'     , 'p_truth_eta'     , 'p_truth
             'p_Rhad'          , 'p_Rphi'          , 'p_Reta'          , 'p_d0'             , 'p_d0Sig'    ,
             'p_sigmad0'       , 'p_dPOverP'       , 'p_f1'            , 'p_f3'             , 'p_weta2'    ,
             'p_TRTPID'        , 'p_deltaEta1'     , 'p_LHValue'       , 'p_chi2'           , 'p_ndof'     ,
-            'p_deltaPhiRescaled2'                                                                         ]
+            'p_ECIDSResult'   , 'p_deltaPhiRescaled2'                                                     ]
 integers = ['p_TruthType'     , 'p_iffTruth'      , 'p_nTracks'       , 'mcChannelNumber'  , 'eventNumber',
-            'p_LHTight'       , 'p_LHMedium'      , 'p_LHLoose'       , 'p_numberOfSCTHits', 'p_charge'   ]
+            'p_LHTight'       , 'p_LHMedium'      , 'p_LHLoose'       , 'p_numberOfSCTHits', 'p_charge'   ,
+            'p_TruthOrigin'   , 'p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin'                  ]
 
 
 # REMOVING TEMPORARY FILES (if any)

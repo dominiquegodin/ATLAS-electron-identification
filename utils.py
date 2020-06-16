@@ -1,12 +1,10 @@
 import tensorflow as tf, matplotlib.pyplot as plt
 import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
-from numpy import inf
 from   sklearn    import metrics, utils, preprocessing
 from   tabulate   import tabulate
 from   skimage    import transform
 from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
 from   plots_KM   import plot_distributions_KM, differential_plots
-from   io         import StringIO
 
 
 def find_bin(array,binning):
@@ -71,12 +69,11 @@ def get_bin_indices(p_var,boundaries):
 
 #def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
 def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='outputs/',ref_var='pt'):
-#    if weight_type=="none": return None
-    if weight_type==None: return None
+    if weight_type=="none": return None
 
     print("-------------------------------")
     print("generate_weights: sample weight mode \"",weight_type,"\" designated. Generating weights.",)
-    print("-------------------------------")
+    print("-------------------------------\n")
 
     binning=[0,10,20,30,40,60,80,100,130,180,250,500]
     labels=['sig','bkg']
@@ -116,7 +113,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
         pass
 
     #KM: to replce inf with 0
-    for i in range(nClass): weights[i]=np.where(weights[i]==inf,0,weights[i]) #np.where(array1==0, 1, array1)
+    for i in range(nClass): weights[i]=np.where(weights[i]==np.inf,0,weights[i]) #np.where(array1==0, 1, array1)
         
     debug=0
     if debug:
@@ -189,19 +186,26 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def validation(output_dir, results_in, plotting, n_valid, data_file, total_var, valid_cuts=''):
+def validation(output_dir, results_in, plotting, n_valid, data_file, variables, valid_cuts=''):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
-    n_e = min(len(probs), int(n_valid))
+    n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
     if len(valid_data) == 1:
         print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
-        sample, labels = make_sample(data_file, total_var, [0,n_valid], 0, probs.shape[1])
+        sample, labels = make_sample(data_file, variables, n_valid, n_tracks=0, n_classes=probs.shape[1])
+        sample.update({'eta':sample['p_eta'], 'pt':sample['p_et_calo']})
         n_e = len(labels)
-    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
+    if False and len(valid_data)==1:
+        print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
+        pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
+    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
     #valid_cuts = '(probs[:,0]<=0.11)' #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
+    #valid_cuts = '(sample["p_et_calo"]  < 20)'
+    #valid_cuts = '(sample["p_et_calo"] >= 20) & (sample["p_et_calo"] <= 80)'
+    #valid_cuts = '(sample["p_et_calo"]  > 80)'
     cuts = n_e*[True] if valid_cuts == '' else eval(valid_cuts)
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
@@ -209,8 +213,8 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, total_var, 
     valid_results(sample, labels, probs, [], None, output_dir, plotting)
 
 
-def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_', process=False):
-    var_list = np.sum(list(total_var.values())); start_time = time.time()
+def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_', process=False):
+    var_list = np.sum(list(variables.values())); start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in var_list if key != 'tracks_image'}
         if 'tracks_image' in var_list or 'tracks' in var_list:
@@ -219,15 +223,15 @@ def make_sample(data_file, total_var, idx, n_tracks, n_classes, cuts='', p='p_',
             tracks_data = np.concatenate((abs(tracks_data[...,0:5]), tracks_data[...,5:13]), axis=2)
     if 'tracks_image' in var_list: sample.update({'tracks_image':tracks_data})
     if 'tracks'       in var_list: sample['tracks'] = tracks_data
-    if tf.__version__ < '2.1.0' or len(total_var['images']) <= 1:
-        for key in set(sample) - set(total_var['others']): sample[key] = np.float32(sample[key])
+    if tf.__version__ < '2.1.0' or len(variables['images']) == 0:
+        for key in set(sample) - set(variables['others']): sample[key] = np.float32(sample[key])
     if False:
-        for n in total_var['images']: sample[n] = resize_images(np.float32(sample[n]),target_shape=(56,11))
+        for n in variables['images']: sample[n] = resize_images(np.float32(sample[n]),target_shape=(56,11))
     labels = make_labels(sample, n_classes)
     if idx[1]-idx[0] > 1:
         print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
         sample, labels = sample_cuts(sample, labels, cuts)
-        if process: sample = process_images(sample, total_var['images'])
+        if process: sample = process_images(sample, variables['images'])
     return sample, labels
 
 
@@ -331,7 +335,7 @@ def balance_sample(sample, labels):
 
 
 def apply_scaler(train_sample, valid_sample, scalars, scaler_out):
-    print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
+    print('CLASSIFIER: applying quantile transform to scalar variables', end=' ... ', flush=True)
     start_time    = time.time()
     train_scalars = np.hstack([np.expand_dims(train_sample[key], axis=1) for key in scalars])
     valid_scalars = np.hstack([np.expand_dims(valid_sample[key], axis=1) for key in scalars])
@@ -349,14 +353,14 @@ def apply_scaler(train_sample, valid_sample, scalars, scaler_out):
 
 
 def load_scaler(sample, scalars, scaler_file):
-    print('CLASSIFIER: loading scaler transform from ' + scaler_file)
+    print('CLASSIFIER: loading quantile transform from ' + scaler_file)
     scaler         = pickle.load(open(scaler_file, 'rb'))
     start_time     = time.time()
     scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
-    print('CLASSIFIER: applying scaler transform to scalar variables', end=' ... ', flush=True)
+    print('CLASSIFIER: applying quantile transform to scalar variables', end=' ... ', flush=True)
     scalars_scaled = scaler.transform(scalars_scaled)
     for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_scaled[:,n]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
     return sample
 
 
@@ -421,7 +425,7 @@ def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds,
         indices =               np.where(event_number%n_folds==fold_number-1)[0]
         labels  =           valid_labels[event_number%n_folds==fold_number-1]
         sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
-        if os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
+        if scalars != [] and os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
         print('CLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
         probs = model.predict(sample, batch_size=20000, verbose=verbose)
         print('FOLD', fold_number, 'ACCURACY:', format(100*valid_accuracy(labels, probs), '.2f'), end='')
@@ -494,7 +498,7 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     if plotting == 'ON' and differential:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
         pt_boundaries=  [10, 20, 30, 40, 60, 100, 200, 500] #60, 80, 120, 180, 300, 500]
-        eta, pt         = sample['p_eta'], sample['p_et_calo']
+        eta, pt         = sample['eta'], sample['pt']
         eta_bin_indices = get_bin_indices(eta, eta_boundaries)
         pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
         plot_distributions_KM(labels, eta, 'eta', output_dir=output_dir)
@@ -532,8 +536,9 @@ def verify_sample(sample):
 
 
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
-    #for key in sample: print(key, sample[key].shape)
-    #verify_sample(sample); sys.exit()
+    for key in sample: print(key, sample[key].shape)
+    sys.exit()
+    verify_sample(sample); sys.exit()
     # CALORIMETER IMAGES
     from plots_DG import cal_images
     layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
@@ -560,13 +565,39 @@ def NN_weights(image_shape, CNN_dict, FCN_neurons, n_classes):
     return sum([(K[l]*A[l]+1)*K[l+1] for l in np.arange(len(K)-1)])
 
 
-def order_kernels(image_shape, CNN_dict, FCN_neurons, n_classes, par_tuple=[]):
+def order_kernels(image_shape, n_maps, FCN_neurons, n_classes):
     x_dims  = [(x1,x2) for x1 in np.arange(1,image_shape[0]+1) for x2 in np.arange(1,image_shape[0]-x1+2)]
     y_dims  = [(y1,y2) for y1 in np.arange(1,image_shape[1]+1) for y2 in np.arange(1,image_shape[1]-y1+2)]
+    par_tuple = []
     for kernels in [[(x[0],y[0]),(x[1],y[1])] for x in x_dims for y in y_dims]:
-        CNN_dict[image_shape]['kernels'] = kernels
+        CNN_dict   = {image_shape:{'maps':n_maps, 'kernels':kernels}}
         par_tuple += [(NN_weights(image_shape, CNN_dict, FCN_neurons, n_classes), kernels)]
     return sorted(par_tuple)[::-1]
+
+
+def print_channels(sample, col, reverse=False):
+    def getkey(item): return item[col]
+    channel_dict= {301535:'Z -> ee+y 10-35'   , 301536:'Z -> mumu+y 10-35', 301899:'Z -> ee+y 35-70'   ,
+                   301900:'Z -> ee+y 70-140'  , 301901:'Z -> ee+y 140'    , 301902:'Z -> mumu+y 35-70' ,
+                   301903:'Z -> mumu+y 70-140', 301904:'Z -> mumu+y 140'  , 361020:'dijet JZ0W'        ,
+                   361021:'dijet JZ1W'        , 361022:'dijet JZ2W'       , 361023:'dijet JZ3W'        ,
+                   361024:'dijet JZ4W'        , 361025:'dijet JZ5W'       , 361026:'dijet JZ6W'        ,
+                   361027:'dijet JZ7W'        , 361028:'dijet JZ8W'       , 361029:'dijet JZ9W'        ,
+                   361100:'W+ -> ev'          , 361101:'W+ -> muv'        , 361102:'W+ -> tauv'        ,
+                   361103:'W- -> ev'          , 361104:'W- -> muv'        , 361105:'W- -> tauv'        ,
+                   361106:'Z -> ee'           , 361108:'Z -> tautau'      , 410470:'ttbar nonhad'      ,
+                   410471:'ttbar allhad'      , 410644:'s top s-chan.'    , 410645:'s top s-chan.'     ,
+                   410646:'s top Wt-chan.'    , 410647:'s top Wt-chan.'   , 410658:'s top t-chan.'     ,
+                   410659:'s top t-chan.'     , 423099:'y+jets 8-17'      , 423100:'y+jets 17-35'      ,
+                   423101:'y+jets 35-50'      , 423102:'y+jets 50-70'     , 423103:'y+jets 70-140'     ,
+                   423104:'y+jets 140-280'    , 423105:'y+jets 280-500'   , 423106:'y+jets 500-800'    ,
+                   423107:'y+jets 800-1000'   , 423108:'y+jets 1000-1500' , 423111:'y+jets 2500-3000'  ,
+                   423112:'y+jets 3000'       , 423200:'direct:Jpsie3e3'  , 423201:'direct:Jpsie3e8'   ,
+                   423202:'direct:Jpsie3e13'  , 423211:'np:bb -> Jpsie3e8', 423212:'np:bb -> Jpsie3e13',
+                   423300:'JF17'              , 423301:'JF23'             , 423302:'JF35'              }
+    channels = sample['mcChannelNumber']; headers = ['Channel', 'Process', 'Number']
+    channels = sorted([[n, channel_dict[n], int(np.sum(channels==n))] for n in set(channels)], key=getkey)
+    print(tabulate(channels[::-1] if reverse else channels, headers=headers, tablefmt='psql'))
 
 
 
