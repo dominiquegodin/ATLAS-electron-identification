@@ -289,7 +289,7 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 
     #print(roc_curves)
     if makeOutput:
-        outfilename = output_dir+"roc"
+        outfilename = output_dir+"/differential/"+"roc"
         if evalLLH: outfilename+= "LLH"
         outfilename+="_vs_"+varname+".pkl"
         print('Writing ROC pickle file:', outfilename)
@@ -345,8 +345,8 @@ def plot_rej_vsX_curves(x_centers,x_errs,
     plt.text(0.85, 1.02, '80%', transform=plt.gca().transAxes, color='g', fontsize=15)
     plt.text(0.95, 1.02, '90%', transform=plt.gca().transAxes, color='r', fontsize=15)
 
-    output_name=output_dir+'/'+"rej_vs_"
-    if cType.find('GlobS')!=-1: output_name=output_dir+'/'+"eff_vs_"
+    output_name=output_dir+'/differential/'+"rej_vs_"
+    if cType.find('GlobS')!=-1: output_name=output_dir+'/differential/'+"eff_vs_"
     output_name+=varname+"_"+cType
     if evalLLH: output_name+="LLH"
     output_name+=".png"    #output_name+=varname+"_"+cType+".png"
@@ -355,7 +355,7 @@ def plot_rej_vsX_curves(x_centers,x_errs,
     #plt.close()
 
     if makeOutput: #pickle.dump(errGraphs, open(output_dir+cType+'_graphs.pickle', 'wb'))
-        outfilename=output_dir+'/'+cType
+        outfilename=output_dir+'/differential/'+cType
         if evalLLH: outfilename+="LLH"
         outfilename+='_graphs.pkl'    #outfilename=output_dir+cType+'_graphs.pkl'
         print('Writing pickle file:', outfilename)
