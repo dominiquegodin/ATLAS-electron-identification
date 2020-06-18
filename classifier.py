@@ -6,7 +6,7 @@ from   tabulate   import tabulate
 from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import balance_sample, compo_matrix, class_weights, cross_valid, valid_results
-from   utils      import sample_analysis, sample_weights
+from   utils      import sample_analysis, sample_weights, downsampling, upsampling, match_samples
 from   models     import multi_CNN
 
 
@@ -78,7 +78,7 @@ images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
-#scalars  += ['p_eta'   , 'p_et_calo']
+scalars  += ['p_eta'   , 'p_et_calo']
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 #others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
@@ -159,7 +159,18 @@ if args.n_epochs > 0:
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
     func_args = (data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
-    sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
+    '''
+    valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels, bkg_ratio=2)
+    train_sample = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
+    train_labels = np.concatenate([train_labels, extra_labels])
+    train_sample, train_labels, sample_weight = match_samples(train_sample, train_labels, valid_sample, valid_labels)
+    train_sample, train_labels, sample_weight = upsampling(train_sample, train_labels, 'bkg_ratio', bkg_ratio=1)
+    from plots_DG import var_histogram
+    var_histogram(train_sample, train_labels, sample_weight, args.output_dir, 'train')
+    var_histogram(valid_sample, valid_labels, None         , args.output_dir, 'valid')
+    '''
+    sample_weight = upsampling(train_sample, train_labels)[-1]
+    #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
     if args.scaling:
         if args.model_in == '':
@@ -188,6 +199,6 @@ else:
 valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    if args.n_folds > 1 and args.valid_cuts == '': valid_data = (valid_probs,)
+    if args.n_folds > 1 and False: valid_data = (valid_probs,)
     else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))

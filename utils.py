@@ -186,6 +186,92 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
+def downsampling(sample, labels, bkg_ratio=None):
+    pt = sample['p_et_calo']; bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
+    indices  = np.digitize(pt, bins, right=True) -1
+    hist_sig = np.histogram(pt[labels==0], bins)[0]
+    hist_bkg = np.histogram(pt[labels==1], bins)[0]
+    if bkg_ratio == None: bkg_ratio = np.sum(hist_bkg)/np.sum(hist_sig)
+    total_sig = np.int_(np.around(np.minimum(hist_sig, hist_bkg/bkg_ratio)))
+    total_bkg = np.int_(np.around(np.minimum(hist_bkg, hist_sig*bkg_ratio)))
+    ind_sig   = [np.where((indices==n) & (labels==0))[0][:total_sig[n]] for n in np.arange(len(bins)-1)]
+    ind_bkg   = [np.where((indices==n) & (labels==1))[0][:total_bkg[n]] for n in np.arange(len(bins)-1)]
+    valid_ind = np.concatenate(ind_sig+ind_bkg); np.random.seed(0); np.random.shuffle(valid_ind)
+    train_ind = list(set(np.arange(len(pt))) - set(valid_ind))
+    valid_sample = {key:np.take(sample[key], valid_ind, axis=0) for key in sample}
+    valid_labels = np.take(labels, valid_ind)
+    extra_sample = {key:np.take(sample[key], train_ind, axis=0) for key in sample}
+    extra_labels = np.take(labels, train_ind)
+    return valid_sample, valid_labels, extra_sample, extra_labels
+
+
+def upsampling(sample, labels, sampling_type=None, bkg_ratio=None, weights=True):
+    if sampling_type not in ['even', 'maxbin', 'match2s', 'match2b', 'bkg_ratio']:
+        return sample, labels, None
+    pt = sample['p_et_calo']; bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
+    indices  = np.digitize(pt, bins, right=True) -1
+    hist_sig = np.histogram(pt[labels==0], bins)[0]
+    hist_bkg = np.histogram(pt[labels==1], bins)[0]
+    if bkg_ratio == None: bkg_ratio = np.sum(hist_bkg)/np.sum(hist_sig)
+    if   sampling_type == 'even':
+        total_sig = np.full( len(hist_sig), max(np.max(hist_sig), np.max(hist_bkg)/bkg_ratio) )
+        total_bkg = np.full( len(hist_bkg), max(np.max(hist_bkg), np.max(hist_sig)/bkg_ratio) )
+    elif sampling_type == 'maxbin':
+        total_sig = np.maximum(hist_sig, hist_bkg/bkg_ratio)
+        total_bkg = np.maximum(hist_bkg, hist_sig*bkg_ratio)
+    elif sampling_type == 'match2s':
+        total_sig = hist_sig * max(1, np.max(hist_bkg/hist_sig)/bkg_ratio)
+        total_bkg = hist_sig * max(1, np.max(hist_bkg/hist_sig)/bkg_ratio)*bkg_ratio
+    elif sampling_type == 'match2b':
+        total_sig = hist_bkg * max(1, np.max(hist_sig/hist_bkg)*bkg_ratio)/bkg_ratio
+        total_bkg = hist_bkg * max(1, np.max(hist_sig/hist_bkg)*bkg_ratio)
+    elif sampling_type == 'bkg_ratio':
+        total_sig = hist_sig * max(1, np.sum(hist_bkg)/np.sum(hist_sig)/bkg_ratio)
+        total_bkg = hist_bkg * max(1, np.sum(hist_sig)/np.sum(hist_bkg)*bkg_ratio)
+    return sampling(sample, labels, bins, indices, hist_sig, hist_bkg, total_sig, total_bkg, weights)
+
+
+def match_samples(sample, labels, target_sample, target_labels):
+    bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 501]
+    pt = sample['p_et_calo']; target_pt = target_sample['p_et_calo']
+    indices         = np.digitize(pt, bins, right=False) -1
+    hist_sig        = np.histogram(       pt[labels==0]       , bins)[0]
+    hist_bkg        = np.histogram(       pt[labels==1]       , bins)[0]
+    hist_sig_target = np.histogram(target_pt[target_labels==0], bins)[0]
+    hist_bkg_target = np.histogram(target_pt[target_labels==1], bins)[0]
+    total_sig = hist_sig_target * np.max(np.append(hist_sig/hist_sig_target, hist_bkg/hist_bkg_target))
+    total_bkg = hist_bkg_target * np.max(np.append(hist_sig/hist_sig_target, hist_bkg/hist_bkg_target))
+    return sampling(sample, labels, bins, indices, hist_sig, hist_bkg, total_sig, total_bkg, True)
+
+
+def sampling(sample, labels, bins, indices, hist_sig, hist_bkg, total_sig, total_bkg, weights):
+    if weights:
+        weights_sig = len(labels)*(total_sig/hist_sig)/np.sum(total_sig+total_bkg)
+        weights_bkg = len(labels)*(total_bkg/hist_bkg)/np.sum(total_sig+total_bkg)
+        return sample, labels, np.where(labels==0, weights_sig[indices], weights_bkg[indices])
+    np.random.seed(0)
+    new_sig = np.int_(np.around(total_sig)) - hist_sig
+    new_bkg = np.int_(np.around(total_bkg)) - hist_bkg
+    ind_sig = [np.where((indices==n) & (labels==0))[0] for n in np.arange(len(bins)-1)]
+    ind_bkg = [np.where((indices==n) & (labels==1))[0] for n in np.arange(len(bins)-1)]
+    ind_sig = [np.append(ind_sig[n], np.random.choice(ind_sig[n], new_sig[n],
+               replace = len(ind_sig[n])<new_sig[n]))  for n in np.arange(len(bins)-1)]
+    ind_bkg = [np.append(ind_bkg[n], np.random.choice(ind_bkg[n], new_bkg[n],
+               replace = len(ind_bkg[n])<new_bkg[n]))  for n in np.arange(len(bins)-1)]
+    indices = np.concatenate(ind_sig + ind_bkg); np.random.shuffle(indices)
+    sample  = {key:np.take(sample[key], indices, axis=0) for key in sample}
+    labels  = np.take(labels, indices)
+    return sample, labels, None
+
+
+def class_weights(labels, bkg_ratio):
+    n_e = len(labels); n_classes = max(labels) + 1
+    if bkg_ratio == 0 and n_classes == 2: return None
+    if bkg_ratio == 0 and n_classes != 2: bkg_ratio = 1
+    ratios = {**{0:1}, **{n:bkg_ratio for n in np.arange(1, n_classes)}}
+    return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
+
+
 def validation(output_dir, results_in, plotting, n_valid, data_file, variables, valid_cuts=''):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
@@ -237,7 +323,7 @@ def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_',
 
 def make_labels(sample, n_classes):
     MC_type, IFF_type = sample['p_TruthType'], sample['p_iffTruth']
-    if n_classes == 2:
+    if   n_classes == 2:
         labels = np.where(IFF_type <= 1                               , -1, IFF_type)
         labels = np.where(IFF_type == 2                               ,  0, labels  )
         return   np.where(IFF_type >= 3                               ,  1, labels  )
@@ -360,7 +446,7 @@ def load_scaler(sample, scalars, scaler_file):
     print('CLASSIFIER: applying quantile transform to scalar variables', end=' ... ', flush=True)
     scalars_scaled = scaler.transform(scalars_scaled)
     for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_scaled[:,n]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     return sample
 
 
@@ -400,14 +486,6 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         valid_accuracy = np.array(valid_ratios) @ np.array(matrix.diagonal())/100
         print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
-
-
-def class_weights(labels, bkg_ratio=None):
-    n_e = len(labels); n_classes = max(labels) + 1
-    if bkg_ratio == None and n_classes == 2: return None
-    if bkg_ratio == None and n_classes != 2: bkg_ratio = 1
-    ratios = {**{0:1}, **{n:bkg_ratio for n in np.arange(1, n_classes)}}
-    return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
 def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
@@ -535,28 +613,6 @@ def verify_sample(sample):
         for key in sample: print(key, np.where(np.isfinite(sample[key])==False))
 
 
-def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
-    for key in sample: print(key, sample[key].shape)
-    sys.exit()
-    verify_sample(sample); sys.exit()
-    # CALORIMETER IMAGES
-    from plots_DG import cal_images
-    layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
-              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    cal_images(sample, labels, layers, output_dir, mode='random')
-    # TRACKS DISTRIBUTIONS
-    #from plots_DG import plot_tracks
-    #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
-    #processes = [mp.Process(target=plot_tracks, args=arg) for arg in arguments]
-    #for job in processes: job.start()
-    #for job in processes: job.join()
-    # SCALARS DISTRIBUTIONS
-    #from plots_DG import plot_scalars
-    #sample_trans = sample.copy()
-    #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
-    #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
-
-
 def NN_weights(image_shape, CNN_dict, FCN_neurons, n_classes):
     kernels = np.array(CNN_dict[image_shape]['kernels']); n_maps = CNN_dict[image_shape]['maps']
     K = [image_shape[2] if len(image_shape)==3 else 1] + n_maps + FCN_neurons + [n_classes]
@@ -575,7 +631,7 @@ def order_kernels(image_shape, n_maps, FCN_neurons, n_classes):
     return sorted(par_tuple)[::-1]
 
 
-def print_channels(sample, col, reverse=False):
+def print_channels(sample, col=0, reverse=False):
     def getkey(item): return item[col]
     channel_dict= {301535:'Z -> ee+y 10-35'   , 301536:'Z -> mumu+y 10-35', 301899:'Z -> ee+y 35-70'   ,
                    301900:'Z -> ee+y 70-140'  , 301901:'Z -> ee+y 140'    , 301902:'Z -> mumu+y 35-70' ,
@@ -598,6 +654,28 @@ def print_channels(sample, col, reverse=False):
     channels = sample['mcChannelNumber']; headers = ['Channel', 'Process', 'Number']
     channels = sorted([[n, channel_dict[n], int(np.sum(channels==n))] for n in set(channels)], key=getkey)
     print(tabulate(channels[::-1] if reverse else channels, headers=headers, tablefmt='psql'))
+
+
+def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
+    for key in sample: print(key, sample[key].shape)
+    sys.exit()
+    verify_sample(sample); sys.exit()
+    # CALORIMETER IMAGES
+    from plots_DG import cal_images
+    layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
+              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+    cal_images(sample, labels, layers, output_dir, mode='random')
+    # TRACKS DISTRIBUTIONS
+    #from plots_DG import plot_tracks
+    #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
+    #processes = [mp.Process(target=plot_tracks, args=arg) for arg in arguments]
+    #for job in processes: job.start()
+    #for job in processes: job.join()
+    # SCALARS DISTRIBUTIONS
+    #from plots_DG import plot_scalars
+    #sample_trans = sample.copy()
+    #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
+    #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
 
 
