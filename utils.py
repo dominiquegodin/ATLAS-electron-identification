@@ -67,6 +67,18 @@ def get_bin_indices(p_var,boundaries):
 
     return bin_indices
 
+def getMaxContents(binContents):
+
+    maxContents = np.full(len(binContents[0]),-1.)
+    for i_bin in range(len(binContents[0])):
+        for i in range(len(binContents)): 
+            if binContents[i][i_bin] > maxContents[i_bin]: maxContents[i_bin] = binContents[i][i_bin]
+            pass
+        pass
+    #print("maxContens=",maxContents)
+
+    return maxContents
+
 #def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
 def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='outputs/',ref_var='pt'):
     if weight_type=="none": return None
@@ -104,6 +116,10 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
     weights=list() #KM: currently implemented for the 2-class case only
     if weight_type=="flattening":
         for i in range(nClass): weights.append(np.average(binContents[i])/binContents[i] )
+    elif weight_type=="match2max": #shaping to whichever that has max in the corresponding bin
+        #for i in range(nClass): print("bincontens[",i,"]=",binContents[i])
+        maxContents = getMaxContents(binContents)#print(maxContents)
+        for i in range(nClass): weights.append( maxContents/binContents[i] )
     elif weight_type=="match2b": #shaping sig to match the bkg, using pt,or any other designated variable
         for i in range(nClass-1): weights.append(binContents[nClass-1]/binContents[i])
         weights.append(np.ones(len(binContents[5])))

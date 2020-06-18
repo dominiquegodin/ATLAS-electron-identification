@@ -51,7 +51,7 @@ args = parser.parse_args()
 
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b', 'none']:
+if args.weight_type not in ['flattening', 'match2s', 'match2b', 'match2max', 'none']:
     print('\nweight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
@@ -178,8 +178,8 @@ if args.n_epochs > 0:
     var_histogram(train_sample, train_labels, sample_weight, args.output_dir, 'train')
     var_histogram(valid_sample, valid_labels, None         , args.output_dir, 'valid')
     '''
-    sample_weight = upsampling(train_sample, train_labels)[-1]
-    #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
+    #sample_weight = upsampling(train_sample, train_labels)[-1]
+    sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
     if args.scaling:
         if args.model_in == '':
