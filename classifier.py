@@ -45,6 +45,7 @@ parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
 parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
+parser.add_argument( '--runDiffPlots', default = 0, type = int       )
 args = parser.parse_args()
 
 
@@ -97,9 +98,17 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
-if os.path.isfile(args.output_dir+'/'+args.results_in):
+if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     variables = {'others':others, 'scalars':scalars, 'images':[]}
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, variables)
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, variables,differential=args.runDiffPlots)
+elif args.results_in !='':
+    print ()
+    print ("option [--results_in] was given but no matching file found in the right path, aborting..")
+    print("reults_in file=",args.output_dir+'/'+args.results_in)
+    print ()
+    sys.exit()
+    pass
+
 if args.results_in != '': sys.exit()
 
 
@@ -185,7 +194,7 @@ if args.n_folds > 1:
 else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting)
+valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting, differential=args.runDiffPlots)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and args.valid_cuts == '': valid_data = (valid_probs,)

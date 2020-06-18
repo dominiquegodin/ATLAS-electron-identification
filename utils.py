@@ -186,7 +186,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def validation(output_dir, results_in, plotting, n_valid, data_file, variables, valid_cuts=''):
+def validation(output_dir, results_in, plotting, n_valid, data_file, variables, valid_cuts='',differential=False):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
@@ -210,7 +210,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
     print(text_line(len(labels)) if len(labels) < n_e else '', '\n')
-    valid_results(sample, labels, probs, [], None, output_dir, plotting)
+    valid_results(sample, labels, probs, [], None, output_dir, plotting, differential=differential)
 
 
 def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_', process=False):
