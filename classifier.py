@@ -153,12 +153,6 @@ if args.model_in != '':
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
 
-for key in valid_sample: print(key,valid_sample[key].shape)
-print( np.mean(valid_sample['tracks_image'][:,:,0],axis=1)[:5])
-print( valid_sample['p_mean_efrac'][:10])
-sys.exit()
-
-
 # TRAINING LOOP
 if args.n_epochs > 0:
     print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
