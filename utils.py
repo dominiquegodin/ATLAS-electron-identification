@@ -67,6 +67,18 @@ def get_bin_indices(p_var,boundaries):
 
     return bin_indices
 
+def getMaxContents(binContents):
+
+    maxContents = np.full(len(binContents[0]),-1.)
+    for i_bin in range(len(binContents[0])):
+        for i in range(len(binContents)): 
+            if binContents[i][i_bin] > maxContents[i_bin]: maxContents[i_bin] = binContents[i][i_bin]
+            pass
+        pass
+    #print("maxContens=",maxContents)
+
+    return maxContents
+
 #def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
 def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='outputs/',ref_var='pt'):
     if weight_type=="none": return None
@@ -104,6 +116,10 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
     weights=list() #KM: currently implemented for the 2-class case only
     if weight_type=="flattening":
         for i in range(nClass): weights.append(np.average(binContents[i])/binContents[i] )
+    elif weight_type=="match2max": #shaping to whichever that has max in the corresponding bin
+        #for i in range(nClass): print("bincontens[",i,"]=",binContents[i])
+        maxContents = getMaxContents(binContents)#print(maxContents)
+        for i in range(nClass): weights.append( maxContents/binContents[i] )
     elif weight_type=="match2b": #shaping sig to match the bkg, using pt,or any other designated variable
         for i in range(nClass-1): weights.append(binContents[nClass-1]/binContents[i])
         weights.append(np.ones(len(binContents[5])))
@@ -272,7 +288,8 @@ def class_weights(labels, bkg_ratio):
     return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
-def validation(output_dir, results_in, plotting, n_valid, data_file, variables, valid_cuts=''):
+def validation(output_dir, results_in, plotting, n_valid, data_file, variables, valid_cuts='',differential=False):
+
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
@@ -296,7 +313,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
     print(text_line(len(labels)) if len(labels) < n_e else '', '\n')
-    valid_results(sample, labels, probs, [], None, output_dir, plotting)
+    valid_results(sample, labels, probs, [], None, output_dir, plotting, differential=differential)
 
 
 def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_', process=False):
