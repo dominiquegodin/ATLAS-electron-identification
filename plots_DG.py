@@ -45,14 +45,14 @@ def plot_history(history, output_dir, key='accuracy'):
 
 def var_histogram(sample, labels, weights, output_dir, name, variable='p_et_calo'):
     bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
-    var  = sample[variable]; sig = var[labels==0]; bkg = var[labels==1]
+    var  = sample[variable]; sig = var[labels==0]; bkg = var[labels!=0]
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     if weights is None:
         sig_weights = len(sig)*[100/len(var)]
         bkg_weights = len(bkg)*[100/len(var)]
     else:
         sig_weights = 100*weights[labels==0]/len(var)
-        bkg_weights = 100*weights[labels==1]/len(var)
+        bkg_weights = 100*weights[labels!=0]/len(var)
     hs = pylab.hist(sig, bins, label='signal'    , histtype='step', weights=sig_weights, lw=2)[0]
     hb = pylab.hist(bkg, bins, label='background', histtype='step', weights=bkg_weights, lw=2)[0]
     pylab.xlim(bins[0],bins[-1]); plt.xticks(np.arange(0,bins[-1]+1,step=100))

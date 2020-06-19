@@ -5,8 +5,8 @@ from   argparse   import ArgumentParser
 from   tabulate   import tabulate
 from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
-from   utils      import balance_sample, compo_matrix, class_weights, cross_valid, valid_results
-from   utils      import sample_analysis, sample_weights, downsampling, upsampling, match_samples
+from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
+from   utils      import sample_weights, downsampling, balance_sample, match_distributions
 from   models     import multi_CNN
 
 
@@ -33,7 +33,6 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
-parser.add_argument( '--resampling'  , default = 'OFF'               )
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
@@ -51,7 +50,7 @@ args = parser.parse_args()
 
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b', 'match2max', 'none']:
+if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max', 'none']:
     print('\nweight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
@@ -65,6 +64,7 @@ for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')
 data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
 #data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 if args.data_file != '': data_file= args.data_file
+#for key, val in h5py.File(data_file, 'r').items(): print(key, val.shape)
 
 
 # CNN PARAMETERS
@@ -82,7 +82,7 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 scalars  += ['p_eta'   , 'p_et_calo']
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
-#others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
+others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
@@ -100,15 +100,11 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     variables = {'others':others, 'scalars':scalars, 'images':[]}
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, variables,differential=args.runDiffPlots)
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
+               data_file, variables, args.runDiffPlots)
 elif args.results_in !='':
-    print ()
-    print ("option [--results_in] was given but no matching file found in the right path, aborting..")
-    print("reults_in file=",args.output_dir+'/'+args.results_in)
-    print ()
-    sys.exit()
-    pass
-
+    print("\noption [--results_in] was given but no matching file found in the right path, aborting..")
+    print("results_in file =", args.output_dir+'/'+args.results_in, '\n')
 if args.results_in != '': sys.exit()
 
 
@@ -157,6 +153,12 @@ if args.model_in != '':
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
 
+for key in valid_sample: print(key,valid_sample[key].shape)
+print( np.mean(valid_sample['tracks_image'][:,:,0],axis=1)[:5])
+print( valid_sample['p_mean_efrac'][:10])
+sys.exit()
+
+
 # TRAINING LOOP
 if args.n_epochs > 0:
     print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
@@ -169,18 +171,17 @@ if args.n_epochs > 0:
     func_args = (data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
     '''
-    valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels, bkg_ratio=2)
-    train_sample = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
-    train_labels = np.concatenate([train_labels, extra_labels])
-    train_sample, train_labels, sample_weight = match_samples(train_sample, train_labels, valid_sample, valid_labels)
-    train_sample, train_labels, sample_weight = upsampling(train_sample, train_labels, 'bkg_ratio', bkg_ratio=1)
+    valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
+    train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
+    train_labels  = np.concatenate([train_labels, extra_labels])
+    sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
+    train_sample, train_labels, sample_weight = balance_sample(train_sample, train_labels, 'bkg_ratio')
     from plots_DG import var_histogram
     var_histogram(train_sample, train_labels, sample_weight, args.output_dir, 'train')
     var_histogram(valid_sample, valid_labels, None         , args.output_dir, 'valid')
     '''
-    #sample_weight = upsampling(train_sample, train_labels)[-1]
+    #sample_weight = balance_sample(train_sample, train_labels, args.weight_type)[-1]
     sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
-    if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
     if args.scaling:
         if args.model_in == '':
             scaler_out = args.output_dir+'/'+args.scaler_out
@@ -205,7 +206,8 @@ if args.n_folds > 1:
 else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting, differential=args.runDiffPlots)
+valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
+              args.output_dir, args.plotting, args.runDiffPlots)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
