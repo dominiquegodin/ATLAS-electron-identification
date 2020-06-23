@@ -33,6 +33,7 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
+parser.add_argument( '--endcap'      , default = 'OFF'               )
 parser.add_argument( '--resampling'  , default = 'OFF'               )
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
@@ -79,10 +80,16 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
 #scalars  += ['p_eta'   , 'p_et_calo']
-others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
+others    = ['mcChannelNumber', 'eventNumber', 'p_truthType', 'p_iffTruth'   , 'p_truthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
+if args.endcap == 'ON':
+    images = ['em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3'    ,
+              'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3'    ]
+    scalars.remove('p_qd0Sig')
+    scalars.remove('p_sct_weight_charge')
 #others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
-train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
+train_var = {'images' :images  if args.images =='ON' else [],
+             'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 

@@ -236,7 +236,7 @@ def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_',
 
 
 def make_labels(sample, n_classes):
-    MC_type, IFF_type = sample['p_TruthType'], sample['p_iffTruth']
+    MC_type, IFF_type = sample['p_truthType'], sample['p_iffTruth']
     if n_classes == 2:
         labels = np.where(IFF_type <= 1                               , -1, IFF_type)
         labels = np.where(IFF_type == 2                               ,  0, labels  )
@@ -297,7 +297,7 @@ def process_images(sample, image_list, n_tasks=16):
 
 
 def sample_composition(sample):
-    MC_type, IFF_type  = sample['p_TruthType']    , sample['p_iffTruth']
+    MC_type, IFF_type  = sample['p_truthType']    , sample['p_iffTruth']
     MC_list, IFF_list  = np.arange(max(MC_type)+1), np.arange(max(IFF_type)+1)
     ratios = np.array([ [np.sum(MC_type[IFF_type==IFF]==MC) for MC in MC_list] for IFF in IFF_list ])
     IFF_sum, MC_sum = 100*np.sum(ratios, axis=0)/len(MC_type), 100*np.sum(ratios, axis=1)/len(MC_type)
@@ -629,8 +629,8 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
                     'p_mean_sigmad0':12, 'p_qd0Sig'      :13, 'p_nTracks'     :14, 'p_sct_weight_charge':15}
         sample.update({key:tracks_list[:,tracks_dict[key]] for key in tracks_dict})
     for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
-    sample.update({'true_m':np.float16(get_truth_m(sample))})
-    for key in tracks + ['p_truth_E']: sample.pop(key)
+    #sample.update({'true_m':np.float16(get_truth_m(sample))}) #HACK for endcap sample which lacks p_truth_E var!
+    for key in tracks: sample.pop(key)
     with h5py.File(output_path+'temp_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
         for key in sample:
             shape = (sum_e+batch_size,) + sample[key].shape[1:]

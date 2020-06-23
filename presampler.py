@@ -53,10 +53,14 @@ integers = ['p_TruthType'     , 'p_iffTruth'      , 'p_nTracks'       , 'mcChann
             'p_LHTight'       , 'p_LHMedium'      , 'p_LHLoose'       , 'p_numberOfSCTHits', 'p_charge'   ,
             'p_TruthOrigin'   , 'p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin'                  ]
 
-if args.endcap != 'OFF':
-      images = ['em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3'    ,
+if args.endcap == 'ON':
+    images  = ['em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3'    ,
               'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3'    ]
-      tracks = []
+    tracks  = []
+    scalars.remove('p_truth_E')
+    integers = [i.replace('p_TruthType'  ,'p_truthType')   for i in integers]
+    integers = [i.replace('p_TruthOrigin','p_truthOrigin') for i in integers]
+
 
 # REMOVING TEMPORARY FILES (if any)
 temp_files = [h5_file for h5_file in os.listdir(output_path) if 'temp' in h5_file]
