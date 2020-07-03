@@ -85,8 +85,9 @@ others    = ['mcChannelNumber', 'eventNumber', 'p_truthType', 'p_iffTruth'   , '
 if args.endcap == 'ON':
     images = ['em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3'    ,
               'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3'    ]
-    scalars.remove('p_qd0Sig')
-    scalars.remove('p_sct_weight_charge')
+else: images.remove('tracks_image')
+scalars.remove('p_qd0Sig')
+scalars.remove('p_sct_weight_charge')
 #others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
 train_var = {'images' :images  if args.images =='ON' else [],
              'tracks':[],

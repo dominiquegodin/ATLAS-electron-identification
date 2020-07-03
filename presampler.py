@@ -56,10 +56,12 @@ integers = ['p_TruthType'     , 'p_iffTruth'      , 'p_nTracks'       , 'mcChann
 if args.endcap == 'ON':
     images  = ['em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3'    ,
               'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3'    ]
-    tracks  = []
-    scalars.remove('p_truth_E')
-    integers = [i.replace('p_TruthType'  ,'p_truthType')   for i in integers]
-    integers = [i.replace('p_TruthOrigin','p_truthOrigin') for i in integers]
+
+# TESTING FOR NEW FILE TYPE "2020-05-08"
+tracks  = []
+scalars.remove('p_truth_E')
+integers = [i.replace('p_TruthType'  ,'p_truthType')   for i in integers]
+integers = [i.replace('p_TruthOrigin','p_truthOrigin') for i in integers]
 
 
 # REMOVING TEMPORARY FILES (if any)
