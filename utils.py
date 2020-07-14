@@ -5,6 +5,7 @@ from   tabulate   import tabulate
 from   skimage    import transform
 from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
 from   plots_KM   import plot_distributions_KM, differential_plots
+rdm = np.random
 
 
 def find_bin(array,binning):
@@ -676,12 +677,14 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
-def permutation_importance(model, valid_sample, valid_probs, feats, n_rep=1):
+def permutation_importance(model, valid_sample, labels, valid_probs, feats, n_rep=1):
     bkg_rej =  np.empty((n_rep,len(feats)))
     for k in range(n_rep):
+        print('PERMUTATION' + str(k))
         probs = dict()
         i = 0
         for feat in feats :
+            print('PERMUTATION DE : ' + feat)
             valid_shuffled = valid_sample.copy()
             if feat == 'full':
                 probs[feat] = valid_probs
