@@ -676,7 +676,37 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
+def permutation_importance(model, valid_sample, valid_probs, feats, n_rep=1):
+    bkg_rej =  np.empty((n_rep,len(feats)))
+    for k in range(n_rep):
+        probs = dict()
+        i = 0
+        for feat in feats :
+            valid_shuffled = valid_sample.copy()
+            if feat == 'full':
+                probs[feat] = valid_probs
+            else:
+                rdm.shuffle(valid_shuffled[feat])                                           # shuffling of one feature
+                probs[feat] = model.predict(valid_shuffled, batch_size=20000, verbose=1)    # prediction with only one feature shuffled
 
+            fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
+            bkg_rej[k,i] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+            i += 1
+            importance = bkg_rej[k,0] / bkg_rej[k:] - 1
+            importances_mean = np.mean(importance,0)
+            importances_std = np.std(importance,0)
+    return importances_mean, importances_std
+
+def plot_importances(feats, importances_mean, importances_std=0, path='outputs/feat_importances.png'):
+    N = len(feats)
+    ind = np.arange(N)    # the y locations for the groups
+    width = 0.35       # the width of the bars: can also be len(y) sequence
+
+    plt.barh(ind, width, importances_mean, ticks_label=feats, xerr=importances_std)
+    plt.title('Feature importances')
+    plt.xticks(np.linspace(0, 1.10 * importances.amax, 10))
+
+    plt.savefig(path)
 
 
 #################################################################################
