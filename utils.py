@@ -677,7 +677,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
-def permutation_importance(model, valid_sample, labels, valid_probs, feats, n_rep=1):
+def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1):
     bkg_rej =  np.empty((n_rep,len(feats)))
     for k in range(n_rep):
         print('PERMUTATION' + str(k))
