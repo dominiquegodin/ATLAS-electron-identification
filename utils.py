@@ -727,19 +727,6 @@ def plot_importances(results, path='outputs/feat_importances.png'):
     ax.savefig(path)
     return fig, ax
 
-
-def plot_importances(feats, importances_mean, importances_std=0, path='outputs/feat_importances.png'):
-    N = len(feats)
-    ind = np.arange(N)    # the y locations for the groups
-    width = 0.35       # the width of the bars: can also be len(y) sequence
-
-    plt.barh(ind, width, importances_mean, ticks_label=feats, xerr=importances_std)
-    plt.title('Feature importances')
-    plt.xticks(np.linspace(0, 1.10 * importances.amax, 10))
-
-    plt.savefig(path)
-
-
 #################################################################################
 #####    presampler.py functions    #############################################
 #################################################################################
