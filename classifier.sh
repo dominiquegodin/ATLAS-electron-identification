@@ -1,6 +1,6 @@
 # Feature importance test
 python classifier.py  --n_train=10  --n_valid=10  --batch_size=5  --n_epochs=0 --plotting=ON --output_dir=tests \
-		      --model_in=model.h5
+		      --model_in=../pre_trained/model.h5
 
 exit
 
