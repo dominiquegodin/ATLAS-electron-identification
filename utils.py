@@ -724,7 +724,7 @@ def plot_importances(results, path='outputs/feat_importances.png'):
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(int(c)), ha='center', va='center',
                     color=text_color)
-    ax.savefig(path)
+    plt.savefig(path)
     return fig, ax
 
 #################################################################################
