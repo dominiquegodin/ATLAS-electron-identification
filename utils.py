@@ -72,7 +72,7 @@ def getMaxContents(binContents):
 
     maxContents = np.full(len(binContents[0]),-1.)
     for i_bin in range(len(binContents[0])):
-        for i in range(len(binContents)): 
+        for i in range(len(binContents)):
             if binContents[i][i_bin] > maxContents[i_bin]: maxContents[i_bin] = binContents[i][i_bin]
             pass
         pass
@@ -131,11 +131,11 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 
     #KM: to replce inf with 0
     for i in range(nClass): weights[i]=np.where(weights[i]==np.inf,0,weights[i]) #np.where(array1==0, 1, array1)
-        
+
     debug=0
     if debug:
         tmp_i=0
-        for weight in weights: 
+        for weight in weights:
             print("weights[",labels[tmp_i],"]=",weight)
             tmp_i+=1
         #print(weights[0])
@@ -168,7 +168,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
         print()
         #print(sig_weight,"\n", bkg_weight)
         tmp_i=0
-        for i in range(nClass): 
+        for i in range(nClass):
             print("class_weight[",tmp_i,"]=",class_weight[i])
             tmp_i+=1
             pass
@@ -684,13 +684,13 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
         probs = dict()
         bkg_rej =  np.empty(n_rep)
         if feat == 'full':
-            
+
             probs[feat] = valid_probs
             fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
             bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-        else:    
+        else:
             for k in range(n_rep):
-                print('PERMUTATION #' + str(k))
+                print('PERMUTATION #' + str(k+1))
                 valid_shuffled = valid_sample.copy()
                 rdm.shuffle(valid_shuffled[feat])                                           # shuffling of one feature
                 probs[feat] = model.predict(valid_shuffled, batch_size=20000, verbose=1)    # prediction with only one feature shuffled
@@ -699,7 +699,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
                 bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
                 importance = bkg_rej_full / bkg_rej - 1
             imp_dict[feat] = [np.mean(importance,0), np.std(importance,0)]
-            
+
     return imp_dict
 
 def plot_importances(results, path='outputs/feat_importances.png'):
