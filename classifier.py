@@ -7,7 +7,7 @@ from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
-from   utils      import permutation_importance, plot_importances
+from   utils      import feature_permutation, plot_importances
 from   models     import multi_CNN
 rdm = np.random
 
@@ -209,8 +209,8 @@ if args.results_out != '':
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
     else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
-    
+
 # FEATURE IMPORTANCE
 feats = ['full'] + images + scalars
-importances_mean, importances_std = feature_permutation(model, valid_sample, valid_probs, feats, n_rep=30)
-plot_importances(importances_mean, importances_std)
+results = feature_permutation(model, valid_sample, valid_probs, feats, n_rep=30)
+plot_importances(results)
