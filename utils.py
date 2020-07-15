@@ -678,27 +678,55 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
 def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1):
-    bkg_rej =  np.empty((n_rep,len(feats)))
-    for k in range(n_rep):
-        print('PERMUTATION' + str(k))
+    imp_dict = dict()
+    for feat in feats :
+        print('PERMUTATION DE : ' + feat)
         probs = dict()
-        i = 0
-        for feat in feats :
-            print('PERMUTATION DE : ' + feat)
-            valid_shuffled = valid_sample.copy()
-            if feat == 'full':
-                probs[feat] = valid_probs
-            else:
+        bkg_rej =  np.empty(n_rep)
+        if feat == 'full':
+            
+            probs[feat] = valid_probs
+            fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
+            bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+        else:    
+            for k in range(n_rep):
+                print('PERMUTATION #' + str(k))
+                valid_shuffled = valid_sample.copy()
                 rdm.shuffle(valid_shuffled[feat])                                           # shuffling of one feature
                 probs[feat] = model.predict(valid_shuffled, batch_size=20000, verbose=1)    # prediction with only one feature shuffled
 
-            fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
-            bkg_rej[k,i] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-            i += 1
-            importance = bkg_rej[k,0] / bkg_rej[k:] - 1
-            importances_mean = np.mean(importance,0)
-            importances_std = np.std(importance,0)
-    return importances_mean, importances_std
+                fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
+                bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+                importance = bkg_rej_full / bkg_rej - 1
+            imp_dict[feat] = [np.mean(importance,0), np.std(importance,0)]
+            
+    return imp_dict
+
+def plot_importances(results, path='outputs/feat_importances.png'):
+    labels = list(results.keys())
+    data = list()
+    error = list()
+    for key in results:
+        data.append(results[key][0])
+        error.append(results[key][1])
+    data = np.array(data)
+    error = np.array(error)
+
+    fig, ax = plt.subplots(figsize=(9.2, 5))
+    ax.invert_yaxis()
+    ax.xaxis.set_visible(False)
+
+    widths = data
+    ax.barh(labels, widths, height=0.5, xerr=error)
+    xcenters = widths / 2
+
+    text_color = 'white'
+    for y, (x, c) in enumerate(zip(xcenters, widths)):
+            ax.text(x, y, str(int(c)), ha='center', va='center',
+                    color=text_color)
+    ax.savefig(path)
+    return fig, ax
+
 
 def plot_importances(feats, importances_mean, importances_std=0, path='outputs/feat_importances.png'):
     N = len(feats)
