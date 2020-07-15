@@ -1,0 +1,389 @@
+Singularity: Invoking an interactive shell within container...
+
+[0m2020-07-15 20:40:08.595168: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libnvinfer.so.6
+2020-07-15 20:40:08.636717: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libnvinfer_plugin.so.6
+2020-07-15 20:40:10.343422: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
+2020-07-15 20:40:12.805963: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 0 with properties: 
+pciBusID: 0000:0a:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:12.806821: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 1 with properties: 
+pciBusID: 0000:0b:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:12.806895: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:12.807632: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 2 with properties: 
+pciBusID: 0000:41:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:12.807697: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:12.808437: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 3 with properties: 
+pciBusID: 0000:42:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:12.808467: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.1
+2020-07-15 20:40:12.808492: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10
+2020-07-15 20:40:12.824959: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10
+2020-07-15 20:40:12.831954: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10
+2020-07-15 20:40:12.866642: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10
+2020-07-15 20:40:12.873657: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10
+2020-07-15 20:40:12.873706: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-07-15 20:40:12.875506: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:12.876305: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:12.878721: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:12.879503: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:12.880237: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1697] Adding visible gpu devices: 0, 1, 2, 3
+2020-07-15 20:40:12.881155: I tensorflow/core/platform/cpu_feature_guard.cc:142] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2020-07-15 20:40:12.894122: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3399555000 Hz
+2020-07-15 20:40:12.897557: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x50d8f10 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-07-15 20:40:12.897619: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2020-07-15 20:40:13.136115: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.202607: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.218036: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x4f2fe90 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2020-07-15 20:40:13.218063: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): GeForce RTX 2080 Ti, Compute Capability 7.5
+2020-07-15 20:40:13.218070: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (1): GeForce RTX 2080 Ti, Compute Capability 7.5
+2020-07-15 20:40:13.218076: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (2): GeForce RTX 2080 Ti, Compute Capability 7.5
+2020-07-15 20:40:13.218081: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (3): GeForce RTX 2080 Ti, Compute Capability 7.5
+2020-07-15 20:40:13.219352: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 0 with properties: 
+pciBusID: 0000:0a:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:13.220194: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 1 with properties: 
+pciBusID: 0000:0b:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:13.220267: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.221051: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 2 with properties: 
+pciBusID: 0000:41:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:13.221124: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.221907: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1555] Found device 3 with properties: 
+pciBusID: 0000:42:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
+coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
+2020-07-15 20:40:13.221936: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.1
+2020-07-15 20:40:13.221945: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10
+2020-07-15 20:40:13.221975: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10
+2020-07-15 20:40:13.221988: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10
+2020-07-15 20:40:13.221999: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10
+2020-07-15 20:40:13.222016: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10
+2020-07-15 20:40:13.222025: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
+2020-07-15 20:40:13.223733: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.224567: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.227047: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.227882: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:13.228658: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1697] Adding visible gpu devices: 0, 1, 2, 3
+2020-07-15 20:40:13.249692: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.1
+2020-07-15 20:40:15.311170: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1096] Device interconnect StreamExecutor with strength 1 edge matrix:
+2020-07-15 20:40:15.311227: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1102]      0 1 2 3 
+2020-07-15 20:40:15.311238: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] 0:   N N N N 
+2020-07-15 20:40:15.311243: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] 1:   N N N N 
+2020-07-15 20:40:15.311248: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] 2:   N N N N 
+2020-07-15 20:40:15.311253: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] 3:   N N N N 
+2020-07-15 20:40:15.315038: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:15.315825: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:15.317395: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1241] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 10236 MB memory) -> physical GPU (device: 0, name: GeForce RTX 2080 Ti, pci bus id: 0000:0a:00.0, compute capability: 7.5)
+2020-07-15 20:40:15.318715: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1241] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:1 with 10236 MB memory) -> physical GPU (device: 1, name: GeForce RTX 2080 Ti, pci bus id: 0000:0b:00.0, compute capability: 7.5)
+2020-07-15 20:40:15.319334: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:15.320097: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1241] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:2 with 10236 MB memory) -> physical GPU (device: 2, name: GeForce RTX 2080 Ti, pci bus id: 0000:41:00.0, compute capability: 7.5)
+2020-07-15 20:40:15.320701: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:981] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2020-07-15 20:40:15.321513: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1241] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:3 with 10236 MB memory) -> physical GPU (device: 3, name: GeForce RTX 2080 Ti, pci bus id: 0000:42:00.0, compute capability: 7.5)
+
+NEURAL NETWORK ARCHITECTURE
+Model: "model"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to                     
+==================================================================================================
+em_barrel_Lr1_fine (InputLayer) [(None, 56, 11)]     0                                            
+__________________________________________________________________________________________________
+em_barrel_Lr0 (InputLayer)      [(None, 7, 11)]      0                                            
+__________________________________________________________________________________________________
+em_barrel_Lr1 (InputLayer)      [(None, 7, 11)]      0                                            
+__________________________________________________________________________________________________
+em_barrel_Lr2 (InputLayer)      [(None, 7, 11)]      0                                            
+__________________________________________________________________________________________________
+em_barrel_Lr3 (InputLayer)      [(None, 7, 11)]      0                                            
+__________________________________________________________________________________________________
+tile_barrel_Lr1 (InputLayer)    [(None, 7, 11)]      0                                            
+__________________________________________________________________________________________________
+tile_barrel_Lr2 (InputLayer)    [(None, 7, 11)]      0                                            
+__________________________________________________________________________________________________
+tile_barrel_Lr3 (InputLayer)    [(None, 7, 11)]      0                                            
+__________________________________________________________________________________________________
+reshape_7 (Reshape)             (None, 56, 11, 1)    0           em_barrel_Lr1_fine[0][0]         
+__________________________________________________________________________________________________
+reshape (Reshape)               (None, 7, 11, 1)     0           em_barrel_Lr0[0][0]              
+__________________________________________________________________________________________________
+reshape_1 (Reshape)             (None, 7, 11, 1)     0           em_barrel_Lr1[0][0]              
+__________________________________________________________________________________________________
+reshape_2 (Reshape)             (None, 7, 11, 1)     0           em_barrel_Lr2[0][0]              
+__________________________________________________________________________________________________
+reshape_3 (Reshape)             (None, 7, 11, 1)     0           em_barrel_Lr3[0][0]              
+__________________________________________________________________________________________________
+reshape_4 (Reshape)             (None, 7, 11, 1)     0           tile_barrel_Lr1[0][0]            
+__________________________________________________________________________________________________
+reshape_5 (Reshape)             (None, 7, 11, 1)     0           tile_barrel_Lr2[0][0]            
+__________________________________________________________________________________________________
+reshape_6 (Reshape)             (None, 7, 11, 1)     0           tile_barrel_Lr3[0][0]            
+__________________________________________________________________________________________________
+conv2d_2 (Conv2D)               (None, 54, 9, 200)   2000        reshape_7[0][0]                  
+__________________________________________________________________________________________________
+tracks_image (InputLayer)       [(None, 5, 13)]      0                                            
+__________________________________________________________________________________________________
+concatenate (Concatenate)       (None, 7, 11, 7)     0           reshape[0][0]                    
+                                                                 reshape_1[0][0]                  
+                                                                 reshape_2[0][0]                  
+                                                                 reshape_3[0][0]                  
+                                                                 reshape_4[0][0]                  
+                                                                 reshape_5[0][0]                  
+                                                                 reshape_6[0][0]                  
+__________________________________________________________________________________________________
+leaky_re_lu_2 (LeakyReLU)       (None, 54, 9, 200)   0           conv2d_2[0][0]                   
+__________________________________________________________________________________________________
+reshape_8 (Reshape)             (None, 5, 13, 1)     0           tracks_image[0][0]               
+__________________________________________________________________________________________________
+conv2d (Conv2D)                 (None, 6, 9, 200)    8600        concatenate[0][0]                
+__________________________________________________________________________________________________
+max_pooling2d (MaxPooling2D)    (None, 27, 5, 200)   0           leaky_re_lu_2[0][0]              
+__________________________________________________________________________________________________
+conv2d_4 (Conv2D)               (None, 5, 13, 200)   400         reshape_8[0][0]                  
+__________________________________________________________________________________________________
+leaky_re_lu (LeakyReLU)         (None, 6, 9, 200)    0           conv2d[0][0]                     
+__________________________________________________________________________________________________
+dropout_2 (Dropout)             (None, 27, 5, 200)   0           max_pooling2d[0][0]              
+__________________________________________________________________________________________________
+leaky_re_lu_4 (LeakyReLU)       (None, 5, 13, 200)   0           conv2d_4[0][0]                   
+__________________________________________________________________________________________________
+dropout (Dropout)               (None, 6, 9, 200)    0           leaky_re_lu[0][0]                
+__________________________________________________________________________________________________
+conv2d_3 (Conv2D)               (None, 25, 3, 200)   360200      dropout_2[0][0]                  
+__________________________________________________________________________________________________
+dropout_4 (Dropout)             (None, 5, 13, 200)   0           leaky_re_lu_4[0][0]              
+__________________________________________________________________________________________________
+conv2d_1 (Conv2D)               (None, 5, 7, 200)    240200      dropout[0][0]                    
+__________________________________________________________________________________________________
+leaky_re_lu_3 (LeakyReLU)       (None, 25, 3, 200)   0           conv2d_3[0][0]                   
+__________________________________________________________________________________________________
+conv2d_5 (Conv2D)               (None, 5, 13, 200)   40200       dropout_4[0][0]                  
+__________________________________________________________________________________________________
+leaky_re_lu_1 (LeakyReLU)       (None, 5, 7, 200)    0           conv2d_1[0][0]                   
+__________________________________________________________________________________________________
+max_pooling2d_1 (MaxPooling2D)  (None, 13, 2, 200)   0           leaky_re_lu_3[0][0]              
+__________________________________________________________________________________________________
+leaky_re_lu_5 (LeakyReLU)       (None, 5, 13, 200)   0           conv2d_5[0][0]                   
+__________________________________________________________________________________________________
+dropout_1 (Dropout)             (None, 5, 7, 200)    0           leaky_re_lu_1[0][0]              
+__________________________________________________________________________________________________
+dropout_3 (Dropout)             (None, 13, 2, 200)   0           max_pooling2d_1[0][0]            
+__________________________________________________________________________________________________
+dropout_5 (Dropout)             (None, 5, 13, 200)   0           leaky_re_lu_5[0][0]              
+__________________________________________________________________________________________________
+p_Eratio (InputLayer)           [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_Reta (InputLayer)             [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_Rhad (InputLayer)             [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_Rphi (InputLayer)             [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_TRTPID (InputLayer)           [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_numberOfSCTHits (InputLayer)  [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_ndof (InputLayer)             [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_dPOverP (InputLayer)          [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_deltaEta1 (InputLayer)        [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_f1 (InputLayer)               [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_f3 (InputLayer)               [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_deltaPhiRescaled2 (InputLayer [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_weta2 (InputLayer)            [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_d0 (InputLayer)               [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_d0Sig (InputLayer)            [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_qd0Sig (InputLayer)           [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_nTracks (InputLayer)          [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_sct_weight_charge (InputLayer [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_eta (InputLayer)              [(None,)]            0                                            
+__________________________________________________________________________________________________
+p_et_calo (InputLayer)          [(None,)]            0                                            
+__________________________________________________________________________________________________
+flatten (Flatten)               (None, 7000)         0           dropout_1[0][0]                  
+__________________________________________________________________________________________________
+flatten_1 (Flatten)             (None, 5200)         0           dropout_3[0][0]                  
+__________________________________________________________________________________________________
+flatten_2 (Flatten)             (None, 13000)        0           dropout_5[0][0]                  
+__________________________________________________________________________________________________
+flatten_3 (Flatten)             (None, 1)            0           p_Eratio[0][0]                   
+__________________________________________________________________________________________________
+flatten_4 (Flatten)             (None, 1)            0           p_Reta[0][0]                     
+__________________________________________________________________________________________________
+flatten_5 (Flatten)             (None, 1)            0           p_Rhad[0][0]                     
+__________________________________________________________________________________________________
+flatten_6 (Flatten)             (None, 1)            0           p_Rphi[0][0]                     
+__________________________________________________________________________________________________
+flatten_7 (Flatten)             (None, 1)            0           p_TRTPID[0][0]                   
+__________________________________________________________________________________________________
+flatten_8 (Flatten)             (None, 1)            0           p_numberOfSCTHits[0][0]          
+__________________________________________________________________________________________________
+flatten_9 (Flatten)             (None, 1)            0           p_ndof[0][0]                     
+__________________________________________________________________________________________________
+flatten_10 (Flatten)            (None, 1)            0           p_dPOverP[0][0]                  
+__________________________________________________________________________________________________
+flatten_11 (Flatten)            (None, 1)            0           p_deltaEta1[0][0]                
+__________________________________________________________________________________________________
+flatten_12 (Flatten)            (None, 1)            0           p_f1[0][0]                       
+__________________________________________________________________________________________________
+flatten_13 (Flatten)            (None, 1)            0           p_f3[0][0]                       
+__________________________________________________________________________________________________
+flatten_14 (Flatten)            (None, 1)            0           p_deltaPhiRescaled2[0][0]        
+__________________________________________________________________________________________________
+flatten_15 (Flatten)            (None, 1)            0           p_weta2[0][0]                    
+__________________________________________________________________________________________________
+flatten_16 (Flatten)            (None, 1)            0           p_d0[0][0]                       
+__________________________________________________________________________________________________
+flatten_17 (Flatten)            (None, 1)            0           p_d0Sig[0][0]                    
+__________________________________________________________________________________________________
+flatten_18 (Flatten)            (None, 1)            0           p_qd0Sig[0][0]                   
+__________________________________________________________________________________________________
+flatten_19 (Flatten)            (None, 1)            0           p_nTracks[0][0]                  
+__________________________________________________________________________________________________
+flatten_20 (Flatten)            (None, 1)            0           p_sct_weight_charge[0][0]        
+__________________________________________________________________________________________________
+flatten_21 (Flatten)            (None, 1)            0           p_eta[0][0]                      
+__________________________________________________________________________________________________
+flatten_22 (Flatten)            (None, 1)            0           p_et_calo[0][0]                  
+__________________________________________________________________________________________________
+concatenate_1 (Concatenate)     (None, 25220)        0           flatten[0][0]                    
+                                                                 flatten_1[0][0]                  
+                                                                 flatten_2[0][0]                  
+                                                                 flatten_3[0][0]                  
+                                                                 flatten_4[0][0]                  
+                                                                 flatten_5[0][0]                  
+                                                                 flatten_6[0][0]                  
+                                                                 flatten_7[0][0]                  
+                                                                 flatten_8[0][0]                  
+                                                                 flatten_9[0][0]                  
+                                                                 flatten_10[0][0]                 
+                                                                 flatten_11[0][0]                 
+                                                                 flatten_12[0][0]                 
+                                                                 flatten_13[0][0]                 
+                                                                 flatten_14[0][0]                 
+                                                                 flatten_15[0][0]                 
+                                                                 flatten_16[0][0]                 
+                                                                 flatten_17[0][0]                 
+                                                                 flatten_18[0][0]                 
+                                                                 flatten_19[0][0]                 
+                                                                 flatten_20[0][0]                 
+                                                                 flatten_21[0][0]                 
+                                                                 flatten_22[0][0]                 
+__________________________________________________________________________________________________
+dense (Dense)                   (None, 200)          5044200     concatenate_1[0][0]              
+__________________________________________________________________________________________________
+leaky_re_lu_6 (LeakyReLU)       (None, 200)          0           dense[0][0]                      
+__________________________________________________________________________________________________
+dropout_6 (Dropout)             (None, 200)          0           leaky_re_lu_6[0][0]              
+__________________________________________________________________________________________________
+dense_1 (Dense)                 (None, 200)          40200       dropout_6[0][0]                  
+__________________________________________________________________________________________________
+leaky_re_lu_7 (LeakyReLU)       (None, 200)          0           dense_1[0][0]                    
+__________________________________________________________________________________________________
+dropout_7 (Dropout)             (None, 200)          0           leaky_re_lu_7[0][0]              
+__________________________________________________________________________________________________
+dense_2 (Dense)                 (None, 2)            402         dropout_7[0][0]                  
+==================================================================================================
+Total params: 5,736,402
+Trainable params: 5,736,402
+Non-trainable params: 0
+__________________________________________________________________________________________________
+
+CNN ARCHITECTURES:
+(56, 11): {'maps': [200, 200], 'kernels': [(3, 3), (3, 3)], 'pools': [(2, 2), (2, 2)]}
+ (7, 11): {'maps': [200, 200], 'kernels': [(2, 3, 7), (2, 3, 1)], 'pools': [(1, 1, 1), (1, 1, 1)]}
+ (5, 13): {'maps': [200, 200], 'kernels': [(1, 1), (1, 1)], 'pools': [(1, 1), (1, 1)]}
+
+PROGRAM ARGUMENTS:
++--------------+--------------+
+| n_train      | [0, 10]      |
+| n_valid      | [10, 20]     |
+| batch_size   | 5            |
+| n_epochs     | 0            |
+| n_classes    | 2            |
+| n_tracks     | 5            |
+| bkg_ratio    | 2            |
+| n_folds      | 1            |
+| n_gpus       | 4            |
+| verbose      | 1            |
+| patience     | 10           |
+| sbatch_var   | 1            |
+| l2           | 1e-08        |
+| dropout      | 0.05         |
+| FCN_neurons  | [200, 200]   |
+| weight_type  | none         |
+| train_cuts   |              |
+| valid_cuts   |              |
+| NN_type      | CNN          |
+| images       | ON           |
+| scalars      | ON           |
+| scaling      | True         |
+| plotting     | ON           |
+| metrics      | val_accuracy |
+| data_file    |              |
+| output_dir   | tests        |
+| model_in     | model.h5     |
+| model_out    | model.h5     |
+| scaler_in    | scaler.pkl   |
+| scaler_out   | scaler.pkl   |
+| results_in   |              |
+| results_out  |              |
+| runDiffPlots | 0            |
++--------------+--------------+
+
+TRAINING VARIABLES:
++--------------------+---------------------+
+| images             | scalars             |
+|--------------------+---------------------|
+| em_barrel_Lr0      | p_Eratio            |
+| em_barrel_Lr1      | p_Reta              |
+| em_barrel_Lr2      | p_Rhad              |
+| em_barrel_Lr3      | p_Rphi              |
+| em_barrel_Lr1_fine | p_TRTPID            |
+| tile_barrel_Lr1    | p_numberOfSCTHits   |
+| tile_barrel_Lr2    | p_ndof              |
+| tile_barrel_Lr3    | p_dPOverP           |
+| tracks_image       | p_deltaEta1         |
+|                    | p_f1                |
+|                    | p_f3                |
+|                    | p_deltaPhiRescaled2 |
+|                    | p_weta2             |
+|                    | p_d0                |
+|                    | p_d0Sig             |
+|                    | p_qd0Sig            |
+|                    | p_nTracks           |
+|                    | p_sct_weight_charge |
+|                    | p_eta               |
+|                    | p_et_calo           |
++--------------------+---------------------+
+
+CLASSIFIER: loading valid sample [10, 20] ... ( 0.0  s)
+
+CLASSIFIER: loading pre-trained weights from tests/model.h5 
+
+Traceback (most recent call last):
+  File "classifier.py", line 154, in <module>
+    model.load_weights(args.output_dir+'/'+args.model_in)
+  File "/usr/local/lib/python3.6/dist-packages/tensorflow_core/python/keras/engine/training.py", line 234, in load_weights
+    return super(Model, self).load_weights(filepath, by_name, skip_mismatch)
+  File "/usr/local/lib/python3.6/dist-packages/tensorflow_core/python/keras/engine/network.py", line 1215, in load_weights
+    with h5py.File(filepath, 'r') as f:
+  File "/usr/local/lib/python3.6/dist-packages/h5py/_hl/files.py", line 408, in __init__
+    swmr=swmr)
+  File "/usr/local/lib/python3.6/dist-packages/h5py/_hl/files.py", line 173, in make_fid
+    fid = h5f.open(name, flags, fapl=fapl)
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 88, in h5py.h5f.open
+OSError: Unable to open file (unable to open file: name = 'tests/model.h5', errno = 2, error message = 'No such file or directory', flags = 0, o_flags = 0)
