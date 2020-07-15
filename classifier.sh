@@ -1,13 +1,6 @@
-# CROSS-VALIDATION TRAINING (array jobs)
-n_e=15e6; n_epochs=100; n_classes=2; n_tracks=5; n_folds=10; verbose=2; scalars=ON; images=ON; NN_type=CNN
-fold=$VAR; output_dir=outputs
-python classifier.py  --n_train=$n_e          --n_valid=0           --batch_size=5e3     --n_epochs=$n_epochs  \
-                      --n_classes=$n_classes  --n_tracks=$n_tracks  --verbose=$verbose   --dropout=0.05        \
-                      --images=$images        --scalars=$scalars    --NN_type=$NN_type   --weight_type='none'  \
-                      --train_cuts '(sample["eventNumber"]%'${n_folds}'!='$(($fold-1))')'                      \
-                      --valid_cuts '(sample["eventNumber"]%'${n_folds}'=='$(($fold-1))')'                      \
-                      --output_dir=$output_dir  --scaler_out scaler_${fold}.pkl --model_out model_${fold}.h5
-
+# Feature importance test
+python classifier.py  --n_train=10  --n_valid=10  --batch_size=5  --n_epochs=0 --plotting=ON --output_dir=tests \
+		      --model_in=model.h5
 
 exit
 
