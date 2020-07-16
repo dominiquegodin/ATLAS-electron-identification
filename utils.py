@@ -697,8 +697,8 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
                 probs[feat] = model.predict(valid_shuffled, batch_size=20000, verbose=1)    # prediction with only one feature shuffled
                 fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
                 bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-                importance = bkg_rej_full / bkg_rej - 1
-            imp_dict[feat] = [np.mean(importance,0), np.std(importance,0)]
+            importance = bkg_rej_full / bkg_rej - 1
+            imp_dict[feat] = [np.mean(importance), np.std(importance)]
 
     return imp_dict
 
@@ -712,12 +712,12 @@ def plot_importances(results, path='outputs/feat_importances.png'):
     data = np.array(data)
     error = np.array(error)
 
-    fig, ax = plt.subplots(figsize=(9.2, 5))
+    fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
     ax.xaxis.set_visible(False)
 
     widths = data
-    ax.barh(labels, widths, height=0.5, xerr=error)
+    ax.barh(labels, widths, height=0.75, xerr=error)
     xcenters = widths / 2
 
     text_color = 'white'
