@@ -212,5 +212,5 @@ if args.results_out != '':
 
 # FEATURE IMPORTANCE
 feats = ['full'] + images + scalars
-results = feature_permutation(model, valid_sample, valid_labels, valid_probs, feats, n_rep=25)
+results = feature_permutation(model, valid_sample, valid_labels, valid_probs, feats, n_rep=10)
 plot_importances(results)
