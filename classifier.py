@@ -47,6 +47,9 @@ parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
+parser.add_argument( '--featImp'     , default = 'OFF'               )
+parser.add_argument( '--n_reps'      , default = 10 , type = int     )
+parser.add_argument( '--impDir'      , default = 'outputs/feat_importances.png')
 args = parser.parse_args()
 
 
@@ -211,6 +214,7 @@ if args.results_out != '':
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
 # FEATURE IMPORTANCE
-feats = ['full'] + images + scalars
-results = feature_permutation(model, valid_sample, valid_labels, valid_probs, feats, n_rep=10)
-plot_importances(results)
+if args.featImp == 'ON':
+    feats = ['full'] + images + scalars
+    results = feature_permutation(model, valid_sample, valid_labels, valid_probs, feats, n_rep=args.n_reps)
+    plot_importances(results,args.impDir)

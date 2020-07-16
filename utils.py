@@ -702,7 +702,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
 
     return imp_dict
 
-def plot_importances(results, path='outputs/feat_importances.png'):
+def plot_importances(results, path):
     labels = list(results.keys())
     data = list()
     error = list()
