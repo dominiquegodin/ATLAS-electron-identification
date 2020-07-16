@@ -722,8 +722,8 @@ def plot_importances(results, path):
 
     text_color = 'white'
     for y, (x, c) in enumerate(zip(xcenters, widths)):
-            ax.text(x, y, str(int(c)), ha='center', va='center',
-                    color=text_color)
+            ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
+    plt.title('Feature importance')
     plt.savefig(path)
     return fig, ax
 
