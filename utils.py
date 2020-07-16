@@ -692,7 +692,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
         else:
             valid_shuffled = deepcopy(valid_sample)
             for k in range(n_rep):
-                print('PERMUTATION #' + str(k+1))
+                print('PERMUTATION' + feat + #' + str(k+1))
                 rdm.shuffle(valid_shuffled[feat])                                           # shuffling of one feature
                 probs[feat] = model.predict(valid_shuffled, batch_size=20000, verbose=1)    # prediction with only one feature shuffled
                 fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
