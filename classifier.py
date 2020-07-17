@@ -49,7 +49,8 @@ parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
 parser.add_argument( '--featImp'     , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10 , type = int     )
-parser.add_argument( '--impDir'      , default = 'outputs/feat_importances.png')
+parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
+parser.add_argument( '--impOut'      , default = 'importances'       )
 args = parser.parse_args()
 
 
@@ -217,4 +218,7 @@ if args.results_out != '':
 if args.featImp == 'ON':
     feats = ['full'] + images + scalars
     results = feature_permutation(model, valid_sample, valid_labels, valid_probs, feats, n_rep=args.n_reps)
-    plot_importances(results,args.impDir)
+    outfile = open(args.output_dir+'/'+args.impOut,'wb')
+    pickle.dump(dogs_dict,outfile)
+    outfile.close()
+    plot_importances(results,args.output_dir+'/'+args.impPlot)
