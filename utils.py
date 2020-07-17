@@ -703,29 +703,31 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
     return imp_dict
 
 def plot_importances(results, path):
-    labels = list(results.keys())
-    data = list()
-    error = list()
-    for key in results:
-        data.append(results[key][0])
-        error.append(results[key][1])
+    sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
+    labels = [tup[0] for tup in sortedResults]
+    data = [tup[1][0] for tup in sortedResults]
+    error = [tup[1][1] for tup in sortedResults]
+
     data = np.array(data)
     error = np.array(error)
 
     fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
-    ax.xaxis.set_visible(False)
 
     widths = data
-    ax.barh(labels, widths, height=0.75, xerr=error)
+    ax.barh(labels, widths, height=0.75, xerr=error, capsize=10)
     xcenters = widths / 2
 
     text_color = 'white'
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
+
     plt.title('Feature importance')
+    ax.set_xlabel(r'$\frac{bkg rej_(full)}{bkg\_rej} - 1$')
+    ax.set_ylabel('Features')
     plt.savefig(path)
     return fig, ax
+
 
 #################################################################################
 #####    presampler.py functions    #############################################
