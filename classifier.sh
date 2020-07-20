@@ -1,5 +1,6 @@
-# Feature importance test
-python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs --model_in=model.h5
+# Feature permutations importance
+python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/bkg_ratio_2d      \
+--model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON'
 
 exit
 
@@ -42,3 +43,7 @@ python classifier.py  --n_train=0           --n_valid=$n_e        --n_epochs=0  
 
 # USING VALIDATION RESULTS FOR PLOTTING
 python classifier.py  --n_valid=15e6  --output_dir=outputs  --results_in=valid_probs.pkl  --plotting=ON
+
+# FEATURE PERMUTATION IMPORTANCE
+python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/$REWEIGHTING     \
+--model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON'
