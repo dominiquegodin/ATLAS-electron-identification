@@ -1,5 +1,5 @@
 # Feature importance test
-python classifier.py  --n_epochs=0 --plotting=ON --output_dir=outputs --model_in=model.h5
+python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs --model_in=model.h5
 
 exit
 
