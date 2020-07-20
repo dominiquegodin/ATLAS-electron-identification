@@ -5,7 +5,6 @@ from   tabulate   import tabulate
 from   skimage    import transform
 from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
 from   plots_KM   import plot_distributions_KM, differential_plots
-from copy import deepcopy
 rdm = np.random
 
 
@@ -689,7 +688,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
             fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
             bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
         else:
-            valid_shuffled = deepcopy(valid_sample)
+            valid_shuffled = valid_sample.copy()
             for k in range(n_rep):
                 print('PERMUTATION DE ' + feat + " " + str(k+1))
                 rdm.shuffle(valid_shuffled[feat])                                           # shuffling of one feature
