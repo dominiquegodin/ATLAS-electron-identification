@@ -685,24 +685,23 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1
         probs = dict()
         bkg_rej =  np.empty(n_rep)
         if feat == 'full':
-
             probs[feat] = valid_probs
             fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
             bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
         else:
             valid_shuffled = deepcopy(valid_sample)
             for k in range(n_rep):
-                print('PERMUTATION' + feat + #' + str(k+1))
+                print('PERMUTATION DE ' + feat + " " + str(k+1))
                 rdm.shuffle(valid_shuffled[feat])                                           # shuffling of one feature
                 probs[feat] = model.predict(valid_shuffled, batch_size=20000, verbose=1)    # prediction with only one feature shuffled
                 fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
                 bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-            importance = bkg_rej_full / bkg_rej - 1
+            importance = bkg_rej_full / bkg_rej
             imp_dict[feat] = [np.mean(importance), np.std(importance)]
 
     return imp_dict
 
-def plot_importances(results, path):
+def plot_importances(results, path, n_reps):
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
     labels = [tup[0] for tup in sortedResults]
     data = [tup[1][0] for tup in sortedResults]
@@ -722,8 +721,8 @@ def plot_importances(results, path):
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
 
-    plt.title('Feature importance')
-    ax.set_xlabel(r'$\frac{bkg rej_(full)}{bkg\_rej} - 1$')
+    plt.title('Feature permutations importance ({} repetitions)'.format(n_reps))
+    ax.set_xlabel(r'$\frac{bkg\_rej_full}{bkg\_rej}$')
     ax.set_ylabel('Features')
     plt.savefig(path)
     return fig, ax
