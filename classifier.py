@@ -50,7 +50,7 @@ parser.add_argument( '--runDiffPlots', default = 0, type = int       )
 parser.add_argument( '--featImp'     , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10 , type = int     )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
-parser.add_argument( '--impOut'      , default = 'importances'       )
+parser.add_argument( '--impOut'      , default = 'importances.pkl'       )
 args = parser.parse_args()
 
 
@@ -82,10 +82,12 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', 'em_barrel_Lr1_fine',
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
+#images = [images[i] for i in range(len(images)) if images[i] != images[args.images]]
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
 scalars  += ['p_eta'   , 'p_et_calo']
+#scalars = [scalars[i] for i in range(len(scalars)) if scalars[i] != scalars[args.scalars]]
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
@@ -214,11 +216,11 @@ if args.results_out != '':
     else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
-# FEATURE IMPORTANCE
+# FEATURE PERMUTATION IMPORTANCE
 if args.featImp == 'ON':
     feats = ['full'] + images + scalars
     results = feature_permutation(model, valid_sample, valid_labels, valid_probs, feats, n_rep=args.n_reps)
     outfile = open(args.output_dir+'/'+args.impOut,'wb')
-    pickle.dump(dogs_dict,outfile)
+    pickle.dump(results,outfile)
     outfile.close()
-    plot_importances(results,args.output_dir+'/'+args.impPlot)
+    plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
