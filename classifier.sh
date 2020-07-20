@@ -1,6 +1,6 @@
 # Feature permutations importance
 python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/bkg_ratio_2d      \
---model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON'
+                      --model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON'
 
 exit
 
@@ -13,7 +13,7 @@ exit
 # SINGLE TRAINING
 python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
                       --n_tracks=5    --l2=1e-8      --dropout=0.05    --verbose=2     --NN_type=CNN           \
-		      --plotting=ON   --weight_type=None --output_dir=outputs
+		                  --plotting=ON   --weight_type=None --output_dir=outputs
 
 
 # TRAINING (array jobs)
@@ -46,4 +46,4 @@ python classifier.py  --n_valid=15e6  --output_dir=outputs  --results_in=valid_p
 
 # FEATURE PERMUTATION IMPORTANCE
 python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/$REWEIGHTING     \
---model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON'
+                      --model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON'
