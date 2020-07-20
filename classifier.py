@@ -91,8 +91,8 @@ scalars  += ['p_eta'   , 'p_et_calo']
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
-train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
-             'scalars':scalars if args.scalars=='ON' else []}
+train_var = {'images' :images  if args.images !='OFF' else [], 'tracks':[],
+             'scalars':scalars if args.scalars!='OFF' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
