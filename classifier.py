@@ -49,6 +49,7 @@ parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
 parser.add_argument( '--featImp'     , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10 , type = int     )
+parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
 parser.add_argument( '--impOut'      , default = 'importances.pkl'       )
 args = parser.parse_args()
@@ -82,12 +83,12 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', 'em_barrel_Lr1_fine',
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
-#images = [images[i] for i in range(len(images)) if images[i] != images[args.images]]
+images = images[:args.images]+images[args.images+1:]                                                                    # Removes the specified image
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
 scalars  += ['p_eta'   , 'p_et_calo']
-#scalars = [scalars[i] for i in range(len(scalars)) if scalars[i] != scalars[args.scalars]]
+scalars = scalars[:args.scalars]+scalars[args.scalars+1:]                                                               # Removes the specified scalar
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
@@ -219,8 +220,10 @@ if args.results_out != '':
 # FEATURE PERMUTATION IMPORTANCE
 if args.featImp == 'ON':
     feats = ['full'] + images + scalars
-    results = feature_permutation(model, valid_sample, valid_labels, valid_probs, feats, n_rep=args.n_reps)
-    outfile = open(args.output_dir+'/'+args.impOut,'wb')
-    pickle.dump(results,outfile)
-    outfile.close()
-    plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
+
+    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
+    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+
+    feature_permutation(model, valid_sample, valid_labels, bkg_rej_full, feats[args.feat], n_rep=args.n_reps, args.output_dir+'/'+args.impOut)
+    #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
+    print_importances()
