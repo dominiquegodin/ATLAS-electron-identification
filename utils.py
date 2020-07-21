@@ -202,7 +202,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d', weighting=True):
+def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d', get_weights=True):
     if sampling_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max']:
         return sample, labels, None
     pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
@@ -229,7 +229,7 @@ def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d'
     elif sampling_type == 'match2max':
         total_sig = np.maximum(hist_sig, hist_bkg/bkg_ratio)
         total_bkg = np.maximum(hist_bkg, hist_sig*bkg_ratio)
-    if weighting:
+    if get_weights or hist != 'pt':
         weights_sig = total_sig/hist_sig * len(labels)/np.sum(total_sig+total_bkg)
         weights_bkg = total_bkg/hist_bkg * len(labels)/np.sum(total_sig+total_bkg)
         return sample, labels, np.where(labels==0, weights_sig[pt_ind,eta_ind], weights_bkg[pt_ind,eta_ind])
@@ -298,12 +298,12 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
     n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
-    if False or len(valid_data) == 1:
+    if True or len(valid_data) == 1: #add variables to the results
         print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
         sample, labels = make_sample(data_file, variables, n_valid, n_tracks=5, n_classes=probs.shape[1])
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    if False and len(valid_data) == 1:
+    if False: #save the added variables to the results file
         print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
         pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
@@ -314,7 +314,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     #valid_cuts = '(sample["p_et_calo"]  > 80)'
     cuts = n_e*[True] if valid_cuts == '' else eval(valid_cuts)
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
-    if True:
+    if False: #generate calorimeter images
         layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1_fine'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
                   'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
         from plots_DG import cal_images
