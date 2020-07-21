@@ -223,4 +223,4 @@ if args.featImp == 'ON':
     file = args.output_dir+'/'+args.impOut
     feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, file)
     #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
-    print_importances(file,[feat[i] for i in [0,2,9]] )
+    print_importances(file,[feats[i] for i in [0,2,9]] )
