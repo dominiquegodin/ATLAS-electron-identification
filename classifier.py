@@ -165,10 +165,11 @@ if args.n_epochs > 0:
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
     func_args = (args.data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
-    #valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
-    #train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
-    #train_labels  = np.concatenate([train_labels, extra_labels])
-    #sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
+    if False: #generate a different validation sample from training sample with downsampling
+        valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
+        train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
+        train_labels  = np.concatenate([train_labels, extra_labels])
+        sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
     sample_weight = balance_sample(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2d')[-1]
     #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     for var in ['pt','eta']:
@@ -203,5 +204,5 @@ valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
-    else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
+    else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))

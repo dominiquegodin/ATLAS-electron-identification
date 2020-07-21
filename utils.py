@@ -298,7 +298,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
     n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
-    if True or len(valid_data) == 1: #add variables to the results
+    if False or len(valid_data) == 1: #add variables to the results
         print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
         sample, labels = make_sample(data_file, variables, n_valid, n_tracks=5, n_classes=probs.shape[1])
         n_e = len(labels)
