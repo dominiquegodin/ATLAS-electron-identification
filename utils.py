@@ -698,12 +698,13 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, f
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(imp_tup, afp)
 
-def print_importances(file, feats):
+def print_importances(file):
     with open(file,'rb') as rfp:
         record = dict()
-        for feat in feats:
+        while True:
             try:
-                record[feat] = pickle.load(rfp)
+                imp = pickle.load(rfp)
+                record[imp[0]] = imp[1:]
             except EOFError:
                 break
     print(record)
