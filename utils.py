@@ -678,29 +678,33 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
-def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep=1):
-    imp_dict = dict()
-    for feat in feats :
-        print('PERMUTATION DE : ' + feat)
-        probs = dict()
-        bkg_rej =  np.empty(n_rep)
-        if feat == 'full':
-            probs[feat] = valid_probs
-            fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
-            bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-        else:
-            shuffled_sample = {key:value for (key,value) in valid_sample.items() if key != feat}
-            shuffled_sample[feat] = deepcopy(valid_sample[feat])
-            for k in range(n_rep):
-                print('PERMUTATION DE ' + feat + " " + str(k+1))
-                rdm.shuffle(shuffled_sample[feat])                                           # shuffling of one feature
-                probs[feat] = model.predict(shuffled_sample, batch_size=20000, verbose=1)    # prediction with only one feature shuffled
-                fpr, tpr, _ = metrics.roc_curve(labels, probs[feat][:,0], pos_label=0)
-                bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-            importance = bkg_rej_full / bkg_rej
-            imp_dict[feat] = [np.mean(importance), np.std(importance)]
+def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep=1,file):
+    print('PERMUTATION DE : ' + feat)
+    bkg_rej = np.empty(n_rep)
+    shuffled_sample = {key:value for (key,value) in valid_sample.items() if key != feat}
+    shuffled_sample[feat] = deepcopy(valid_sample[feat])                                    # Copy of the feature to be shuffled in order to keep valid_sample intact
 
-    return imp_dict
+    for k in range(n_rep):                                                                  # Reshuffling loop
+        print('PERMUTATION DE ' + feat + " " + str(k+1))
+        rdm.shuffle(shuffled_sample[feat])                                                  # Shuffling of one feature
+        probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
+        fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+        bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
+
+    importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+    imp_tup = feat, np.mean(importance), np.std(importance)
+    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
+        pickle.dump(imp_tup, afp)
+
+def print_importances(file, feats):
+    with open(file,'rb') as rfp:
+        record = dict()
+        for feat in feats:
+            try:
+                record[feat] = pickle.load(rfp)
+            except EOFError:
+                break
+    print(record)
 
 def plot_importances(results, path, n_reps):
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
