@@ -219,7 +219,7 @@ if args.results_out != '':
 
 # FEATURE PERMUTATION IMPORTANCE
 if args.featImp == 'ON':
-    feats = ['full'] + images + scalars
+    feats = images + scalars
     feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, args.output_dir+'/'+args.impOut)
     #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
     print_importances()
