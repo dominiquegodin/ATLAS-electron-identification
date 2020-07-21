@@ -43,24 +43,29 @@ def plot_history(history, output_dir, key='accuracy'):
     print('Saving training accuracy history to:', file_name, '\n'); plt.savefig(file_name)
 
 
-def var_histogram(sample, labels, weights, output_dir, name, variable='p_et_calo'):
-    bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
-    var  = sample[variable]; sig = var[labels==0]; bkg = var[labels==1]
+def var_histogram(sample, labels, weights, output_dir, prefix, var):
+    variable  = sample[var]; sig = variable[labels==0]; bkg = variable[labels!=0]
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+    if var == 'pt' :
+        bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
+        plt.xticks(np.arange(0,bins[-1]+1,step=100))
+    if var == 'eta':
+        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37]
+        plt.xticks(bins)
     if weights is None:
-        sig_weights = len(sig)*[100/len(var)]
-        bkg_weights = len(bkg)*[100/len(var)]
+        sig_weights = len(sig)*[100/len(variable)]
+        bkg_weights = len(bkg)*[100/len(variable)]
     else:
-        sig_weights = 100*weights[labels==0]/len(var)
-        bkg_weights = 100*weights[labels==1]/len(var)
+        sig_weights = 100*weights[labels==0]/len(variable)
+        bkg_weights = 100*weights[labels!=0]/len(variable)
     hs = pylab.hist(sig, bins, label='signal'    , histtype='step', weights=sig_weights, lw=2)[0]
     hb = pylab.hist(bkg, bins, label='background', histtype='step', weights=bkg_weights, lw=2)[0]
-    pylab.xlim(bins[0],bins[-1]); plt.xticks(np.arange(0,bins[-1]+1,step=100))
+    pylab.xlim(bins[0],bins[-1])
     axes.xaxis.set_minor_locator(FixedLocator(bins)) #axes.xaxis.set_minor_locator(AutoMinorLocator(10))
     step = 5; y_max = step*(max(np.append(hs,hb))//step+1)
     pylab.ylim(0, y_max); plt.yticks(np.arange(0, y_max+1, step))
     plt.xlabel('$p_t$ (GeV)', fontsize=25); plt.ylabel('Distribution (% per bin)', fontsize=25)
-    plt.legend(loc='upper right', fontsize=16); file_name = output_dir+'/'+str(variable)+'_'+name+'.png'
+    plt.legend(loc='upper right', fontsize=16); file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
     print('Saving test sample distributions to:', file_name); plt.savefig(file_name)
 
 
@@ -243,37 +248,47 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     print('Saving test sample ROC'+str(ROC_type)+' curve to:   ', file_name); plt.savefig(file_name)
 
 
-def combine_ROC_curves(output_dir, CNN_dict):
+def combine_ROC_curves(output_dir, cuts=''):
     import multiprocessing as mp, pickle
     from scipy.interpolate import make_interp_spline
     from utils import NN_weights
     def mp_roc(idx, output_dir, return_dict):
-        #result_file = output_dir+'/'+'class_0_vs_'+str(bkg_class)+'/'+'results_0_vs_'+str(bkg_class)+'.out'
-        #result_file = output_dir+'/'+str(idx)+'-tracks'+'/'+'results.pkl'
-        #result_file = output_dir+'/'+str(idx)+'_to_1'+'/'+'results.pkl'
         result_file = output_dir+'/'+'results_'+str(idx)+'.pkl'
         sample, labels, probs = pickle.load(open(result_file, 'rb'))
-        #cuts = sample["p_et_calo"] < 20
-        cuts = (sample["p_et_calo"] >= 0) & (sample["p_et_calo"] <= 100)
+        #cuts = (sample["p_et_calo"] >= 0) & (sample["p_et_calo"] <= 500)
+        if cuts == '': cuts = len(labels)*[True]
         sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
         fpr, tpr, threshold = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         LLH_fpr, LLH_tpr = LLH_rates(sample, labels)
         print('LOADING VALIDATION RESULTS FROM', result_file)
         return_dict[idx] = fpr, tpr, threshold, LLH_fpr, LLH_tpr
     manager  = mp.Manager(); return_dict = manager.dict()
-    idx_list = [1, 2, 3, 4, 5, 6]
-    #names    = ['no weight', 'match2s', 'flattening', 'no weight + ($p_t$,$\eta$)',
-    #            'match2s + ($p_t$,$\eta$)', 'flattening + ($p_t$,$\eta$)']
-    names    = ['even to none (upsampled)', 'even to maxbin (upsampled)', 'even to even (upsampled)',
-                'even to none (weighted)', 'even to maxbin (weighted)', 'even to even (weighted)']
-    #colors   = ['tab:blue', 'tab:blue', 'tab:blue', 'tab:orange', 'tab:orange', 'tab:orange']
-    colors   = ['tab:blue', 'tab:orange', 'tab:green', 'tab:blue', 'tab:orange', 'tab:green']
-    #lines    = ['-', '--', ':', '-', '--', ':']
-    lines    = ['-', '-', '-', '--', '--', '--']
-    var_name = '$r_{sig}:r_{bkg}$'
+    idx_list = [1, 2, 3, 4]
+    names    = ['no weight', 'flattening', 'match2s', 'match2max']
+    colors   = ['tab:blue', 'tab:orange', 'tab:green', 'tab:brown']
+    lines    = ['-', '-', '-', '-', '--', '--']
     processes = [mp.Process(target=mp_roc, args=(idx, output_dir, return_dict)) for idx in idx_list]
     for job in processes: job.start()
     for job in processes: job.join()
+    plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+    file_name = output_dir+'/'+'ROC_curve.png'
+    x_min = []; y_max = []
+    for n in np.arange(len(idx_list)):
+        fpr, tpr, threshold, LLH_fpr, LLH_tpr = return_dict[idx_list[n]]; len_0  = np.sum(fpr==0)
+        x_min += [min(60, 10*np.floor(10*LLH_tpr[0]))]
+        y_max += [100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min[-1]/100)[0]], 1/LLH_fpr[0])/100)]
+        plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color=colors[n], label=names[n], linestyle=lines[n], lw=2)
+        #label = str(bkg_class) if bkg_class != 0 else 'others'
+        #val   = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='class 0 vs '+label, lw=2)
+        #for LLH in zip(LLH_tpr, LLH_fpr): plt.scatter(100*LLH[0], 1/LLH[1], s=40, marker='o', c=val[0].get_color())
+    plt.xlim([min(x_min), 100]); plt.ylim([1, 250])  #plt.ylim([1, max(y_max)])
+    axes.xaxis.set_major_locator(MultipleLocator(10))
+    axes.yaxis.set_ticks( np.append([1], np.arange(50,300,50)) )
+    plt.xlabel('Signal Efficiency (%)',fontsize=25)
+    plt.ylabel('1/(Background Efficiency)',fontsize=25); #plt.yscale("log")
+    plt.legend(loc='upper right', fontsize=15, numpoints=3)
+    plt.savefig(file_name); sys.exit()
+    '''
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     file_name = output_dir+'/'+'ROC1_curve.png'
     for LLH_tpr in [0.7, 0.8, 0.9]:
@@ -288,38 +303,13 @@ def combine_ROC_curves(output_dir, CNN_dict):
         plt.plot(idx_array, spline(idx_array), label=format(100*LLH_tpr,'.0f')+'% sig. eff.', lw=2)
     plt.xlim([min(idx_list)-1, max(idx_list)+1])
     axes.xaxis.set_major_locator(MultipleLocator(1))
-    #plt.ylim([0, 1500])
-    #axes.yaxis.set_major_locator(MultipleLocator(100))
-    plt.ylim([0.9, 1.1])
-    axes.yaxis.set_major_locator(MultipleLocator(0.05))
-    #plt.xlabel('Maximum Number of Tracks',fontsize=25)
-    plt.xlabel('Ratio bkg/sig (for training)',fontsize=25)
+    plt.ylim([0, 1500])
+    axes.yaxis.set_major_locator(MultipleLocator(100))
+    plt.xlabel('Maximum Number of Tracks',fontsize=25)
     plt.ylabel('1/(Background Efficiency)',fontsize=25)
-    #plt.ylabel('1/(Bkg. Eff.) over Mean',fontsize=25)
     plt.legend(loc='lower center', fontsize=15, numpoints=3)
     plt.savefig(file_name)
-    plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
-    file_name = output_dir+'/'+'ROC2_curve.png'
-    x_min = []; y_max = []
-    for n in np.arange(len(idx_list)):
-        fpr, tpr, threshold, LLH_fpr, LLH_tpr = return_dict[idx_list[n]]; len_0  = np.sum(fpr==0)
-        x_min += [min(60, 10*np.floor(10*LLH_tpr[0]))]
-        y_max += [100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min[-1]/100)[0]], 1/LLH_fpr[0])/100)]
-        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color=colors[n], label=names[n],
-                       linestyle=lines[n], lw=2)
-        #label = str(bkg_class) if bkg_class != 0 else 'others'
-        #val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], label='class 0 vs '+label, lw=2)
-        #for LLH in zip(LLH_tpr, LLH_fpr):
-        #    plt.scatter(100*LLH[0], 1/LLH[1], s=40, marker='o', c=val[0].get_color())
-    plt.xlim([min(x_min), 100])
-    plt.ylim([1, 5000])  #plt.ylim([1, max(y_max)])
-    axes.xaxis.set_major_locator(MultipleLocator(10))
-    #axes.yaxis.set_major_locator(MultipleLocator(500))
-    axes.yaxis.set_ticks( np.append([1], np.arange(1000,5100,1000)) )
-    plt.xlabel('Signal Efficiency (%)',fontsize=25)
-    plt.ylabel('1/(Background Efficiency)',fontsize=25); #plt.yscale("log")
-    plt.legend(loc='upper right', fontsize=15, numpoints=3)
-    plt.savefig(file_name); sys.exit()
+    '''
 
 
 def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', soft=True):

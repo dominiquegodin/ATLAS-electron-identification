@@ -5,8 +5,9 @@ from   argparse   import ArgumentParser
 from   tabulate   import tabulate
 from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
-from   utils      import balance_sample, compo_matrix, class_weights, cross_valid, valid_results
-from   utils      import sample_analysis, sample_weights, downsampling, upsampling, match_samples
+from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
+from   utils      import sample_weights, downsampling, balance_sample, match_distributions
+from   plots_DG   import var_histogram
 from   models     import multi_CNN
 
 
@@ -23,7 +24,7 @@ parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
 parser.add_argument( '--patience'    , default =   10,  type = int   )
-parser.add_argument( '--sbatch_var'  , default =    1,  type = int   )
+parser.add_argument( '--sbatch_var'  , default =    0,  type = int   )
 parser.add_argument( '--l2'          , default = 1e-8,  type = float )
 parser.add_argument( '--dropout'     , default = 0.05,  type = float )
 parser.add_argument( '--FCN_neurons' , default = [200, 200], type = int, nargs='+')
@@ -33,7 +34,6 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
-parser.add_argument( '--resampling'  , default = 'OFF'               )
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
@@ -47,11 +47,13 @@ parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
 args = parser.parse_args()
+#from plots_DG import combine_ROC_curves
+#combine_ROC_curves(args.output_dir, CNN)
 
 
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['flattening', 'match2s', 'match2b', 'match2max', 'none']:
+if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max', 'none']:
     print('\nweight_type: \"',args.weight_type,'\" not recognized, resetting it to none!!!')
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
@@ -62,9 +64,9 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except FileExistsError: pass
-data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
-#data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
-if args.data_file != '': data_file= args.data_file
+if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+#if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
+#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 
 # CNN PARAMETERS
@@ -82,33 +84,29 @@ scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p
 scalars  += ['p_eta'   , 'p_et_calo']
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
-#others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
+others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars=='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
-sample_size  = len(h5py.File(data_file, 'r')['eventNumber'])
+sample_size  = len(h5py.File(args.data_file, 'r')['mcChannelNumber'])
 args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
 if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
-#args.valid_cuts += ' & (abs(sample["p_eta"] > 0.6)'
-#args.valid_cuts += ' & (sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
+#args.train_cuts += '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
+#args.valid_cuts += '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     variables = {'others':others, 'scalars':scalars, 'images':[]}
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_file, variables,differential=args.runDiffPlots)
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
+               args.data_file, variables, args.runDiffPlots)
 elif args.results_in !='':
-    print ()
-    print ("option [--results_in] was given but no matching file found in the right path, aborting..")
-    print("reults_in file=",args.output_dir+'/'+args.results_in)
-    print ()
-    sys.exit()
-    pass
-
+    print("\noption [--results_in] was given but no matching file found in the right path, aborting..")
+    print("results_in file =", args.output_dir+'/'+args.results_in, '\n')
 if args.results_in != '': sys.exit()
 
 
@@ -120,7 +118,7 @@ strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
 with strategy.scope():
     if tf.__version__ >= '2.1.0' and len(variables['images']) >= 1:
         tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
-    sample, _ = make_sample(data_file, variables, [0,1], args.n_tracks, args.n_classes)
+    sample, _ = make_sample(args.data_file, variables, [0,1], args.n_tracks, args.n_classes)
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
     model     = multi_CNN(*func_args, **train_var)
     print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
@@ -147,9 +145,8 @@ print(tabulate(table, headers=headers, tablefmt='psql')); print()
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
 print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
-func_args = (data_file, variables, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
+func_args = (args.data_file, variables, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
 valid_sample, valid_labels = make_sample(*func_args)
-valid_sample.update({'eta':valid_sample['p_eta'], 'pt':valid_sample['p_et_calo']})
 #sample_analysis(valid_sample, valid_labels, scalars, args.scaler_in, args.output_dir); sys.exit()
 if args.model_in != '':
     print('CLASSIFIER: loading pre-trained weights from', args.output_dir+'/'+args.model_in, '\n')
@@ -166,21 +163,17 @@ if args.n_epochs > 0:
     print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
     print([group for group in train_var if train_var[group] != [ ]])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
-    func_args = (data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
+    func_args = (args.data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
-    '''
-    valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels, bkg_ratio=2)
-    train_sample = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
-    train_labels = np.concatenate([train_labels, extra_labels])
-    train_sample, train_labels, sample_weight = match_samples(train_sample, train_labels, valid_sample, valid_labels)
-    train_sample, train_labels, sample_weight = upsampling(train_sample, train_labels, 'bkg_ratio', bkg_ratio=1)
-    from plots_DG import var_histogram
-    var_histogram(train_sample, train_labels, sample_weight, args.output_dir, 'train')
-    var_histogram(valid_sample, valid_labels, None         , args.output_dir, 'valid')
-    '''
-    #sample_weight = upsampling(train_sample, train_labels)[-1]
-    sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
-    if args.resampling == 'ON': train_sample, train_labels = balance_sample(train_sample, train_labels)
+    #valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
+    #train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
+    #train_labels  = np.concatenate([train_labels, extra_labels])
+    #sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
+    sample_weight = balance_sample(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2d')[-1]
+    #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
+    for var in ['pt','eta']:
+        var_histogram(valid_sample, valid_labels,     None     , args.output_dir, 'valid', var)
+        var_histogram(train_sample, train_labels, sample_weight, args.output_dir, 'train', var)
     if args.scaling:
         if args.model_in == '':
             scaler_out = args.output_dir+'/'+args.scaler_out
@@ -192,7 +185,7 @@ if args.n_epochs > 0:
     early_stop  = cb.EarlyStopping(patience=args.patience, restore_best_weights=True, monitor=args.metrics)
     training    = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
                              callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                             class_weight=class_weights(train_labels, bkg_ratio=args.bkg_ratio),
+                             #class_weight=class_weights(train_labels, bkg_ratio=args.bkg_ratio),
                              sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size) )
     model.load_weights(model_out)
 else: train_labels = []; training = None
@@ -205,7 +198,8 @@ if args.n_folds > 1:
 else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir, args.plotting, differential=args.runDiffPlots)
+valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
+              args.output_dir, args.plotting, args.runDiffPlots)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
