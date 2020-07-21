@@ -220,6 +220,7 @@ if args.results_out != '':
 # FEATURE PERMUTATION IMPORTANCE
 if args.featImp == 'ON':
     feats = images + scalars
-    feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, args.output_dir+'/'+args.impOut)
+    file = args.output_dir+'/'+args.impOut
+    feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, file)
     #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
-    print_importances()
+    print_importances(file,[feat[i] for i in [0,2,9]] )
