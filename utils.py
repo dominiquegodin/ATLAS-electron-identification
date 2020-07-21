@@ -681,6 +681,8 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
 def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, file):
     print('PERMUTATION DE : ' + feat)
     bkg_rej = np.empty(n_rep)
+    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
+    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
     shuffled_sample = {key:value for (key,value) in valid_sample.items() if key != feat}
     shuffled_sample[feat] = deepcopy(valid_sample[feat])                                    # Copy of the feature to be shuffled in order to keep valid_sample intact
 

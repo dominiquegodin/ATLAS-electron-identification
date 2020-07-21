@@ -220,10 +220,6 @@ if args.results_out != '':
 # FEATURE PERMUTATION IMPORTANCE
 if args.featImp == 'ON':
     feats = ['full'] + images + scalars
-
-    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
-    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-
-    feature_permutation(model, valid_sample, valid_labels, bkg_rej_full, feats[args.feat], args.n_reps, args.output_dir+'/'+args.impOut)
+    feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, args.output_dir+'/'+args.impOut)
     #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
     print_importances()
