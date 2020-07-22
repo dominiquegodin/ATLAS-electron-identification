@@ -36,6 +36,8 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
+parser.add_argument( '--rm_images'   , default = -1, type = int      )
+parser.add_argument( '--rm_scalars'  , default = -1, type = int      )
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
@@ -92,14 +94,13 @@ scalars  += ['p_eta'   , 'p_et_calo']
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
-feat = None
-i = args.images
-s = args.scalars
-if type(i) == int : images, feat = images[:i]+images[i+1:], images[i]                                                              # Removes the specified image
-elif type(s) == int : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                                        # Removes the specified scalar
-elif i == 'ON' and s == 'ON': feat = 'full'
-train_var = {'images' :images  if args.images !='OFF' else [], 'tracks':[],
-             'scalars':scalars if args.scalars!='OFF' else []}
+i = args.rm_images
+s = args.rm_scalars
+if i >= 0 : images, feat = images[:i]+images[i+1:], images[i]                                                              # Removes the specified image
+elif s >= 0 == int : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                                 # Removes the specified scalar
+elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
+train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
+             'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
@@ -220,7 +221,7 @@ if args.results_out != '':
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
 # FEATURE REMOVAL IMPORTANCE
-if feat != None:
+if i >= 0 or s >= 0:
     file = args.output_dir+'/'+args.impOut
     removal_bkg_rej(model,valid_probs,valid_labels,feat,file)
     print_importances(file)
