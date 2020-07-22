@@ -1,6 +1,6 @@
-# Feature removals importance (test)
-python classifier.py  --n_train=10  --n_valid=10  --batch_size=5  --n_epochs=5  --n_classes=2           \
-                      --verbose=2  --output_dir=tests --impOut='rImpTest.pkl' --rm_images=${VAR}
+# Feature permutations importance (array job)
+python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/mathch2s_2d     \
+                      --model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON' --feat=${VAR}
 
 exit
 
