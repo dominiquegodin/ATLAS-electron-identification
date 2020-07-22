@@ -1,8 +1,0 @@
-Singularity: Invoking an interactive shell within container...
-
-[0m2020-07-15 20:06:23.163108: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libnvinfer.so.6
-2020-07-15 20:06:23.207333: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libnvinfer_plugin.so.6
-Traceback (most recent call last):
-  File "classifier.py", line 10, in <module>
-    from   utils      import permutation_importance, plot_importances
-ImportError: cannot import name 'permutation_importance'
