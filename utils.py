@@ -729,7 +729,7 @@ def plot_importances(results, path, n_reps):
     data = [tup[1][0] for tup in sortedResults]
     try :
         error = [tup[1][1] for tup in sortedResults]
-    except
+    except:
         error = np.zeros(len(sortedResults))
 
     data = np.array(data)
