@@ -1,6 +1,6 @@
 # Feature removals importance (test)
 python classifier.py  --n_train=10  --n_valid=10  --batch_size=5  --n_epochs=5  --n_classes=2           \
-                      --n_tracks=5  --dropout=0.05   --verbose=2  --output_dir=tests --impOut='rImpTest.pkl'
+                      --verbose=2  --output_dir=tests --impOut='rImpTest.pkl' 
 
 exit
 
