@@ -1,6 +1,5 @@
 # Feature permutations importance (array job)
-python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/match2s_2d     \
-                      --model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON' --feat=${VAR}
+python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.pkl' --importances_out='outputs/2c_10m/match2s_2d/perm_imp.png'
 
 exit
 
