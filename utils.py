@@ -5,6 +5,8 @@ from   tabulate   import tabulate
 from   skimage    import transform
 from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
 from   plots_KM   import plot_distributions_KM, differential_plots
+from   copy       import deepcopy
+rdm = np.random
 
 
 def find_bin(array,binning):
@@ -71,7 +73,7 @@ def getMaxContents(binContents):
 
     maxContents = np.full(len(binContents[0]),-1.)
     for i_bin in range(len(binContents[0])):
-        for i in range(len(binContents)): 
+        for i in range(len(binContents)):
             if binContents[i][i_bin] > maxContents[i_bin]: maxContents[i_bin] = binContents[i][i_bin]
             pass
         pass
@@ -130,11 +132,11 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 
     #KM: to replce inf with 0
     for i in range(nClass): weights[i]=np.where(weights[i]==np.inf,0,weights[i]) #np.where(array1==0, 1, array1)
-        
+
     debug=0
     if debug:
         tmp_i=0
-        for weight in weights: 
+        for weight in weights:
             print("weights[",labels[tmp_i],"]=",weight)
             tmp_i+=1
         #print(weights[0])
@@ -167,7 +169,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
         print()
         #print(sig_weight,"\n", bkg_weight)
         tmp_i=0
-        for i in range(nClass): 
+        for i in range(nClass):
             print("class_weight[",tmp_i,"]=",class_weight[i])
             tmp_i+=1
             pass
@@ -689,7 +691,63 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
+def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, file):
+    print('PERMUTATION DE : ' + feat)
+    bkg_rej = np.empty(n_rep)
+    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
+    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+    shuffled_sample = {key:value for (key,value) in valid_sample.items() if key != feat}
+    shuffled_sample[feat] = deepcopy(valid_sample[feat])                                    # Copy of the feature to be shuffled in order to keep valid_sample intact
 
+    for k in range(n_rep):                                                                  # Reshuffling loop
+        print('PERMUTATION DE ' + feat + " " + str(k+1))
+        rdm.shuffle(shuffled_sample[feat])                                                  # Shuffling of one feature
+        probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
+        fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+        bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
+
+    importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+    imp_tup = feat, np.mean(importance), np.std(importance)
+    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
+        pickle.dump(imp_tup, afp)
+
+def print_importances(file):
+    with open(file,'rb') as rfp:
+        record = dict()
+        while True:
+            try:
+                imp = pickle.load(rfp)
+                record[imp[0]] = imp[1:]
+            except EOFError:
+                break
+    print(record)
+    return record
+
+def plot_importances(results, path, n_reps):
+    sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
+    labels = [tup[0] for tup in sortedResults]
+    data = [tup[1][0] for tup in sortedResults]
+    error = [tup[1][1] for tup in sortedResults]
+
+    data = np.array(data)
+    error = np.array(error)
+
+    fig, ax = plt.subplots(figsize=(18.4, 10))
+    ax.invert_yaxis()
+
+    widths = data
+    ax.barh(labels, widths, height=0.75, xerr=error, capsize=5)
+    xcenters = widths / 2
+
+    text_color = 'white'
+    for y, (x, c) in enumerate(zip(xcenters, widths)):
+            ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
+
+    plt.title('Feature permutations importance (averaged over {} repetitions)'.format(n_reps), fontsize=20)
+    ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
+    ax.set_ylabel('Features', fontsize=18)
+    plt.savefig(path)
+    return fig, ax
 
 
 #################################################################################

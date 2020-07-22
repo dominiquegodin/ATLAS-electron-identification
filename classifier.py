@@ -7,8 +7,10 @@ from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
+from   utils      import feature_permutation, print_importances, plot_importances
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
+rdm = np.random
 
 
 # PROGRAM ARGUMENTS
@@ -46,6 +48,11 @@ parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
+parser.add_argument( '--featImp'     , default = 'OFF'               )
+parser.add_argument( '--n_reps'      , default = 10 , type = int     )
+parser.add_argument( '--feat'        , default = 0, type = int       )
+parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
+parser.add_argument( '--impOut'      , default = 'importances.pkl'       )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -78,15 +85,17 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', 'em_barrel_Lr1_fine',
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
+if type(args.images) == int : images = images[:args.images]+images[args.images+1:]                                                              # Removes the specified image
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
 scalars  += ['p_eta'   , 'p_et_calo']
+if type(args.scalars) == int : scalars = scalars[:args.scalars]+scalars[args.scalars+1:]                                                        # Removes the specified scalar
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
-train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
-             'scalars':scalars if args.scalars=='ON' else []}
+train_var = {'images' :images  if args.images !='OFF' else [], 'tracks':[],
+             'scalars':scalars if args.scalars!='OFF' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
@@ -205,3 +214,11 @@ if args.results_out != '':
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
     else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
+
+# FEATURE PERMUTATION IMPORTANCE
+if args.featImp == 'ON':
+    feats = images + scalars
+    file = args.output_dir+'/'+args.impOut
+    feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, file)
+    #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
+    print_importances(file)
