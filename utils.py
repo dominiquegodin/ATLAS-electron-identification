@@ -746,7 +746,8 @@ def plot_importances(results, path, n_reps):
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
 
-    plt.title('Feature permutations importance (averaged over {} repetitions)'.format(n_reps), fontsize=20)
+    reweight = path.split('/')[-2]
+    plt.title('Feature permutations importance (averaged over {} repetitions)\nusing {} reweighting'.format(n_reps, reweight ), fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
     plt.savefig(path)
