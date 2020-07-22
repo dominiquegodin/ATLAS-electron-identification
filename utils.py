@@ -708,6 +708,7 @@ def print_importances(file):
             except EOFError:
                 break
     print(record)
+    return record
 
 def plot_importances(results, path, n_reps):
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
