@@ -727,7 +727,10 @@ def plot_importances(results, path, n_reps):
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
     labels = [tup[0] for tup in sortedResults]
     data = [tup[1][0] for tup in sortedResults]
-    error = [tup[1][1] for tup in sortedResults]
+    try :
+        error = [tup[1][1] for tup in sortedResults]
+    except
+        error = np.zeros(len(sortedResults))
 
     data = np.array(data)
     error = np.array(error)
@@ -851,6 +854,11 @@ def merge_presamples(n_e, n_files, output_path, output_file):
 #####  UNDER DEVELOPMENT   ######################################################
 #################################################################################
 
+def removal_bkg_rej(model,valid_probs,labels,feat,file):
+    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
+    bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
+    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
+        pickle.dump(bkg_rej_tup, afp)
 
 class Batch_Generator(tf.keras.utils.Sequence):
     def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):

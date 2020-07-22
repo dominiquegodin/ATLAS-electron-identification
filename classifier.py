@@ -85,15 +85,19 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 # TRAINING VARIABLES
 images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', 'em_barrel_Lr1_fine',
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
-if type(args.images) == int : images = images[:args.images]+images[args.images+1:]                                                              # Removes the specified image
 scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
 scalars  += ['p_eta'   , 'p_et_calo']
-if type(args.scalars) == int : scalars = scalars[:args.scalars]+scalars[args.scalars+1:]                                                        # Removes the specified scalar
 others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
              'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
 others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
+feat = None
+i = args.images
+s = args.scalars
+if type(i) == int : images, feat = images[:i]+images[i+1:], images[i]                                                              # Removes the specified image
+elif type(s) == int : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                                        # Removes the specified scalar
+elif i == 'ON' and s == 'ON': feat = 'full'
 train_var = {'images' :images  if args.images !='OFF' else [], 'tracks':[],
              'scalars':scalars if args.scalars!='OFF' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
@@ -215,10 +219,15 @@ if args.results_out != '':
     else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
+# FEATURE REMOVAL IMPORTANCE
+if feat != None:
+    file = args.output_dir+'/'+args.impOut
+    removal_bkg_rej(model,valid_probs,valid_labels,feat,file)
+    print_importances(file)
+
 # FEATURE PERMUTATION IMPORTANCE
 if args.featImp == 'ON':
     feats = images + scalars
     file = args.output_dir+'/'+args.impOut
     feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, file)
-    #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
     print_importances(file)
