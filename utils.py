@@ -723,16 +723,16 @@ def plot_importances(results, path, n_reps):
     ax.invert_yaxis()
 
     widths = data
-    ax.barh(labels, widths, height=0.75, xerr=error, capsize=10)
+    ax.barh(labels, widths, height=0.75, xerr=error, capsize=5)
     xcenters = widths / 2
 
     text_color = 'white'
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
 
-    plt.title('Feature permutations importance ({} repetitions)'.format(n_reps))
-    ax.set_xlabel(r'$\frac{bkg\_rej_full}{bkg\_rej}$')
-    ax.set_ylabel('Features')
+    plt.title('Feature permutations importance (averaged over {} repetitions)'.format(n_reps), fontsize=20)
+    ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
+    ax.set_ylabel('Features', fontsize=18)
     plt.savefig(path)
     return fig, ax
 
