@@ -72,6 +72,7 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 # DATAFILE
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
+    except OSError: continue
     except FileExistsError: pass
 #if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
 if args.data_file == '': args.data_file = '/project/def-arguinj/odenis/el_data.h5'
