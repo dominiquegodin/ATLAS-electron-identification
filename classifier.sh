@@ -1,5 +1,5 @@
 # Feature permutations importance (array job)
-python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.pkl' --importances_out='outputs/2c_10m/match2s_2d/perm_imp.png'
+python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.pkl' --importances_out='outputs/2c_10m/flattening_2d/perm_imp.png'
 
 exit
 
