@@ -21,6 +21,6 @@ export SCRIPT_VAR
 
 
 # TRAINING ON BELUGA
-#SIF=/project/def-arguinj/dgodin/sing_images/tf-2.1.0-gpu-py3_sing-3.5.sif
-#module load singularity/3.5
-#singularity shell --nv --bind /project/def-arguinj/dgodin $SIF < classifier.sh $VAR $SCRIPT_VAR
+SIF=/scratch/odenis/tf-2.1.0-gpu-py3_sing-3.5.sif
+module load singularity/3.5
+singularity shell --nv --bind /project/def-arguinj/dgodin $SIF < classifier.sh $VAR $SCRIPT_VAR
