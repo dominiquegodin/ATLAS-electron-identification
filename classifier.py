@@ -97,12 +97,14 @@ others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , '
 others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
 i = args.rm_images
 s = args.rm_scalars
+feat = ''
 if i >= 0 : images, feat = images[:i]+images[i+1:], images[i]                                                              # Removes the specified image
 elif s >= 0 == int : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                                 # Removes the specified scalar
 elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
+arg.outputs = feat+arg.outputs
 
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES

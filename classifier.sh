@@ -1,5 +1,5 @@
-# Feature removals importance (beluga)
-python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
+# Feature removals importance (beluga) test
+python classifier.py  --n_train=10  --n_valid=10  --batch_size=5  --n_epochs=5  --n_classes=2           \
                       --verbose=2  --output_dir='/scratch/odenis/removal_importance' --impOut='removal_importance.pkl' --rm_images=${VAR}
 
 exit
