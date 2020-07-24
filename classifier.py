@@ -104,7 +104,7 @@ elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
-args.output_dir = feat+args.output_dir
+args.output_dir = args.output_dir + '/' + feat
 
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
