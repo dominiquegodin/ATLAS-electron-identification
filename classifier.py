@@ -69,16 +69,6 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 
 
-# DATAFILE
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    try: os.mkdir(path)
-    except OSError: continue
-    except FileExistsError: pass
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
-if args.data_file == '': args.data_file = '/scratch/odenis/el_data.h5'
-#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
-
-
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
         (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
@@ -106,6 +96,14 @@ train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 args.output_dir = args.output_dir + '/' + feat
 
+# DATAFILE
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+    try: os.mkdir(path)
+    except OSError: continue
+    except FileExistsError: pass
+    #if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+    if args.data_file == '': args.data_file = '/scratch/odenis/el_data.h5'
+    #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
 sample_size  = len(h5py.File(args.data_file, 'r')['mcChannelNumber'])
