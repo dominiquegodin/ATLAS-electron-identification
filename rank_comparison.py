@@ -23,5 +23,4 @@ ax.axis('tight')
 ax.axis('off')
 the_table = ax.table(cellText=data,colLabels=collabel,loc='center')
 
-#ax[1].plot(clust_data[:,0],clust_data[:,1])
-plt.show()
+plt.savefig('results/rank_comparison_noweight_match2s')
