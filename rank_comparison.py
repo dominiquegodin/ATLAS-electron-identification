@@ -2,25 +2,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-files = 'outputs/2c_10m/match2s_2d/importances.pkl', '/outputs/2c_10m/match2s_2d/importances.pkl'
+files = ('outputs/2c_10m/bkg_ratio_2d/importances.pkl', 'outputs/2c_10m/match2s_2d/importances.pkl')
 
-data = list()
-with open(files[0],'rb') as rfp1, open(files[1],'rb') as rfp2:
-    while True:
-        try:
-            imp1 = pickle.load(rfp1)
-            imp2 = pickle.load(rfp2)
-            data.append([imp1[0],imp1[1],imp2[0],imp2[1]])
-        except EOFError:
-            break
-print(data)
+imp = {}
+for f in files:
+    key = f.split('/')[-2]
+    print(key, '\n')
+    imp[key] = []
+    with open(f,'rb') as rfp:
+        while True:
+            try:
+                imp[key].append(pickle.load(rfp))
+            except EOFError:
+                break
+print(imp)
 
-fig, ax = plt.subplots(1)
 
 
-collabel = [f.split('/')[-2] for f in files]
-ax.axis('tight')
-ax.axis('off')
-the_table = ax.table(cellText=data,colLabels=collabel,loc='center')
+#fig, ax = plt.subplots(1)
 
-plt.savefig('results/rank_comparison_noweight_match2s')
+#collabel = ['']+[f.split('/')[-2] for f in files]
+#ax.axis('tight')
+#ax.axis('off')
+#the_table = ax.table(cellText=data,colLabels=collabel,loc='center')
+
+#plt.savefig('results/rank_comparison_noweight_match2s.png')
