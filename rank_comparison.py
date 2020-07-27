@@ -6,24 +6,31 @@ files = ('outputs/2c_10m/bkg_ratio_2d/importances.pkl', 'outputs/2c_10m/match2s_
 
 imp = {}
 for f in files:
-    key = f.split('/')[-2]
-    print(key, '\n')
-    imp[key] = []
+    rwt = f.split('/')[-2][:-3] # Type of reweighting
+    imp[rwt] = []
     with open(f,'rb') as rfp:
         while True:
             try:
-                imp[key].append(pickle.load(rfp))
+                imp[rwt].append(pickle.load(rfp))
             except EOFError:
                 break
-print(imp)
+    imp[rwt] = sorted(imp[rwt], key = lambda lst: lst[1], reverse=True)
 
+noRwt = imp['bkg_ratio']
+match2s = imp['match2s']
 
+data = []
+for i in range(len(noRwt)):
+    data.append([round(noRwt[i][1],2), noRwt[i][0], match2s[i][0], round(match2s[i][1],2)])
 
-#fig, ax = plt.subplots(1)
+print(data)
 
-#collabel = ['']+[f.split('/')[-2] for f in files]
+fig, ax = plt.subplots(1)
+
+collabel = ['importance', files[0].split('/')[-2], files[1].split('/')[-2], 'importance' ]
 #ax.axis('tight')
-#ax.axis('off')
-#the_table = ax.table(cellText=data,colLabels=collabel,loc='center')
-
-#plt.savefig('results/rank_comparison_noweight_match2s.png')
+ax.axis('off')
+the_table = ax.table(cellText=data,colLabels=collabel,loc='center')
+plt.tight_layout()
+plt.savefig('results/rank_comparison_noweight_match2s.png')
+plt.show()
