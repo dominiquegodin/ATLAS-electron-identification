@@ -12,12 +12,13 @@ feats = [
 bkg_rej = dict()
 for file in feats:
     with open('/scratch/odenis/removal_importance/' + file + '/removal_importance.pkl', 'rb') as rfp:
-        bkg_rej.update(pickle.load(rfp))
+        bkg_tup = pickle.load(rfp)
+        bkg_rej[bkg_tup[0]] = bkg_tup[1]
 
 print(bkg_rej)
 imp = dict()
 for feat in feats[1:]:
-    imp[feat] = bkg_rej['full'][0]/bkg_rej[feat][0]
+    imp[feat] = bkg_rej['full']/bkg_rej[feat]
 print(imp)
 
 path = '/scratch/odenis/removal_importance/rm_imp.png'
