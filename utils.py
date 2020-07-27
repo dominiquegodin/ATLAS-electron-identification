@@ -723,7 +723,7 @@ def print_importances(file):
     print(record)
     return record
 
-def plot_importances(results, path, n_reps):
+def plot_importances(results, path, title):
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
     labels = [tup[0] for tup in sortedResults]
     data = [tup[1][0] for tup in sortedResults]
@@ -746,8 +746,7 @@ def plot_importances(results, path, n_reps):
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
 
-    reweight = path.split('/')[-2]
-    plt.title('Feature permutations importance (averaged over {} repetitions)\nusing {} reweighting'.format(n_reps, reweight ), fontsize=20)
+    plt.title(title), fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
     plt.savefig(path)
