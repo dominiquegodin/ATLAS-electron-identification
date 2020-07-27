@@ -11,7 +11,7 @@ feats = [
 
 bkg_rej = dict()
 for file in feats:
-    with open('/scratch/odenis/removal_importance/' + file + '/removal_importance.pkl', 'rb') as rfp
+    with open('/scratch/odenis/removal_importance/' + file + '/removal_importance.pkl', 'rb') as rfp:
         bkg_rej.update(pickle.load(rfp))
 
 print(bkg_rej)
