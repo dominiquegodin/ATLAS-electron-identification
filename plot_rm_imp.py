@@ -18,7 +18,7 @@ for file in feats:
 print(bkg_rej)
 imp = dict()
 for feat in feats[1:]:
-    imp[feat] = bkg_rej['full']/bkg_rej[feat]
+    imp[feat] = bkg_rej['full'][0]/bkg_rej[feat][0]
 print(imp)
 
 path = '/scratch/odenis/removal_importance/rm_imp.png'
