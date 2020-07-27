@@ -1,6 +1,4 @@
-# Feature removals importance (beluga)
-python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --impOut='removal_importance.pkl' --rm_scalars=${VAR}
+python plot_rm_imp.py
 
 exit
 
@@ -66,3 +64,7 @@ python classifier.py  --n_valid=15e6  --output_dir=outputs  --results_in=valid_p
 # FEATURE PERMUTATION IMPORTANCE (ARRAY JOB)
 python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/bkg_ratio_2d     \
                       --model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON' --feat=${VAR}
+
+# FEATURE REMOVAL IMPORTANCE (BELUGA)
+python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
+                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --impOut='removal_importance.pkl' --rm_scalars=${VAR}
