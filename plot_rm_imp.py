@@ -13,7 +13,7 @@ bkg_rej = dict()
 for file in feats:
     with open('/scratch/odenis/removal_importance/' + file + '/removal_importance.pkl', 'rb') as rfp:
         bkg_tup = pickle.load(rfp)
-        bkg_rej[bkg_tup[0]] = bkg_tup[1]
+        bkg_rej[bkg_tup[0]] = bkg_tup[1:]
 
 print(bkg_rej)
 imp = dict()
