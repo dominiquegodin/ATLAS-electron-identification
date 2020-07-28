@@ -17,8 +17,8 @@ parser.add_argument( '--file_path'   , default = ''                       )
 args = parser.parse_args()
 
 
-data_path = '/opt/tmp/godin/el_data/2019-06-20'
-#data_path = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3'
+#data_path = '/opt/tmp/godin/el_data/2019-06-20'
+data_path = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3'
 #data_path = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6'
 #data_path = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5'
 
@@ -29,6 +29,12 @@ if not os.path.isdir(args.file_path+'/'+'output'): os.mkdir(args.file_path+'/'+'
 output_path = args.file_path+'/'+'output'
 data_files  = [args.file_path+'/'+h5_file for h5_file in os.listdir(args.file_path) if '.h5' in h5_file]
 data_files  = sorted(data_files)[0:args.n_files]
+
+
+#data = h5py.File(data_files[0], 'r')
+#for key in data: print(key)
+#for key, val in data['train'].items(): print(key, val.shape)
+#sys.exit()
 
 
 # MERGING FILES/ NO PRESAMPLING
@@ -50,7 +56,7 @@ tracks  =  ['tracks_pt'       , 'tracks_phi'      , 'tracks_eta'      , 'tracks_
             'p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof'    ,
             'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0'                ]
 scalars =  ['p_truth_pt'      , 'p_truth_phi'     , 'p_truth_eta'     , 'p_truth_E'        , 'p_truth_e'  ,
-            'p_et_calo'       , 'p_pt_track'      , 'p_eCluster'      , 'p_Eratio'         , 'p_phi'      ,
+            'p_et_calo'       , 'p_pt_track'      , 'p_EoverP'        , 'p_Eratio'         , 'p_phi'      ,
             'p_eta'           , 'p_e'             , 'p_Rhad'          , 'p_Rphi'           , 'p_Reta'     ,
             'p_d0'            , 'p_d0Sig'         , 'p_sigmad0'       , 'p_dPOverP'        , 'p_f1'       ,
             'p_f3'            , 'p_weta2'         , 'p_TRTPID'        , 'p_deltaEta1'      , 'p_LHValue'  ,

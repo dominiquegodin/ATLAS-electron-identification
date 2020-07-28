@@ -701,19 +701,18 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
     with h5py.File(h5_file, 'r') as data:
         images   = list(set(data['train']) & set(images))
         tracks   = list(set(data['train']) & set(tracks))
-        scalars  = list(set(data['train']) & set(scalars))
-        integers = list(set(data['train']) & set(integers))
-        sample = {key:data['train'][key][idx[0]:idx[1]] for key in images+tracks+scalars+integers}
-    try: sample['p_TruthType'] = sample.pop('p_truthType')
-    except KeyError: pass
-    try: sample['p_TruthOrigin'] = sample.pop('p_truthOrigin')
-    except KeyError: pass
+        scalars  = list(set(data['train']) & set(scalars+integers))
+        sample = {key:data['train'][key][idx[0]:idx[1]] for key in images+tracks+scalars}
     for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
     for key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
         try: sample[key+'_fine'] = sample[key]
         except KeyError: pass
     for key in images: sample[key] = resize_images(sample[key])
     for key in images+scalars: sample[key] = np.float16(sample[key])
+    try: sample['p_TruthType'] = sample.pop('p_truthType')
+    except KeyError: pass
+    try: sample['p_TruthOrigin'] = sample.pop('p_truthOrigin')
+    except KeyError: pass
     tracks_list = [np.expand_dims(get_tracks(sample,n,50     ), axis=0) for n in np.arange(batch_size)]
     sample['tracks'] = np.concatenate(tracks_list)
     tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_'), axis=0) for n in np.arange(batch_size)]
