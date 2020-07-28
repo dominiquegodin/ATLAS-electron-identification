@@ -767,8 +767,10 @@ def get_tracks(sample, idx, max_tracks=20, p='', scalars=False):
     if p == 'p_' and scalars:
         tracks_means       = np.mean(tracks,axis=0) if len(tracks)!=0 else tracks.shape[1]*[0]
         qd0Sig             = sample['p_charge'][idx] * sample['p_d0'][idx] / sample['p_sigmad0'][idx]
-        sct_weight_charge  = sample['p_tracks_charge'][idx] @     sample['p_tracks_scthits'][idx]
-        sct_weight_charge *= sample['p_charge'       ][idx] / sum(sample['p_tracks_scthits'][idx])
+        if np.any(sample['p_tracks_scthits'][idx]!=0):
+            sct_weight_charge  = sample['p_tracks_charge'][idx] @     sample['p_tracks_scthits'][idx]
+            sct_weight_charge *= sample['p_charge'       ][idx] / sum(sample['p_tracks_scthits'][idx])
+        else: sct_weight_charge = 0
         return np.concatenate([tracks_means, np.array([qd0Sig, len(tracks), sct_weight_charge])])
     else:
         return np.vstack([tracks, np.zeros((max(0, max_tracks-len(tracks)), tracks.shape[1]))])
