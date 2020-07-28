@@ -22,31 +22,33 @@ imp['permutation'] = sorted(imp['permutation'], key = lambda lst: lst[1], revers
 
 imp['removal'] = []
 for feat in feats:
-    with open('removal_importance/'+feat+'/removal_importance.pkl') as rfp:
+    with open('removal_importance/'+feat+'/removal_importance.pkl','rb') as rfp:
         while True:
             try:
-                imp['removal'].apend(pickle.load(rfp))
+                tup = pickle.load(rfp)
+                lst = [tup[0],1685.52/tup[1]]
+                imp['removal'].append(lst)
                 print(imp['removal'])
             except EOFError:
                 break
-imp['removal'] = sorted(imp['removal'], key = lambda lst: lst[1], reverse=True)
+imp['removal'] = sorted(imp['removal'], key = lambda lst: lst[1], reverse = True)
 
-noRwt = imp['permutation']
-match2s = imp['removal']
+perm = imp['permutation']
+rm = imp['removal']
 
 
 data = []
-for i in range(len(noRwt)):
-    data.append([round(noRwt[i][1],2), noRwt[i][0], match2s[i][0], round(match2s[i][1],2)])
+for i in range(len(perm)):
+    data.append([round(perm[i][1],2), perm[i][0], rm[i][0], round(rm[i][1],2)])
 
 print(data)
 
 fig, ax = plt.subplots(1)
 
-collabel = ['importance', permutation, removal, 'importance' ]
+collabel = ['importance', 'permutation', 'removal', 'importance' ]
 #ax.axis('tight')
 ax.axis('off')
 the_table = ax.table(cellText=data,colLabels=collabel,loc='center')
 plt.tight_layout()
-plt.savefig('results/rank_comparison_noweight_match2s.png')
+plt.savefig('results/rank_comparison_perm_rm.png')
 plt.show()
