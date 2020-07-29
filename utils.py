@@ -884,7 +884,7 @@ def correlations(sample, dir):
     ax = fig.add_subplot(111)
     cax = ax.matshow(correlations, vmin=-1, vmax=1)
     fig.colorbar(cax)
-    ticks = numpy.arange(0,9,1)
+    ticks = np.arange(0,9,1)
     ax.set_xticks(ticks)
     ax.set_yticks(ticks)
     ax.set_xticklabels(names)

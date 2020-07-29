@@ -179,8 +179,6 @@ if args.correlation == 'ON':
         try: os.mkdir(path)
         except FileExistsError: pass
     print('CLASSIFIER : evaluating variables correlations')
-    print(valid_sample)
-    print('VALID LABELS', valid_labels)
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
     correlations(sig_sample, args.output_dir + '/correlations/signal/')
