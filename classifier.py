@@ -73,7 +73,10 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except FileExistsError: pass
-if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/output/el_data.h5'
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
 #if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
@@ -85,22 +88,24 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 
 
 # TRAINING VARIABLES
-images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', 'em_barrel_Lr1_fine',
-             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
-scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
-             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
-             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
-scalars  += ['p_eta'   , 'p_et_calo']
-others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
-             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
-others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
-i = args.rm_images
-s = args.rm_scalars
-if i >= 0 : images, feat = images[:i]+images[i+1:], images[i]                                                              # Removes the specified image
-if s >= 0 : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                                 # Removes the specified scalar
-elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
+images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+            'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+            'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
+            'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
+            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
+            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
+with h5py.File(args.data_file, 'r') as data:
+    images  = [key for key in images  if key in data or key=='tracks_image']
+    scalars = [key for key in scalars if key in data]
+    others  = [key for key in others  if key in data]
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
-             'scalars':scalars if args.scalars =='ON' else []}
+             'scalars':scalars if args.scalars=='ON' else []}
+
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 
@@ -179,10 +184,11 @@ if args.n_epochs > 0:
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
     func_args = (args.data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
-    #valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
-    #train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
-    #train_labels  = np.concatenate([train_labels, extra_labels])
-    #sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
+    if False: #generate a different validation sample from training sample with downsampling
+        valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
+        train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
+        train_labels  = np.concatenate([train_labels, extra_labels])
+        sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
     sample_weight = balance_sample(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2d')[-1]
     #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     for var in ['pt','eta']:
@@ -217,7 +223,7 @@ valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
-    else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
+    else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
 # FEATURE REMOVAL IMPORTANCE
