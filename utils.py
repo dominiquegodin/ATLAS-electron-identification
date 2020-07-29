@@ -874,9 +874,25 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, afp)
 
+def LaTeXizer(names):
+    scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+    'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+    'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+    'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+    Lscalars  = [r'$E_{ratio}$', r'$R_{eta}$', r'$R_{had}$'  , r'$R_{phi}$' , r'TRTPID' , r'Number of SCT hits',
+    'ndof'  , r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$', r'$f_3$'   , r'$\Delta \phi _{res}$',
+    r'$w_{\eta 2}$', r'd0'  , r'd0Sig'    , r'qd0Sig', r'$n_{Tracks}$', r'sct_weight_charge',
+    r'$\eta$' , r'$\p_t$', r'$E/p$' , r'$w_{stot}', r'n_{Blayer}' ]
+    Lnames = []
+    for name in names:
+        for  i,scalar in enumerate(scalars):
+            if name == scalar:
+                Lname.append(Lscalars[i])
+                return Lnames
+
 def correlations(sample, dir):
     data = pd.DataFrame(sample)
-    names = data.columns
+    names = LaTeXizer(data.columns)
     correlations = data.corr()
 
     # plot correlation matrix
@@ -889,11 +905,14 @@ def correlations(sample, dir):
     ax.set_yticks(ticks)
     ax.set_xticklabels(names)
     ax.set_yticklabels(names)
+    plt.xticks(rotation=90)
     plt.savefig(dir + 'corr_matrix.png')
 
     # plot scatter plot matrix
     scatter_matrix(data, figsize = (12,10))
     plt.savefig(dir + 'scatter_plot_matrix.png')
+
+
 
 
 #################################################################################
