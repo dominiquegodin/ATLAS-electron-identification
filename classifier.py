@@ -180,7 +180,7 @@ if args.correlation == 'ON':
         except FileExistsError: pass
     print('CLASSIFIER : evaluating variables correlations')
     print(valid_sample)
-    print('VALID LABELS'. valid_labels)
+    print('VALID LABELS', valid_labels)
     sig_sample = {key : valid_sample[key] for key in scalars if valid_labels[key] == 0}
     bkg_sample = {key : valid_sample[key] for key in scalars if valid_labels[key] == 1}
     correlations(sig_sample, args.output_dir + '/correlations/signal/')
