@@ -204,7 +204,7 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d', weighting=True):
+def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d', get_weights=True):
     if sampling_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max']:
         return sample, labels, None
     pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
@@ -231,7 +231,7 @@ def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d'
     elif sampling_type == 'match2max':
         total_sig = np.maximum(hist_sig, hist_bkg/bkg_ratio)
         total_bkg = np.maximum(hist_bkg, hist_sig*bkg_ratio)
-    if weighting:
+    if get_weights or hist != 'pt':
         weights_sig = total_sig/hist_sig * len(labels)/np.sum(total_sig+total_bkg)
         weights_bkg = total_bkg/hist_bkg * len(labels)/np.sum(total_sig+total_bkg)
         return sample, labels, np.where(labels==0, weights_sig[pt_ind,eta_ind], weights_bkg[pt_ind,eta_ind])
@@ -300,23 +300,22 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
     n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
-    if False or len(valid_data) == 1:
+    if False or len(valid_data) == 1: #add variables to the results
         print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
         sample, labels = make_sample(data_file, variables, n_valid, n_tracks=5, n_classes=probs.shape[1])
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    if False and len(valid_data) == 1:
+    if False: #save the added variables to the results file
         print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
         pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
-    #valid_cuts = '(probs[:,0]<=0.11)'
     #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
     #valid_cuts = '(sample["p_et_calo"]  < 20)'
     #valid_cuts = '(sample["p_et_calo"] >= 20) & (sample["p_et_calo"] <= 80)'
     #valid_cuts = '(sample["p_et_calo"]  > 80)'
     cuts = n_e*[True] if valid_cuts == '' else eval(valid_cuts)
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
-    if True:
+    if False: #generate calorimeter images
         layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1_fine'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
                   'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
         from plots_DG import cal_images
@@ -335,8 +334,8 @@ def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_',
             n_tracks    = min(n_tracks, data[p+'tracks'].shape[1])
             tracks_data = data[p+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
             tracks_data = np.concatenate((abs(tracks_data[...,0:5]), tracks_data[...,5:13]), axis=2)
-    if 'tracks_image' in var_list: sample.update({'tracks_image':tracks_data})
-    if 'tracks'       in var_list: sample['tracks'] = tracks_data
+    if 'tracks_image' in var_list: sample['tracks_image'] = tracks_data
+    if 'tracks'       in var_list: sample['tracks'      ] = tracks_data
     if tf.__version__ < '2.1.0' or len(variables['images']) == 0:
         for key in set(sample) - set(variables['others']): sample[key] = np.float32(sample[key])
     if False:
@@ -761,27 +760,39 @@ def plot_importances(results, path, title):
 def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, integers, index):
     idx = index*batch_size, (index+1)*batch_size
     with h5py.File(h5_file, 'r') as data:
-        sample = {key:data['train'][key][idx[0]:idx[1]] for key in images + tracks + scalars + integers}
+        images   = list(set(data['train']) & set(images))
+        tracks   = list(set(data['train']) & set(tracks))
+        scalars  = list(set(data['train']) & set(scalars+integers))
+        sample = {key:data['train'][key][idx[0]:idx[1]] for key in images+tracks+scalars}
     for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
-    sample.update({'em_barrel_Lr1_fine':sample['em_barrel_Lr1']})
+    for key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
+        try: sample[key+'_fine'] = sample[key]
+        except KeyError: pass
     for key in images: sample[key] = resize_images(sample[key])
-    #for key in set(images)-set(['em_barrel_Lr1']): sample[key] = resize_images(sample[key])
     for key in images+scalars: sample[key] = np.float16(sample[key])
+    try: sample['p_TruthType'] = sample.pop('p_truthType')
+    except KeyError: pass
+    try: sample['p_TruthOrigin'] = sample.pop('p_truthOrigin')
+    except KeyError: pass
     tracks_list = [np.expand_dims(get_tracks(sample,n,50     ), axis=0) for n in np.arange(batch_size)]
-    sample.update({'tracks'  :np.concatenate(tracks_list)})
+    sample['tracks'] = np.concatenate(tracks_list)
     tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_'), axis=0) for n in np.arange(batch_size)]
-    sample.update({'p_tracks':np.concatenate(tracks_list)})
+    sample['p_tracks'] = np.concatenate(tracks_list)
     tracks_list = [np.expand_dims(get_tracks(sample,n,20,'p_',True), axis=0) for n in np.arange(batch_size)]
     tracks_list = np.concatenate(tracks_list)
     tracks_dict = {'p_mean_efrac'  :0 , 'p_mean_deta'   :1 , 'p_mean_dphi'   :2 , 'p_mean_d0'          :3 ,
                    'p_mean_z0'     :4 , 'p_mean_charge' :5 , 'p_mean_vertex' :6 , 'p_mean_chi2'        :7 ,
                    'p_mean_ndof'   :8 , 'p_mean_pixhits':9 , 'p_mean_scthits':10, 'p_mean_trthits'     :11,
                    'p_mean_sigmad0':12, 'p_qd0Sig'      :13, 'p_nTracks'     :14, 'p_sct_weight_charge':15}
-    sample.update({key:tracks_list[:,tracks_dict[key]] for key in tracks_dict})
+    #sample.update({key:tracks_list[:,tracks_dict[key]] for key in tracks_dict})
+    for key in tracks_dict:
+        if np.any(tracks_list[:,tracks_dict[key]]!=0): sample[key] = tracks_list[:,tracks_dict[key]]
     for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
-    sample.update({'true_m':np.float16(get_truth_m(sample))})
-    for key in tracks + ['p_truth_E']: sample.pop(key)
-    with h5py.File(output_path+'temp_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
+    sample['true_m'] = np.float16(get_truth_m(sample))
+    for key in tracks + ['p_truth_E', 'p_truth_e']:
+        try: sample.pop(key)
+        except KeyError: pass
+    with h5py.File(output_path+'/'+'temp_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
         for key in sample:
             shape = (sum_e+batch_size,) + sample[key].shape[1:]
             if sum_e == 0:
@@ -807,8 +818,11 @@ def get_tracks(sample, idx, max_tracks=20, p='', scalars=False):
     tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
     p_tracks    = ['p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof',
                    'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0']
-    tracks      = tracks + [sample[key][idx] for key in p_tracks] if p == 'p_' else tracks
-    #if p == 'p_': tracks += sample['p_tracks_charge' ][idx]*tracks_d0/sample['p_tracks_sigmad0'][idx]
+    #if p == 'p_': tracks += [sample[key][idx] for key in p_tracks]
+    if p == 'p_':
+        for key in p_tracks:
+            try: tracks += [sample[key][idx]]
+            except KeyError: tracks += [np.zeros(sample['p_tracks_charge'][idx].shape)]
     tracks      = np.float16(np.vstack(tracks).T)
     tracks      = tracks[np.isfinite(np.sum(abs(tracks), axis=1))][:max_tracks,:]
     if p == 'p_' and scalars:
@@ -823,27 +837,28 @@ def get_tracks(sample, idx, max_tracks=20, p='', scalars=False):
 
 def get_truth_m(sample, new=True, m_e=0.511, max_eta=4.9):
     truth_eta = np.float64(np.vectorize(min)(abs(sample['p_truth_eta']), max_eta))
-    truth_e   = np.float64(sample['p_truth_E' ])
+    try:             truth_e = np.float64(sample['p_truth_E' ])
+    except KeyError: truth_e = np.float64(sample['p_truth_e' ])
     truth_pt  = np.float64(sample['p_truth_pt'])
     truth_s   = truth_e**2 - (truth_pt*np.cosh(truth_eta))**2
     if new: return np.where(truth_eta == max_eta, -1, np.sqrt(np.vectorize(max)(m_e**2, truth_s)))
     else:   return np.where(truth_eta == max_eta, -1, np.sign(truth_s)*np.sqrt(abs(truth_s)) )
 
 
-def merge_presamples(n_e, n_files, output_path, output_file):
+def merge_presamples(n_e, n_tasks, output_path, output_file):
     temp_files = [h5_file for h5_file in os.listdir(output_path) if 'temp' in h5_file and '.h5' in h5_file]
     np.random.seed(0); np.random.shuffle(temp_files)
-    os.rename(output_path+temp_files[0], output_path+output_file)
-    dataset = h5py.File(output_path+output_file, 'a')
-    GB_size = n_files*sum([np.float16(dataset[key]).nbytes for key in dataset])/(1024)**2/1e3
+    os.rename(output_path+'/'+temp_files[0], output_path+'/'+output_file)
+    dataset = h5py.File(output_path+'/'+output_file, 'a')
+    GB_size = n_tasks*sum([np.float16(dataset[key]).nbytes for key in dataset])/(1024)**2/1e3
     print('MERGING TEMPORARY FILES (', '\b{:.1f}'.format(GB_size),'GB) IN:', end=' ')
     print('output/'+output_file, end=' .', flush=True); start_time = time.time()
-    for key in dataset: dataset[key].resize((n_e*n_files,) + dataset[key].shape[1:])
+    for key in dataset: dataset[key].resize((n_e*n_tasks,) + dataset[key].shape[1:])
     for h5_file in temp_files[1:]:
-        data  = h5py.File(output_path+h5_file, 'r')
+        data  = h5py.File(output_path+'/'+h5_file, 'r')
         index = temp_files.index(h5_file)
         for key in dataset: dataset[key][index*n_e:(index+1)*n_e] = data[key]
-        data.close(); os.remove(output_path+h5_file)
+        data.close(); os.remove(output_path+'/'+h5_file)
         print('.', end='', flush=True)
     print(' (', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
 

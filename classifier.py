@@ -36,8 +36,7 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
-parser.add_argument( '--rm_images'   , default = -1, type = int      )
-parser.add_argument( '--rm_scalars'  , default = -1, type = int      )
+parser.add_argument( '--rm_features' , default = -1, type = int      ) # 0-19 : images, 20-42 : scalars, 43- : groups of features
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
@@ -76,17 +75,30 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 
 
 # TRAINING VARIABLES
-images    = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3', 'em_barrel_Lr1_fine',
-             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image']
-scalars   = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
-             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
-             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge']
-scalars  += ['p_eta'   , 'p_et_calo']
-others    = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
-             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo']
-others   += ['p_firstEgMotherTruthType', 'p_firstEgMotherTruthOrigin']
-i = args.rm_images
-s = args.rm_scalars
+images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+            'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+            'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
+            'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
+            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
+            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
+with h5py.File(args.data_file, 'r') as data:
+    images  = [key for key in images  if key in data or key=='tracks_image']
+    scalars = [key for key in scalars if key in data]
+    others  = [key for key in others  if key in data]
+
+groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],
+            ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],
+            ['lar_endcap_Lr0','lar_endcap_Lr1','lar_endcap_Lr2','lar_endcap_Lr3'],
+            ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+            ]
+i = args.rm_features                                                                                            # image indices
+s = args.rm_features - len(images)                                                                              # scalar indices
+g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
 feat = ''
 if i >= 0 : images, feat = images[:i]+images[i+1:], images[i]                                                              # Removes the specified image
 if s >= 0: scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                                 # Removes the specified scalar
@@ -180,10 +192,11 @@ if args.n_epochs > 0:
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
     func_args = (args.data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
-    #valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
-    #train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
-    #train_labels  = np.concatenate([train_labels, extra_labels])
-    #sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
+    if False: #generate a different validation sample from training sample with downsampling
+        valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
+        train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
+        train_labels  = np.concatenate([train_labels, extra_labels])
+        sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
     sample_weight = balance_sample(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2d')[-1]
     #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     for var in ['pt','eta']:
@@ -218,7 +231,7 @@ valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
-    else: valid_data = ({key:valid_sample[key] for key in others}, valid_labels, valid_probs)
+    else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
 # FEATURE REMOVAL IMPORTANCE
