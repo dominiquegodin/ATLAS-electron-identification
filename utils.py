@@ -881,8 +881,8 @@ def LaTeXizer(names):
                 'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
     Lscalars = [r'$E_{ratio}$', r'$R_{eta}$', r'$R_{had}$', r'$R_{phi}$' , r'TRTPID' ,   r'Number of SCT hits',
                 'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
-                r'$w_{\eta 2}$',   r'd0'  , r'd0Sig'    , r'qd0Sig'   , r'$n_{Tracks}$',  r'sct_weight_charge',
-                r'$\eta$'      , r'$\p_t$', r'$E/p$'    , r'$w_{stot}', r'n_{Blayer}' ]
+                r'$w_{\eta 2}$',  r'$d_0$', r'd_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
+                r'sct_weight_charge',r'$\eta$'      , r'$\p_t$', r'$E/p$'    , r'$w_{stot}', r'n_{Blayer}' ]
     Lnames = []
     for name in names:
         if name not in scalars:
