@@ -179,8 +179,9 @@ if args.correlation == 'ON':
         try: os.mkdir(path)
         except FileExistsError: pass
     print('CLASSIFIER : evaluating variables correlations')
-    sig_sample = {key : valid_sample[key][labels == 0] for key in scalars}
-    bkg_sample = {key : valid_sample[key][labels == 1] for key in scalars}
+    print(valid_sample)
+    sig_sample = {key : valid_sample[key][labels==0] for key in scalars}
+    bkg_sample = {key : valid_sample[key][labels==1] for key in scalars}
     correlations(sig_sample, args.output_dir + '/correlations/signal/')
     correlation(bkg_sample, args.output_dir + '/correlations/bkg/')
     sys.exit() # No need for training or validation

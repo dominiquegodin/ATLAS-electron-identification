@@ -892,7 +892,7 @@ def correlations(sample, dir):
     plt.savefig(dir + 'corr_matrix.png')
 
     # plot scatter plot matrix
-    scatter_matrix(data)
+    scatter_matrix(data, figsize = (12,10))
     plt.savefig(dir + 'scatter_plot_matrix.png')
 
 
