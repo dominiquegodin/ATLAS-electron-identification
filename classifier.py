@@ -181,8 +181,8 @@ if args.correlation == 'ON':
     print('CLASSIFIER : evaluating variables correlations')
     print(valid_sample)
     print('VALID LABELS', valid_labels)
-    sig_sample = {key : valid_sample[key] for key in scalars if valid_labels[key] == 0}
-    bkg_sample = {key : valid_sample[key] for key in scalars if valid_labels[key] == 1}
+    sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[1]] for key in scalars}
+    bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[1]] for key in scalars}
     correlations(sig_sample, args.output_dir + '/correlations/signal/')
     correlation(bkg_sample, args.output_dir + '/correlations/bkg/')
     sys.exit() # No need for training or validation
