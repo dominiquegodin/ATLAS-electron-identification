@@ -1,5 +1,5 @@
-#RANK COMPARISON
-python rank_comparison.py
+# CORRELATIONS
+python classifier.py  --correlation='ON' --n_valid=15e6 
 
 exit
 
@@ -66,5 +66,5 @@ python classifier.py  --n_valid=15e6  --output_dir=outputs  --results_in=valid_p
 python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=outputs/2c_10m/bkg_ratio_2d     \
                       --model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON' --feat=${VAR}
 
-# Feature permutations importance plotting
+# FEATURE PERMUTATION IMPORTANCE PLOTTING
 python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.pkl' --importances_out='outputs/2c_10m/match2s_2d/perm_imp.png'

@@ -175,10 +175,14 @@ if args.model_in != '':
 
 # EVALUATING CORRELATIONS
 if args.correlation == 'ON':
+    for path in [args.output_dir + '/correlations', args.output_dir + '/correlations/signal/', args.output_dir + '/correlations/bkg/']
+        try: os.mkdir(path)
+        except FileExistsError: pass
+    print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][labels == 0] for key in scalars}
     bkg_sample = {key : valid_sample[key][labels == 1] for key in scalars}
-    correlations(sig_sample, args.output_dir + '/signal/')
-    correlation(bkg_sample, args.output_dir + '/bkg/')
+    correlations(sig_sample, args.output_dir + '/correlations/signal/')
+    correlation(bkg_sample, args.output_dir + '/correlations/bkg/')
     sys.exit() # No need for training or validation
 
 
