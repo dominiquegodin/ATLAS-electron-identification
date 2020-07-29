@@ -1,5 +1,7 @@
 import tensorflow as tf, matplotlib.pyplot as plt
 import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
+import pandas as pd
+from pandas.plotting import scatter_matrix
 from   sklearn    import metrics, utils, preprocessing
 from   tabulate   import tabulate
 from   skimage    import transform
@@ -690,69 +692,6 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
-def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, file):
-    print('PERMUTATION DE : ' + feat)
-    bkg_rej = np.empty(n_rep)
-    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
-    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-    shuffled_sample = {key:value for (key,value) in valid_sample.items() if key != feat}
-    shuffled_sample[feat] = deepcopy(valid_sample[feat])                                    # Copy of the feature to be shuffled in order to keep valid_sample intact
-
-    for k in range(n_rep):                                                                  # Reshuffling loop
-        print('PERMUTATION DE ' + feat + " " + str(k+1))
-        rdm.shuffle(shuffled_sample[feat])                                                  # Shuffling of one feature
-        probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
-        fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
-        bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
-
-    importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-    imp_tup = feat, np.mean(importance), np.std(importance)
-    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
-        pickle.dump(imp_tup, afp)
-
-def print_importances(file):
-    with open(file,'rb') as rfp:
-        record = dict()
-        while True:
-            try:
-                imp = pickle.load(rfp)
-                record[imp[0]] = imp[1:]
-            except EOFError:
-                break
-    print(record)
-    return record
-
-def plot_importances(results, path, n_reps):
-    sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
-    labels = [tup[0] for tup in sortedResults]
-    data = [tup[1][0] for tup in sortedResults]
-    try :
-        error = [tup[1][1] for tup in sortedResults]
-    except:
-        error = np.zeros(len(sortedResults))
-
-    data = np.array(data)
-    error = np.array(error)
-
-    fig, ax = plt.subplots(figsize=(18.4, 10))
-    ax.invert_yaxis()
-
-    widths = data
-    ax.barh(labels, widths, height=0.75, xerr=error, capsize=5)
-    xcenters = widths / 2
-
-    text_color = 'white'
-    for y, (x, c) in enumerate(zip(xcenters, widths)):
-            ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
-
-    reweight = path.split('/')[-2]
-    plt.title('Feature permutations importance (averaged over {} repetitions)\nusing {} reweighting'.format(n_reps, reweight ), fontsize=20)
-    ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
-    ax.set_ylabel('Features', fontsize=18)
-    plt.savefig(path)
-    return fig, ax
-
-
 #################################################################################
 #####    presampler.py functions    #############################################
 #################################################################################
@@ -863,18 +802,103 @@ def merge_presamples(n_e, n_tasks, output_path, output_file):
         print('.', end='', flush=True)
     print(' (', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
 
-
-
-
 #################################################################################
-#####  UNDER DEVELOPMENT   ######################################################
+#####  FEATURE IMPORTANCE FUNCTIONS #############################################
 #################################################################################
+
+def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, file):
+    print('PERMUTATION DE : ' + feat)
+    bkg_rej = np.empty(n_rep)
+    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
+    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+    shuffled_sample = {key:value for (key,value) in valid_sample.items() if key != feat}
+    shuffled_sample[feat] = deepcopy(valid_sample[feat])                                    # Copy of the feature to be shuffled in order to keep valid_sample intact
+
+    for k in range(n_rep):                                                                  # Reshuffling loop
+        print('PERMUTATION DE ' + feat + " " + str(k+1))
+        rdm.shuffle(shuffled_sample[feat])                                                  # Shuffling of one feature
+        probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
+        fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+        bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
+
+    importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+    imp_tup = feat, np.mean(importance), np.std(importance)
+    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
+        pickle.dump(imp_tup, afp)
+
+def print_importances(file):
+    with open(file,'rb') as rfp:
+        record = dict()
+        while True:
+            try:
+                imp = pickle.load(rfp)
+                record[imp[0]] = imp[1:]
+            except EOFError:
+                break
+    print(record)
+    return record
+
+def plot_importances(results, path, n_reps):
+    sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
+    labels = [tup[0] for tup in sortedResults]
+    data = [tup[1][0] for tup in sortedResults]
+    try :
+        error = [tup[1][1] for tup in sortedResults]
+    except:
+        error = np.zeros(len(sortedResults))
+
+    data = np.array(data)
+    error = np.array(error)
+
+    fig, ax = plt.subplots(figsize=(18.4, 10))
+    ax.invert_yaxis()
+
+    widths = data
+    ax.barh(labels, widths, height=0.75, xerr=error, capsize=5)
+    xcenters = widths / 2
+
+    text_color = 'white'
+    for y, (x, c) in enumerate(zip(xcenters, widths)):
+            ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
+
+    reweight = path.split('/')[-2]
+    plt.title('Feature permutations importance (averaged over {} repetitions)\nusing {} reweighting'.format(n_reps, reweight ), fontsize=20)
+    ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
+    ax.set_ylabel('Features', fontsize=18)
+    plt.savefig(path)
+    return fig, ax
 
 def removal_bkg_rej(model,valid_probs,labels,feat,file):
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, afp)
+
+def correlations(sample, dir):
+    data = pd.DataFrame(sample)
+    names = data.columns
+    correlations = data.corr()
+
+    # plot correlation matrix
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(correlations, vmin=-1, vmax=1)
+    fig.colorbar(cax)
+    ticks = numpy.arange(0,9,1)
+    ax.set_xticks(ticks)
+    ax.set_yticks(ticks)
+    ax.set_xticklabels(names)
+    ax.set_yticklabels(names)
+    plt.savefig(dir + 'corr_matrix.png')
+
+    # plot scatter plot matrix
+    scatter_matrix(data)
+    plt.savefig(dir + 'scatter_plot_matrix.png')
+
+
+#################################################################################
+#####  UNDER DEVELOPMENT   ######################################################
+#################################################################################
 
 class Batch_Generator(tf.keras.utils.Sequence):
     def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):

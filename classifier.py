@@ -7,7 +7,7 @@ from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
-from   utils      import feature_permutation, print_importances, plot_importances, removal_bkg_rej
+from   utils      import feature_permutation, print_importances, plot_importances, removal_bkg_rej, correlations
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
@@ -55,6 +55,7 @@ parser.add_argument( '--n_reps'      , default = 10 , type = int     )
 parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
 parser.add_argument( '--impOut'      , default = 'importances.pkl'       )
+parser.add_argument( '--correlation' , default = 'OFF'       )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -171,6 +172,14 @@ if args.model_in != '':
     print('CLASSIFIER: loading pre-trained weights from', args.output_dir+'/'+args.model_in, '\n')
     model.load_weights(args.output_dir+'/'+args.model_in)
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
+
+# EVALUATING CORRELATIONS
+if args.correlation == 'ON':
+    sig_sample = {key : valid_sample[key][labels == 0] for key in scalars}
+    bkg_sample = {key : valid_sample[key][labels == 1] for key in scalars}
+    correlations(sig_sample, args.output_dir + '/signal/')
+    correlation(bkg_sample, args.output_dir + '/bkg/')
+    sys.exit() # No need for training or validation
 
 
 # TRAINING LOOP
