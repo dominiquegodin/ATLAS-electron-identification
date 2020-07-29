@@ -890,7 +890,7 @@ def LaTeXizer(names):
             continue
         for  i,scalar in enumerate(scalars):
             if name == scalar:
-                Lname.append(Lscalars[i])
+                Lnames.append(Lscalars[i])
                 break
     return Lnames
 
