@@ -175,7 +175,7 @@ if args.model_in != '':
 
 # EVALUATING CORRELATIONS
 if args.correlation == 'ON':
-    for path in [args.output_dir + '/correlations', args.output_dir + '/correlations/signal/', args.output_dir + '/correlations/bkg/']
+    for path in [args.output_dir + '/correlations', args.output_dir + '/correlations/signal/', args.output_dir + '/correlations/bkg/']:
         try: os.mkdir(path)
         except FileExistsError: pass
     print('CLASSIFIER : evaluating variables correlations')
