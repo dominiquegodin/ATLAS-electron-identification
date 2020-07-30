@@ -874,23 +874,23 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, afp)
 
-scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
-            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
-            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
-Lscalars = [r'$E_{ratio}$', r'$R_{eta}$', r'$R_{had}$', r'$R_{phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
-            'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
-            r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
-            r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p$'    , r'$w_{stot}$', r'$n_{Blayer}$' ]
-converter = {scalar:Lscalar for scalar,Lscalar in zip(scalars,Lscalars)}
 
 def LaTeXizer(names):
+    scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+    'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+    'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+    'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+    Lscalars = [r'$E_{ratio}$', r'$R_{eta}$', r'$R_{had}$', r'$R_{phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
+    'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
+    r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
+    r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p$'    , r'$w_{stot}$', r'$n_{Blayer}$' ]
+    converter = {scalar:Lscalar for scalar,Lscalar in zip(scalars,Lscalars)}
     Lnames = [converter[name] for name in names]
-    return Lnames
+    return converter,Lnames
 
 def correlations(sample, dir, LaTeX = True):
     data = pd.DataFrame(sample)
-    if LaTeX: data.rename(columns = converter)
+    if LaTeX: data.rename(columns = LaTeXizer([])[0])
     names = data.columns
     correlations = data.corr()
 
