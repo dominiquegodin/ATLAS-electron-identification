@@ -36,7 +36,7 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
-parser.add_argument( '--rm_features' , default = -1, type = int      ) # 0-19 : images, 20-42 : scalars, 43- : groups of features
+parser.add_argument( '--rm_features' , default = -1, type = int      ) # 0-19 : images, 20-41 : scalars, 42- : groups of features
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
@@ -73,6 +73,10 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
         (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
         (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
+# DATAFILE
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+if args.data_file == '': args.data_file = '/scratch/odenis/el_data.h5'
+#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # TRAINING VARIABLES
 images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
@@ -100,22 +104,23 @@ i = args.rm_features                                                            
 s = args.rm_features - len(images)                                                                              # scalar indices
 g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
 feat = ''
-if i >= 0 : images, feat = images[:i]+images[i+1:], images[i]                                                              # Removes the specified image
-if s >= 0: scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                                 # Removes the specified scalar
+if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[i]                                                   # Removes the specified image
+if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                               # Removes the specified scalar
+if g >= 0 :
+    images  = [key for key in images  if key in groups[g]]
+    scalars = [key for key in scalars if key in group[g]]
+    feat = 'group {}'.format(g)
 elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
+
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 args.output_dir = args.output_dir + '/' + feat
 
-# DATAFILE
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except OSError: continue
     except FileExistsError: pass
-    #if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
-    if args.data_file == '': args.data_file = '/scratch/odenis/el_data.h5'
-    #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
 sample_size  = len(h5py.File(args.data_file, 'r')['mcChannelNumber'])
