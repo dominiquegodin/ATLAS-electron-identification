@@ -181,8 +181,8 @@ if args.correlation == 'ON':
     print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
+    correlations(bkg_sample, args.output_dir + '/correlations/bkg/')
     correlations(sig_sample, args.output_dir + '/correlations/signal/')
-    correlation(bkg_sample, args.output_dir + '/correlations/bkg/')
     sys.exit() # No need for training or validation
 
 
