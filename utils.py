@@ -903,10 +903,10 @@ def correlations(sample, dir, LaTeX = True):
     # plot correlation matrix
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    cax = ax.matshow(correlations, vmin=-1, vmax=1)
+    cax = ax.matshow(correlations, vmin=-1, vmax=1, figsize=(20,20))
     fig.colorbar(cax)
     for (i, j), z in np.ndenumerate(correlations):
-        ax.text(j, i, '{:0.1f}'.format(z), ha='center', va='center', fontsize=8)
+        ax.text(j, i, '{:0.1f}'.format(z) if z != 0.0 and z != 1.0, ha='center', va='center', fontsize=8)
     ticks = np.arange(0,len(names),1)
     ax.set_xticks(ticks)
     ax.set_yticks(ticks)
@@ -917,7 +917,8 @@ def correlations(sample, dir, LaTeX = True):
     plt.savefig(dir + 'corr_matrix.png')
 
     # plot scatter plot matrix
-    scatter_matrix(data, figsize = (24,20))
+    scatter_matrix(data, figsize = (20,20))
+    plt.yticks(rotation=-90)
     plt.tight_layout()
     plt.savefig(dir + 'scatter_plot_matrix.png')
 

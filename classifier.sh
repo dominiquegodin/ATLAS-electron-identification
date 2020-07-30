@@ -1,5 +1,5 @@
 # CORRELATIONS
-python classifier.py  --correlation='ON' --n_valid=15e6 
+python classifier.py  --correlation='ON' --n_valid=1e6 
 
 exit
 
