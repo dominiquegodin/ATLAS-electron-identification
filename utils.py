@@ -875,7 +875,7 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
         pickle.dump(bkg_rej_tup, afp)
 
 
-def LaTeXizer(names):
+def LaTeXizer(names=[]):
     scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
     'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
     'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
@@ -890,7 +890,9 @@ def LaTeXizer(names):
 
 def correlations(sample, dir, LaTeX = True):
     data = pd.DataFrame(sample)
-    if LaTeX: data.rename(columns = LaTeXizer([])[0])
+    if LaTeX:
+        print("LaTeX : ", LaTeX)
+        data = data.rename(columns = LaTeXizer()[0])
     names = data.columns
     correlations = data.corr()
 
