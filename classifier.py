@@ -111,7 +111,7 @@ if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[
 if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                               # Removes the specified scalar
 if g >= 0 :
     images  = [key for key in images  if key in groups[g]]
-    scalars = [key for key in scalars if key in group[g]]
+    scalars = [key for key in scalars if key in groups[g]]
     feat = 'group {}'.format(g)
 elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
 
