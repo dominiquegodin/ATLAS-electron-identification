@@ -56,7 +56,7 @@ def var_histogram(sample, labels, weights, output_dir, prefix, var):
         bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
         plt.xticks(np.arange(0,bins[-1]+1,step=100)); plt.xlabel('$p_t$ (GeV)', fontsize=25)
     if var == 'eta':
-        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37]
+        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
         plt.xticks(bins); plt.xlabel('abs($\eta$)', fontsize=25)
     hs = pylab.hist(sig, bins, label='signal'    , histtype='step', weights=sig_weights, lw=2)[0]
     hb = pylab.hist(bkg, bins, label='background', histtype='step', weights=bkg_weights, lw=2)[0]
