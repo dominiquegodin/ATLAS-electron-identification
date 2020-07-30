@@ -906,7 +906,7 @@ def correlations(sample, dir, LaTeX = True):
     cax = ax.matshow(correlations, vmin=-1, vmax=1, figsize=(20,20))
     fig.colorbar(cax)
     for (i, j), z in np.ndenumerate(correlations):
-        ax.text(j, i, '{:0.1f}'.format(z) if z != 0.0 and z != 1.0, ha='center', va='center', fontsize=8)
+        ax.text(j, i, '{:0.1f}'.format(z) if z != 0.0 and z != 1.0 else '', ha='center', va='center', fontsize=8)
     ticks = np.arange(0,len(names),1)
     ax.set_xticks(ticks)
     ax.set_yticks(ticks)
