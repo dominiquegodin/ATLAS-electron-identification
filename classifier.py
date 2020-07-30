@@ -98,9 +98,9 @@ with h5py.File(args.data_file, 'r') as data:
 groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],
             ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],
             ['lar_endcap_Lr0','lar_endcap_Lr1','lar_endcap_Lr2','lar_endcap_Lr3'],
-            ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+            ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'],
             ['p_d0' , 'p_d0Sig'], ['p_d0' , 'p_d0Sig' , 'p_qd0Sig'], ['p_f1' , 'p_f3'],
-            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo'],
+            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo']
             ]
 i = args.rm_features                                                                                            # image indices
 s = args.rm_features - len(images)                                                                              # scalar indices
