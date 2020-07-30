@@ -909,7 +909,7 @@ def correlations(sample, dir, LaTeX = True):
     ax.set_yticks(ticks)
     ax.set_xticklabels(names)
     ax.set_yticklabels(names)
-    plt.xticks(rotation=60)
+    plt.xticks(rotation=30)
     plt.tight_layout()
     plt.savefig(dir + 'corr_matrix.png')
 
