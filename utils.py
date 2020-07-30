@@ -874,39 +874,33 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, afp)
 
+scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+Lscalars = [r'$E_{ratio}$', r'$R_{eta}$', r'$R_{had}$', r'$R_{phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
+            'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
+            r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
+            r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p$'    , r'$w_{stot}$', r'$n_{Blayer}$' ]
+converter = {scalar:Lscalar for scalar,Lscalar in zip(scalars,Lscalars)}
+
 def LaTeXizer(names):
-    scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
-                'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
-                'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-                'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
-    Lscalars = [r'$E_{ratio}$', r'$R_{eta}$', r'$R_{had}$', r'$R_{phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
-                'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
-                r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
-                r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p$'    , r'$w_{stot}$', r'$n_{Blayer}$' ]
-    Lnames = []
-    for name in names:
-        if name not in scalars:
-            Lnames.append(name)
-            continue
-        for  i,scalar in enumerate(scalars):
-            if name == scalar:
-                Lnames.append(Lscalars[i])
-                break
+    Lnames = [converter[name] for name in names]
     return Lnames
 
 def correlations(sample, dir, LaTeX = True):
     data = pd.DataFrame(sample)
+    if LaTeX: data.rename(columns = converter)
     names = data.columns
-    if LaTeX: names = LaTeXizer(names)
     correlations = data.corr()
 
     # plot correlation matrix
-    fig = plt.figure(figsize=(20,20))
+    fig = plt.figure(figsize=(20,18))
     ax = fig.add_subplot(111)
     cax = ax.matshow(correlations, vmin=-1, vmax=1)
     fig.colorbar(cax)
     for (i, j), z in np.ndenumerate(correlations):
-        ax.text(j, i, '{:0.1f}'.format(z) if round(z,1) != 0.0 and z != 1.0 else '', ha='center', va='center', fontsize=8)
+        ax.text(j, i, '{:0.1f}'.format(z) if abs(z) < 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
     ticks = np.arange(0,len(names),1)
     ax.set_xticks(ticks)
     ax.set_yticks(ticks)
@@ -917,7 +911,7 @@ def correlations(sample, dir, LaTeX = True):
     plt.savefig(dir + 'corr_matrix.png')
 
     # plot scatter plot matrix
-    scatter_matrix(data, figsize = (20,20))
+    scatter_matrix(data, figsize = (18,18))
     plt.yticks(rotation=-90)
     plt.tight_layout()
     plt.savefig(dir + 'scatter_plot_matrix.png')
