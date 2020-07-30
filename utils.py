@@ -901,9 +901,9 @@ def correlations(sample, dir, LaTeX = True):
     correlations = data.corr()
 
     # plot correlation matrix
-    fig = plt.figure()
+    fig = plt.figure(figsize=(20,20))
     ax = fig.add_subplot(111)
-    cax = ax.matshow(correlations, vmin=-1, vmax=1, figsize=(20,20))
+    cax = ax.matshow(correlations, vmin=-1, vmax=1)
     fig.colorbar(cax)
     for (i, j), z in np.ndenumerate(correlations):
         ax.text(j, i, '{:0.1f}'.format(z) if z != 0.0 and z != 1.0 else '', ha='center', va='center', fontsize=8)
