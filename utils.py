@@ -1,5 +1,7 @@
 import tensorflow as tf, matplotlib.pyplot as plt
 import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
+import pandas as pd
+from pandas.plotting import scatter_matrix
 from   sklearn    import metrics, utils, preprocessing
 from   tabulate   import tabulate
 from   skimage    import transform
@@ -874,6 +876,58 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
         pickle.dump(bkg_rej_tup, afp)
 
 
+def LaTeXizer(names=[]):
+    scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+    'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+    'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+    'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+    Lscalars = [r'$E_{ratio}$', r'$R_{\eta}$', r'$R_{had}$', r'$R_{\phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
+    'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
+    r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
+    r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p$'    , r'$w_{stot}$', r'$n_{Blayer}$' ]
+    converter = {scalar:Lscalar for scalar,Lscalar in zip(scalars,Lscalars)}
+    Lnames = [converter[name] for name in names]
+    return converter,Lnames
+
+def correlations(sample, dir, LaTeX = True):
+    data = pd.DataFrame(sample)
+    if LaTeX:
+        print("LaTeX : ", LaTeX)
+        data = data.rename(columns = LaTeXizer()[0])
+    names = data.columns
+    correlations = data.corr()
+
+    # plot correlation matrix
+    print('Plotting correimport tensorflow as tf, matplotlib.pyplot as plt
+import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
+import pandas as pd
+from pandas.plotting import scatter_matrix
+from   sklearn    import metrics, utils, preprocessing
+from   tabulate   import tabulate
+from   skimage    import transformlation matrix')
+    fig = plt.figure(figsize=(20,18))
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(correlations, vmin=-1, vmax=1)
+    fig.colorbar(cax)
+    for (i, j), z in np.ndenumerate(correlations):
+        ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
+    ticks = np.arange(0,len(names),1)
+    ax.set_xticks(ticks)
+    ax.set_yticks(ticks)
+    ax.set_xticklabels(names, fontsize = 14)
+    ax.set_yticklabels(names, fontsize = 14)
+    plt.xticks(rotation=30)
+    plt.tight_layout()
+    if pdf :
+        plt.savefig(dir + 'corr_matrix.png')
+    else:
+
+    # plot scatter plot matrix
+    print('Plotting scatter plot matrix')
+    scatter_matrix(data, figsize = (18,18))
+    plt.yticks(rotation=-90)
+    plt.tight_layout()
+    plt.savefig(dir + 'scatter_plot_matrix.png')
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################
