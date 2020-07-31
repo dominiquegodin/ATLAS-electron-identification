@@ -211,8 +211,10 @@ if args.correlation == 'ON':
         scaler_out = args.output_dir+'/'+args.scaler_out
         train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
         dir = 'QT'
+        mode = ' with quantile transform'
     else :
         dir = 'NoQT'
+        mode = ''
     for path in [args.output_dir + '/correlations/', args.output_dir + '/correlations/' + dir,
                  args.output_dir + '/correlations/' + dir + '/signal/', args.output_dir + '/correlations/' + dir + '/bkg/']:
         try: os.mkdir(path)
@@ -220,8 +222,8 @@ if args.correlation == 'ON':
     print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
-    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/')
-    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/')
+    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/', '\n(Background' + mode + ')')
+    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' , '\n(Signal' + mode + ')')
     sys.exit() # No need for training or validation
 
 
