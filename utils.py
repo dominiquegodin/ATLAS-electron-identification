@@ -889,7 +889,7 @@ def LaTeXizer(names=[]):
     Lnames = [converter[name] for name in names]
     return converter,Lnames
 
-def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
+def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fname=''):
     data = pd.DataFrame(sample)
     if LaTeX:
         print("LaTeX : ", "ON" if LaTeX else 'OFF')
@@ -915,10 +915,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
     plt.xticks(rotation=30)
     plt.title('Correlation matrix' + mode, fontsize = 20)
     plt.tight_layout()
-    if pdf :
-        plt.savefig(dir + 'corr_matrix.pdf')
-    else:
-        plt.savefig(dir + 'corr_matrix.png')
+    plt.savefig(dir + 'corr_matrix' + fname + frmt)
 
     # plot scatter plot matrix
     if scatter:
@@ -927,7 +924,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
         plt.title('Scatter plot matrix' + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
-        plt.savefig(dir + 'scatter_plot_matrix.png')
+        plt.savefig(dir + 'scatter_plot_matrix' + fname + frmt)
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################

@@ -97,12 +97,18 @@ scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_
             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
-if args.tracks == 'ON':
-    scalars += ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
+tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
                 'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
                 'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
                 'p_mean_sigmad0']
-
+if args.tracks == 'ON':
+    scalars += tracks_means
+    fname = '_with_tracks'
+elif args.tracks == 'ONLY':
+    scalars = tracks_means
+    fname = '_tracks_only'
+else :
+    fname = ''
 others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
             'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
@@ -222,8 +228,8 @@ if args.correlation == 'ON':
     print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
-    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/', mode = '\n(Background' + mode + ')')
-    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' , mode = '\n(Signal' + mode + ')')
+    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/', mode = '\n(Background' + mode + ')', fname=fname)
+    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' , mode = '\n(Signal' + mode + ')', fname=fname)
     sys.exit() # No need for training or validation
 
 
