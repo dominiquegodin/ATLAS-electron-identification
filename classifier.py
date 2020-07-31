@@ -213,7 +213,7 @@ if args.correlation == 'ON':
         dir = 'QT'
     else :
         dir = 'NoQT'
-    for path in [args.output_dir + dir, args.output_dir + '/correlations/' + dir + '/signal/', args.output_dir + dir + '/bkg/']:
+    for path in [args.output_dir + '/correlations/' + dir, args.output_dir + '/correlations/' + dir + '/signal/', args.output_dir + '/correlations/' + dir + '/bkg/']:
         try: os.mkdir(path)
         except FileExistsError: pass
     print('CLASSIFIER : evaluating variables correlations')
