@@ -889,7 +889,7 @@ def LaTeXizer(names=[]):
     Lnames = [converter[name] for name in names]
     return converter,Lnames
 
-def correlations(sample, dir, LaTeX = True):
+def correlations(sample, dir, scatter=False,LaTeX=True, pdf=True):
     data = pd.DataFrame(sample)
     if LaTeX:
         print("LaTeX : ", LaTeX)
@@ -899,12 +899,6 @@ def correlations(sample, dir, LaTeX = True):
 
     # plot correlation matrix
     print('Plotting correimport tensorflow as tf, matplotlib.pyplot as plt
-import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
-import pandas as pd
-from pandas.plotting import scatter_matrix
-from   sklearn    import metrics, utils, preprocessing
-from   tabulate   import tabulate
-from   skimage    import transformlation matrix')
     fig = plt.figure(figsize=(20,18))
     ax = fig.add_subplot(111)
     cax = ax.matshow(correlations, vmin=-1, vmax=1)
@@ -919,15 +913,17 @@ from   skimage    import transformlation matrix')
     plt.xticks(rotation=30)
     plt.tight_layout()
     if pdf :
-        plt.savefig(dir + 'corr_matrix.png')
+        plt.savefig(dir + 'corr_matrix.pdf')
     else:
+        plt.savefig(dir + 'corr_matrix.png')
 
     # plot scatter plot matrix
-    print('Plotting scatter plot matrix')
-    scatter_matrix(data, figsize = (18,18))
-    plt.yticks(rotation=-90)
-    plt.tight_layout()
-    plt.savefig(dir + 'scatter_plot_matrix.png')
+    if scatter:
+        print('Plotting scatter plot matrix')
+        scatter_matrix(data, figsize = (18,18))
+        plt.yticks(rotation=-90)
+        plt.tight_layout()
+        plt.savefig(dir + 'scatter_plot_matrix.png')
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################
