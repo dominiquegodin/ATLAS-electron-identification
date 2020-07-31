@@ -907,7 +907,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
     ticks = np.arange(0,len(names),1)
     xtcks = np.arange(0,len(names),1, dtype = 'float64')
-    xtcks[np.where(names in ['p_numberOfSCTHits', r'Nb of SCT hits','p_sct_weight_charge', r'sct wt charge'])[0]] += 0.35
+    xtcks[np.nonzero(np.isin(names,['p_numberOfSCTHits', r'Nb of SCT hits','p_sct_weight_charge', r'sct wt charge'])[0]] += 0.35
     ax.set_xticks(xtcks)
     ax.set_yticks(ticks)
     ax.set_xticklabels(names, fontsize = 14)
