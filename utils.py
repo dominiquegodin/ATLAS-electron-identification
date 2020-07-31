@@ -692,6 +692,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
+
 #################################################################################
 #####    presampler.py functions    #############################################
 #################################################################################
@@ -802,9 +803,10 @@ def merge_presamples(n_e, n_tasks, output_path, output_file):
         print('.', end='', flush=True)
     print(' (', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
 
-#################################################################################
-#####  FEATURE IMPORTANCE FUNCTIONS #############################################
-#################################################################################
+
+    #################################################################################
+    #####  FEATURE IMPORTANCE  ######################################################
+    #################################################################################
 
 def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, file):
     print('PERMUTATION DE : ' + feat)
@@ -838,7 +840,7 @@ def print_importances(file):
     print(record)
     return record
 
-def plot_importances(results, path, n_reps):
+def plot_importances(results, path, title):
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
     labels = [tup[0] for tup in sortedResults]
     data = [tup[1][0] for tup in sortedResults]
@@ -861,8 +863,7 @@ def plot_importances(results, path, n_reps):
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
 
-    reweight = path.split('/')[-2]
-    plt.title('Feature permutations importance (averaged over {} repetitions)\nusing {} reweighting'.format(n_reps, reweight ), fontsize=20)
+    plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
     plt.savefig(path)
@@ -888,7 +889,7 @@ def LaTeXizer(names=[]):
     Lnames = [converter[name] for name in names]
     return converter,Lnames
 
-def correlations(sample, dir, LaTeX = True):
+def correlations(sample, dir, scatter=False,LaTeX=True, pdf=True):
     data = pd.DataFrame(sample)
     if LaTeX:
         print("LaTeX : ", "ON" if LaTeX else 'OFF')
@@ -911,21 +912,22 @@ def correlations(sample, dir, LaTeX = True):
     ax.set_yticklabels(names, fontsize = 14)
     plt.xticks(rotation=30)
     plt.tight_layout()
-    plt.savefig(dir + 'corr_matrix.png')
+    if pdf :
+        plt.savefig(dir + 'corr_matrix.pdf')
+    else:
+        plt.savefig(dir + 'corr_matrix.png')
 
     # plot scatter plot matrix
-    print('Plotting scatter plot matrix')
-    scatter_matrix(data, figsize = (18,18))
-    plt.yticks(rotation=-90)
-    plt.tight_layout()
-    plt.savefig(dir + 'scatter_plot_matrix.png')
+    if scatter:
+        print('Plotting scatter plot matrix')
+        scatter_matrix(data, figsize = (18,18))
+        plt.yticks(rotation=-90)
+        plt.tight_layout()
+        plt.savefig(dir + 'scatter_plot_matrix.png')
 
-
-
-
-#################################################################################
-#####  UNDER DEVELOPMENT   ######################################################
-#################################################################################
+        #################################################################################
+        #####  UNDER DEVELOPMENT   ######################################################
+        #################################################################################
 
 class Batch_Generator(tf.keras.utils.Sequence):
     def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):

@@ -36,8 +36,7 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
-parser.add_argument( '--rm_images'   , default = -1, type = int      )
-parser.add_argument( '--rm_scalars'  , default = -1, type = int      )
+parser.add_argument( '--rm_features' , default = -1, type = int      ) # 0-19 : images, 20-41 : scalars, 42- : groups of features
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
@@ -111,11 +110,36 @@ with h5py.File(args.data_file, 'r') as data:
     images  = [key for key in images  if key in data or key=='tracks_image']
     scalars = [key for key in scalars if key in data]
     others  = [key for key in others  if key in data]
+
+groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],
+            ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],
+            ['lar_endcap_Lr0','lar_endcap_Lr1','lar_endcap_Lr2','lar_endcap_Lr3'],
+            ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'],
+            ['p_d0' , 'p_d0Sig'], ['p_d0' , 'p_d0Sig' , 'p_qd0Sig'], ['p_f1' , 'p_f3'],
+            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo']
+            ]
+i = args.rm_features                                                                                            # image indices
+s = args.rm_features - len(images)                                                                              # scalar indices
+g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
+feat = ''
+print('i : {}, s : {s}, g : {}'.format(i,s,g))
+if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[i]                                                   # Removes the specified image
+if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                               # Removes the specified scalar
+if g >= 0 :
+    images  = [key for key in images  if key in groups[g]]
+    scalars = [key for key in scalars if key in groups[g]]
+    feat = 'group {}'.format(g)
+elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
+
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
-             'scalars':scalars if args.scalars=='ON' else []}
-
+             'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
+args.output_dir = args.output_dir + '/' + feat
 
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+    try: os.mkdir(path)
+    except OSError: continue
+    except FileExistsError: pass
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
 sample_size  = len(h5py.File(args.data_file, 'r')['mcChannelNumber'])

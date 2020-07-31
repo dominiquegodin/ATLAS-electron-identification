@@ -68,3 +68,7 @@ python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=ou
 
 # FEATURE PERMUTATION IMPORTANCE PLOTTING
 python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.pkl' --importances_out='outputs/2c_10m/match2s_2d/perm_imp.png'
+
+# FEATURE REMOVAL IMPORTANCE (BELUGA)
+python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
+                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --impOut='removal_importance.pkl' --rm_scalars=${VAR}
