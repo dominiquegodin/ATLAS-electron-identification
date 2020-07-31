@@ -129,7 +129,7 @@ if g >= 0 :
     images  = [key for key in images  if key in groups[g]]
     scalars = [key for key in scalars if key in groups[g]]
     feat = 'group {}'.format(g)
-elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
+elif args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF': feat = 'full'
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
