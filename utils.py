@@ -891,7 +891,7 @@ def LaTeXizer(names=[]):
 def correlations(sample, dir, LaTeX = True):
     data = pd.DataFrame(sample)
     if LaTeX:
-        print("LaTeX : ", LaTeX)
+        print("LaTeX : ", "ON" if LaTeX else 'OFF')
         data = data.rename(columns = LaTeXizer()[0])
     names = data.columns
     correlations = data.corr()
