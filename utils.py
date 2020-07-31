@@ -905,7 +905,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
     fig.colorbar(cax)
     for (i, j), z in np.ndenumerate(correlations):
         ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
-    ticks = np.arange(0,len(names),1, dtype = float64)
+    ticks = np.arange(0,len(names),1, dtype = 'float64')
     ticks[[5,17]] += 0.2
     ax.set_xticks(ticks)
     ax.set_yticks(ticks)
