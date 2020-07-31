@@ -210,10 +210,10 @@ if args.correlation == 'ON':
     if args.scaling:
         scaler_out = args.output_dir+'/'+args.scaler_out
         train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
-        dir = '/correlations/QT'
+        dir = 'QT'
     else :
-        dir = '/correlations/NoQT'
-    for path in [args.output_dir + dir, args.output_dir + dir + '/signal/', args.output_dir + dir + '/bkg/']:
+        dir = 'NoQT'
+    for path in [args.output_dir + dir, args.output_dir + '/correlations/' + dir + '/signal/', args.output_dir + dir + '/bkg/']:
         try: os.mkdir(path)
         except FileExistsError: pass
     print('CLASSIFIER : evaluating variables correlations')
