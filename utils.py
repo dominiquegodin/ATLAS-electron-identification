@@ -908,12 +908,11 @@ def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
     ticks = np.arange(0,len(names),1)
     xtcks = np.arange(0,len(names),1, dtype = 'float64')
     xtcks[[5,17]] += 0.35
-    ax.set_xticks(ticks)
+    ax.set_xticks(xtcks)
     ax.set_yticks(ticks)
     ax.set_xticklabels(names, fontsize = 14)
     ax.set_yticklabels(names, fontsize = 14)
     plt.xticks(rotation=30)
-    ax.xaxis.set_label_coords(xtcks, 0)
     plt.title('Correlation matrix' + mode, fontsize = 20)
     plt.tight_layout()
     if pdf :
