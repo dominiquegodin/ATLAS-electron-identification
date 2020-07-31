@@ -889,7 +889,7 @@ def LaTeXizer(names=[]):
     Lnames = [converter[name] for name in names]
     return converter,Lnames
 
-def correlations(sample, dir, scatter=False,LaTeX=True, pdf=True, mode=''):
+def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
     data = pd.DataFrame(sample)
     if LaTeX:
         print("LaTeX : ", "ON" if LaTeX else 'OFF')
