@@ -911,7 +911,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
     ax.set_xticklabels(names, fontsize = 14)
     ax.set_yticklabels(names, fontsize = 14)
     plt.xticks(rotation=30)
-    plt.title('Correlation matrix' + mode)
+    plt.title('Correlation matrix' + mode, fontsize = 20)
     plt.tight_layout()
     if pdf :
         plt.savefig(dir + 'corr_matrix.pdf')
@@ -922,7 +922,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
     if scatter:
         print('Plotting scatter plot matrix')
         scatter_matrix(data, figsize = (18,18))
-        plt.title('Scatter plot matrix' + mode)
+        plt.title('Scatter plot matrix' + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
         plt.savefig(dir + 'scatter_plot_matrix.png')
