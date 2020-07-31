@@ -54,8 +54,9 @@ parser.add_argument( '--featImp'     , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10 , type = int     )
 parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
-parser.add_argument( '--impOut'      , default = 'importances.pkl'       )
-parser.add_argument( '--correlation' , default = 'OFF'       )
+parser.add_argument( '--impOut'      , default = 'importances.pkl'   )
+parser.add_argument( '--correlation' , default = 'OFF'               )
+parser.add_argument( '--tracks'      , default = 'OFF')
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -97,6 +98,12 @@ scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_
             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+if args.tracks == 'ON':
+    scalars += ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
+                'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
+                'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
+                'p_mean_sigmad0']
+
 others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
             'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
@@ -173,9 +180,16 @@ if args.model_in != '':
     model.load_weights(args.output_dir+'/'+args.model_in)
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
+
 # EVALUATING CORRELATIONS
 if args.correlation == 'ON':
-    for path in [args.output_dir + '/correlations', args.output_dir + '/correlations/signal/', args.output_dir + '/correlations/bkg/']:
+    if args.scaling:
+        scaler_out = args.output_dir+'/'+args.scaler_out
+        train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
+        dir = '/correlations/QT'
+    else :
+        dir = '/correlations/NoQT'
+    for path in [args.output_dir + dir, args.output_dir + dir + '/signal/', args.output_dir + dir + '/bkg/']:
         try: os.mkdir(path)
         except FileExistsError: pass
     print('CLASSIFIER : evaluating variables correlations')
