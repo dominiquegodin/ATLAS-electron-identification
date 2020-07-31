@@ -913,7 +913,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, pdf=True, mode=''):
     ax.set_xticklabels(names, fontsize = 14)
     ax.set_yticklabels(names, fontsize = 14)
     plt.xticks(rotation=30)
-    ax.set_yticks(ticks)
+    ax.set_xticks(ticks)
     plt.title('Correlation matrix' + mode, fontsize = 20)
     plt.tight_layout()
     if pdf :
