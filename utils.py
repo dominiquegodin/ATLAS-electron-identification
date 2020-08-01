@@ -898,7 +898,7 @@ def correlations(sample, dir, scatter=False,LaTeX=True, pdf=True):
     correlations = data.corr()
 
     # plot correlation matrix
-    print('Plotting correimport tensorflow as tf, matplotlib.pyplot as plt
+    print('Plotting correlation matrix')
     fig = plt.figure(figsize=(20,18))
     ax = fig.add_subplot(111)
     cax = ax.matshow(correlations, vmin=-1, vmax=1)

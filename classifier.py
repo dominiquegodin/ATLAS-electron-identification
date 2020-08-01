@@ -53,7 +53,7 @@ parser.add_argument( '--featImp'     , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10 , type = int     )
 parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
-parser.add_argument( '--impOut'      , default = 'importances.pkl'       )
+parser.add_argument( '--impOut'      , default = 'importances.pkl'   )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
