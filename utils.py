@@ -808,6 +808,35 @@ def merge_presamples(n_e, n_tasks, output_path, output_file):
     #####  FEATURE IMPORTANCE  ######################################################
     #################################################################################
 
+def LaTeXizer(names=[]):
+    vars  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+             'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+             'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
+             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+    vars += ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits', 'p_EoverP' ]
+    vars += ['group 0', 'group 1', 'group 2', 'group 3', 'group 4', 'group 5', 'group 6', 'group 7',
+             'group 8',  'group 9', 'group 10', 'group 11']
+
+    Lvars =  ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+              'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+              'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
+              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+    Lvars += [r'$E_{ratio}$', r'$R_{\eta}$', r'$R_{had}$', r'$R_{\phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
+              'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
+              r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
+              r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
+    Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
+              'lar_endcap variables', 'tile variables', 'r$d_0 variables 1$', 'r$d_0 variables 2$', r'$f_1$ and f_3$',
+              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks} and p_t$', 'group 11']
+
+    converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}
+    Lnames = [converter[name] for name in names]
+    return converter,Lnames
+
+
 def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, file):
     print('PERMUTATION DE : ' + feat)
     bkg_rej = np.empty(n_rep)
@@ -843,6 +872,7 @@ def print_importances(file):
 def plot_importances(results, path, title):
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
     labels = [tup[0] for tup in sortedResults]
+    newLabels = LaTeXizer(labels)[1]
     data = [tup[1][0] for tup in sortedResults]
     try :
         error = [tup[1][1] for tup in sortedResults]
@@ -856,13 +886,14 @@ def plot_importances(results, path, title):
     ax.invert_yaxis()
 
     widths = data
-    ax.barh(labels, widths, height=0.75, xerr=error, capsize=5)
+    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5)
     xcenters = widths / 2
 
     text_color = 'white'
     for y, (x, c) in enumerate(zip(xcenters, widths)):
             ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
 
+    plt.axvline(1,color='r', ls=':')
     plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
@@ -875,19 +906,6 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, afp)
 
-
-def LaTeXizer(names=[]):
-    scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
-    'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
-    'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-    'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
-    Lscalars = [r'$E_{ratio}$', r'$R_{\eta}$', r'$R_{had}$', r'$R_{\phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
-    'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
-    r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
-    r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p$'    , r'$w_{stot}$', r'$n_{Blayer}$' ]
-    converter = {scalar:Lscalar for scalar,Lscalar in zip(scalars,Lscalars)}
-    Lnames = [converter[name] for name in names]
-    return converter,Lnames
 
 def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fname=''):
     data = pd.DataFrame(sample)
