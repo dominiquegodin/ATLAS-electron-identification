@@ -926,7 +926,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
     ticks = np.arange(0,len(names),1)
     xtcks = np.arange(0,len(names),1, dtype = 'float64')
     try :
-        xtcks[[5,17]] += 0.35
+        xtcks[[5,17]] += [0,0.35][fname == '_with_tracks']
     except:
         pass
     ax.set_xticks(xtcks)
