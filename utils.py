@@ -4,7 +4,7 @@ import pandas as pd
 from pandas.plotting import scatter_matrix
 from   sklearn    import metrics, utils, preprocessing
 from   tabulate   import tabulate
-#from   skimage    import transform
+from   skimage    import transform
 from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
 from   plots_KM   import plot_distributions_KM, differential_plots
 from   copy       import deepcopy
