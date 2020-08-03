@@ -906,10 +906,11 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, afp)
 
-def correlations(sample, dir, scatter=False,LaTeX=True, pdf=True):
+
+def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fname=''):
     data = pd.DataFrame(sample)
     if LaTeX:
-        print("LaTeX : ", LaTeX)
+        print("LaTeX : ", "ON" if LaTeX else 'OFF')
         data = data.rename(columns = LaTeXizer()[0])
     names = data.columns
     correlations = data.corr()
@@ -923,24 +924,28 @@ def correlations(sample, dir, scatter=False,LaTeX=True, pdf=True):
     for (i, j), z in np.ndenumerate(correlations):
         ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
     ticks = np.arange(0,len(names),1)
-    ax.set_xticks(ticks)
+    xtcks = np.arange(0,len(names),1, dtype = 'float64')
+    try :
+        xtcks[[5,17]] += 0.35
+    except:
+        pass
+    ax.set_xticks(xtcks)
     ax.set_yticks(ticks)
     ax.set_xticklabels(names, fontsize = 14)
     ax.set_yticklabels(names, fontsize = 14)
-    plt.xticks(rotation=30)
+    plt.xticks(rotation=[30,90][fname == '_with_tracks'])
+    plt.title('Correlation matrix' + mode, fontsize = 20)
     plt.tight_layout()
-    if pdf :
-        plt.savefig(dir + 'corr_matrix.pdf')
-    else:
-        plt.savefig(dir + 'corr_matrix.png')
+    plt.savefig(dir + 'corr_matrix' + fname + frmt)
 
     # plot scatter plot matrix
     if scatter:
         print('Plotting scatter plot matrix')
         scatter_matrix(data, figsize = (18,18))
+        plt.title('Scatter plot matrix' + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
-        plt.savefig(dir + 'scatter_plot_matrix.png')
+        plt.savefig(dir + 'scatter_plot_matrix' + fname + frmt)
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################

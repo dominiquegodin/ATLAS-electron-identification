@@ -7,7 +7,7 @@ from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
-from   utils      import feature_permutation, print_importances, plot_importances, removal_bkg_rej
+from   utils      import feature_permutation, print_importances, plot_importances, removal_bkg_rej, correlations
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
@@ -54,6 +54,8 @@ parser.add_argument( '--n_reps'      , default = 10 , type = int     )
 parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
 parser.add_argument( '--impOut'      , default = 'importances.pkl'   )
+parser.add_argument( '--correlation' , default = 'OFF'               )
+parser.add_argument( '--tracks'      , default = 'OFF')
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -86,7 +88,19 @@ images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_
 scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
+            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits']
+tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
+                'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
+                'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
+                'p_mean_sigmad0']
+if args.tracks == 'ON':
+    scalars += tracks_means
+    fname = '_with_tracks'
+elif args.tracks == 'ONLY':
+    scalars = tracks_means
+    fname = '_tracks_only'
+else :
+    fname = ''
 others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
             'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
@@ -113,7 +127,7 @@ if g >= 0 :
     images  = [key for key in images  if key not in groups[g]]
     scalars = [key for key in scalars if key not in groups[g]]
     feat = 'group {}'.format(g)
-elif args.images == 'ON' and args.scalars == 'ON': feat = 'full'
+elif args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF': feat = 'full'
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
@@ -187,6 +201,28 @@ if args.model_in != '':
     print('CLASSIFIER: loading pre-trained weights from', args.output_dir+'/'+args.model_in, '\n')
     model.load_weights(args.output_dir+'/'+args.model_in)
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
+
+
+# EVALUATING CORRELATIONS
+if args.correlation == 'ON':
+    if args.scaling:
+        scaler_out = args.output_dir+'/'+args.scaler_out
+        train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
+        dir = 'QT'
+        mode = ' with quantile transform'
+    else :
+        dir = 'NoQT'
+        mode = ''
+    for path in [args.output_dir + '/correlations/', args.output_dir + '/correlations/' + dir,
+                 args.output_dir + '/correlations/' + dir + '/signal/', args.output_dir + '/correlations/' + dir + '/bkg/']:
+        try: os.mkdir(path)
+        except FileExistsError: pass
+    print('CLASSIFIER : evaluating variables correlations')
+    sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
+    bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
+    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/', mode = '\n(Background' + mode + ')', fname=fname)
+    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' , mode = '\n(Signal' + mode + ')', fname=fname)
+    sys.exit() # No need for training or validation
 
 
 # TRAINING LOOP
