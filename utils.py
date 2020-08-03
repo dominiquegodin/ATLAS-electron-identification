@@ -816,10 +816,9 @@ def LaTeXizer(names=[]):
     vars += ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
-    vars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'lar_endcap variables',
-             'tile variables', 'r$d_0 variables 1$', 'r$d_0 variables 2$', r'$f_1$ and f_3$',
-             r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks} and p_t$', 'group 10', 'group 11']
+             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits', 'p_EoverP' ]
+    vars += ['group 0', 'group 1', 'group 2', 'group 3', 'group 4', 'group 5', 'group 6', 'group 7',
+             'group 8',  'group 9', 'group 10', 'group 11']
 
     Lvars =  ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
               'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
@@ -828,9 +827,10 @@ def LaTeXizer(names=[]):
     Lvars += [r'$E_{ratio}$', r'$R_{\eta}$', r'$R_{had}$', r'$R_{\phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
               'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
               r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
-              r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p$'    , r'$w_{stot}$', r'$n_{Blayer}$' ]
-    Lvars += ['group 0', 'group 1', 'group 2', 'group 3', 'group 4', 'group 5', 'group 6', 'group 7',
-              'group 8',  'group 9', 'group 10', 'group 11']
+              r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
+    Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
+              'lar_endcap variables', 'tile variables', 'r$d_0 variables 1$', 'r$d_0 variables 2$', r'$f_1$ and f_3$',
+              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks} and p_t$', 'group 11']
 
     converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}
     Lnames = [converter[name] for name in names]
