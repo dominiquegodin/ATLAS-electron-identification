@@ -206,7 +206,7 @@ if args.model_in != '':
 
 
 # EVALUATING CORRELATIONS
-if args.correlation == 'ON':
+if args.correlation == 'ON' or args.correlation == 'SCATTER':
     if args.scaling:
         scaler_out = args.output_dir+'/'+args.scaler_out
         train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
@@ -222,8 +222,10 @@ if args.correlation == 'ON':
     print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
-    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/', mode = '\n(Background' + mode + ')', fname=fname)
-    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' , mode = '\n(Signal' + mode + ')', fname=fname)
+    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/',
+                 scatter=args.correlation,  mode = '\n(Background' + mode + ')', fname=fname)
+    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' ,
+                 scatter=args.correlation, mode = '\n(Signal' + mode + ')', fname=fname)
     sys.exit() # No need for training or validation
 
 

@@ -15,14 +15,14 @@ for file in feats:
     try:
         with open('/scratch/odenis/removal_importance/' + file + '/removal_importance.pkl', 'rb') as rfp:
             bkg_tup = pickle.load(rfp)
-            bkg_rej[bkg_tup[0]] = bkg_tup[1]
+            key = bkg_tup[0].replace(' ', '_')
+            bkg_rej[key] = bkg_tup[1]
     except:
-        continue 
+        continue
 
 imp = dict()
 for feat in feats[1:]:
-    imp[feat] = bkg_rej['full']/bkg_rej[feat],
-
+    imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
 path = '/scratch/odenis/removal_importance/rm_imp.png'
 title = 'Feature removal importance without reweighting'
 plot_importances(imp, path, title)
