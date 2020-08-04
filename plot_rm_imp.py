@@ -10,7 +10,8 @@ feats = [
             'group_0', 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7','group_8',  'group_9', 'group_10'
         ]
 
-bkg_rej = dict()
+bkg_rej = {}
+absent = []
 for file in feats:
     try:
         with open('/scratch/odenis/removal_importance/' + file + '/removal_importance.pkl', 'rb') as rfp:
@@ -20,10 +21,11 @@ for file in feats:
             bkg_rej[key] = bkg_tup[1]
     except:
         print(file + ' not in directory')
+        absent.append(file)
         continue
 print('\n', bkg_rej)
-imp = dict()
-for feat in feats[1:]:
+imp = {}
+for feat in feats[1:] and not in absent:
     imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
 path = '/scratch/odenis/removal_importance/rm_imp.png'
 title = 'Feature removal importance without reweighting'
