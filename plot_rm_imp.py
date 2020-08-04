@@ -25,7 +25,7 @@ for file in feats:
         continue
 print('\n', bkg_rej)
 imp = {}
-for feat in [f for f in feats if f not in absent+ ['full']:
+for feat in [f for f in feats if f not in absent+ ['full']]:
     imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
 path = '/scratch/odenis/removal_importance/rm_imp.png'
 title = 'Feature removal importance without reweighting'
