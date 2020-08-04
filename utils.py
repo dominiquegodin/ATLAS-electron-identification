@@ -829,7 +829,7 @@ def LaTeXizer(names=[]):
               r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
               r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
     Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
-              'lar_endcap variables', 'tile variables', 'r$d_0 variables 1$', 'r$d_0 variables 2$', r'$f_1$ and f_3$',
+              'lar_endcap variables', 'tile variables', r'$d_0$ variables 1', r'$d_0$ variables 2', r'$f_1$ and $f_3$',
               r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks} and p_t$', 'group 11']
 
     converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}
@@ -878,15 +878,14 @@ def plot_importances(results, path, title):
         error = [tup[1][1] for tup in sortedResults]
     except:
         error = np.zeros(len(sortedResults))
-
     data = np.array(data)
     error = np.array(error)
 
     fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
-
     widths = data
-    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5)
+    color = ['g' if 'variables' in label else 'tab:blue' for label in labels]
+    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
     xcenters = widths / 2
 
     text_color = 'white'
