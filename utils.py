@@ -915,37 +915,39 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
     names = data.columns
     correlations = data.corr()
 
-    # plot correlation matrix
-    print('Plotting correlation matrix')
-    fig = plt.figure(figsize=(20,18))
-    ax = fig.add_subplot(111)
-    cax = ax.matshow(correlations, vmin=-1, vmax=1)
-    fig.colorbar(cax)
-    for (i, j), z in np.ndenumerate(correlations):
-        ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
-    ticks = np.arange(0,len(names),1)
-    xtcks = np.arange(0,len(names),1, dtype = 'float64')
-    try :
-        xtcks[[5,17]] += 0.35
-    except:
-        pass
-    ax.set_xticks(xtcks)
-    ax.set_yticks(ticks)
-    ax.set_xticklabels(names, fontsize = 14)
-    ax.set_yticklabels(names, fontsize = 14)
-    plt.xticks(rotation=[30,90][fname == '_with_tracks'])
-    plt.title('Correlation matrix' + mode, fontsize = 20)
-    plt.tight_layout()
-    plt.savefig(dir + 'corr_matrix' + fname + frmt)
-
     # plot scatter plot matrix
-    if scatter:
+    if scatter == 'SCATTER':
         print('Plotting scatter plot matrix')
         scatter_matrix(data, figsize = (18,18))
         plt.title('Scatter plot matrix' + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
         plt.savefig(dir + 'scatter_plot_matrix' + fname + frmt)
+
+    # plot correlation matrix
+    else:
+        print('Plotting correlation matrix')
+        fig = plt.figure(figsize=(20,18))
+        ax = fig.add_subplot(111)
+        cax = ax.matshow(correlations, vmin=-1, vmax=1)
+        fig.colorbar(cax)
+        for (i, j), z in np.ndenumerate(correlations):
+            ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
+        ticks = np.arange(0,len(names),1)
+        xtcks = np.arange(0,len(names),1, dtype = 'float64')
+        try :
+            xtcks[[5,17]] += 0.35
+        except:
+            pass
+        ax.set_xticks(xtcks)
+        ax.set_yticks(ticks)
+        ax.set_xticklabels(names, fontsize = 14)
+        ax.set_yticklabels(names, fontsize = 14)
+        plt.xticks(rotation=[30,90][fname == '_with_tracks'])
+        plt.title('Correlation matrix' + mode, fontsize = 20)
+        plt.tight_layout()
+        plt.savefig(dir + 'corr_matrix' + fname + frmt)
+
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################
