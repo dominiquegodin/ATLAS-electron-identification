@@ -885,7 +885,7 @@ def plot_importances(results, path, title):
     ax.invert_yaxis()
     widths = data
     print(labels)
-    color = ['g' if 'variables' in label else 'tab:blue' for label in newLabels]
+    color = ['g' if 'variables' in label or 'and' in labels else 'tab:blue' for label in newLabels]
     print(color)
     ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
     xcenters = widths / 2
