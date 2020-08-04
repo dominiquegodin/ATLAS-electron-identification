@@ -817,8 +817,8 @@ def LaTeXizer(names=[]):
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
              'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits', 'p_EoverP' ]
-    vars += ['group 0', 'group 1', 'group 2', 'group 3', 'group 4', 'group 5', 'group 6', 'group 7',
-             'group 8',  'group 9', 'group 10', 'group 11']
+    vars += ['group_0', 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7',
+             'group_8',  'group_9', 'group_10', 'group_11']
 
     Lvars =  ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
               'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',

@@ -55,7 +55,7 @@ parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
 parser.add_argument( '--impOut'      , default = 'importances.pkl'   )
 parser.add_argument( '--correlation' , default = 'OFF'               )
-parser.add_argument( '--tracks'      , default = 'OFF')
+parser.add_argument( '--tracks'      , default = 'OFF'               )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -77,7 +77,9 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 
 # DATAFILE
 #if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
-if args.data_file == '': args.data_file = '/scratch/odenis/el_data.h5'
+if args.data_file == ''          : args.data_file = '/scratch/odenis/el_data/0.0_1.3/el_data.h5', region = 'barrel'
+if args.data_file == 'transition': args.data_file = '/scratch/odenis/el_data/1.3_1.6/el_data.h5', region = 'transition'
+if args.data_file == 'endcap'    : args.data_file = '/scratch/odenis/el_data/1.6_2.5/el_data.h5', region = 'endcap'
 #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # TRAINING VARIABLES
@@ -126,7 +128,7 @@ if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scal
 if g >= 0 :
     images  = [key for key in images  if key not in groups[g]]
     scalars = [key for key in scalars if key not in groups[g]]
-    feat = 'group {}'.format(g)
+    feat = 'group_{}'.format(g)
 elif args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF': feat = 'full'
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
