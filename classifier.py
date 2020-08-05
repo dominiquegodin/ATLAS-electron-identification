@@ -134,7 +134,7 @@ elif args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF':
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
-args.output_dir = args.output_dir + '/' + region '/' + feat
+args.output_dir = args.output_dir + '/' + region + '/' + feat
 
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
