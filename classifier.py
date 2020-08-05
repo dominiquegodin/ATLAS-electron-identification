@@ -69,18 +69,22 @@ if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'ma
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 
+# DATAFILE
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+    try: os.mkdir(path)
+    except FileExistsError: pass
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
+if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
+#if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
+#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
+
 
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
         (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
         (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
-
-# DATAFILE
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
-if args.data_file == ''          : args.data_file = '/scratch/odenis/el_data/0.0_1.3/el_data.h5', region = 'barrel'
-if args.data_file == 'transition': args.data_file = '/scratch/odenis/el_data/1.3_1.6/el_data.h5', region = 'transition'
-if args.data_file == 'endcap'    : args.data_file = '/scratch/odenis/el_data/1.6_2.5/el_data.h5', region = 'endcap'
-#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # TRAINING VARIABLES
 images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
