@@ -817,8 +817,8 @@ def LaTeXizer(names=[]):
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
              'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits', 'p_EoverP' ]
-    vars += ['group 0', 'group 1', 'group 2', 'group 3', 'group 4', 'group 5', 'group 6', 'group 7',
-             'group 8',  'group 9', 'group 10', 'group 11']
+    vars += ['group_0', 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7',
+             'group_8',  'group_9', 'group_10', 'group_11']
 
     Lvars =  ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
               'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
@@ -829,8 +829,8 @@ def LaTeXizer(names=[]):
               r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
               r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
     Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
-              'lar_endcap variables', 'tile variables', 'r$d_0 variables 1$', 'r$d_0 variables 2$', r'$f_1$ and f_3$',
-              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks} and p_t$', 'group 11']
+              'lar_endcap variables', 'tile variables', r'$d_0$ variables 1', r'$d_0$ variables 2', r'$f_1$ and $f_3$',
+              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'group 11']
 
     converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}
     Lnames = [converter[name] for name in names]
@@ -878,15 +878,16 @@ def plot_importances(results, path, title):
         error = [tup[1][1] for tup in sortedResults]
     except:
         error = np.zeros(len(sortedResults))
-
     data = np.array(data)
     error = np.array(error)
 
     fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
-
     widths = data
-    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5)
+    print(labels)
+    color = ['g' if 'variables' in label or 'and' in label else 'tab:blue' for label in newLabels]
+    print(color)
+    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
     xcenters = widths / 2
 
     text_color = 'white'
@@ -915,37 +916,39 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
     names = data.columns
     correlations = data.corr()
 
-    # plot correlation matrix
-    print('Plotting correlation matrix')
-    fig = plt.figure(figsize=(20,18))
-    ax = fig.add_subplot(111)
-    cax = ax.matshow(correlations, vmin=-1, vmax=1)
-    fig.colorbar(cax)
-    for (i, j), z in np.ndenumerate(correlations):
-        ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
-    ticks = np.arange(0,len(names),1)
-    xtcks = np.arange(0,len(names),1, dtype = 'float64')
-    try :
-        xtcks[[5,17]] += [0.35,0][fname == '_with_tracks']
-    except:
-        pass
-    ax.set_xticks(xtcks)
-    ax.set_yticks(ticks)
-    ax.set_xticklabels(names, fontsize = 14)
-    ax.set_yticklabels(names, fontsize = 14)
-    plt.xticks(rotation=[30,90][fname == '_with_tracks'])
-    plt.title('Correlation matrix' + mode, fontsize = 20)
-    plt.tight_layout()
-    plt.savefig(dir + 'corr_matrix' + fname + frmt)
-
     # plot scatter plot matrix
-    if scatter:
+    if scatter == 'SCATTER':
         print('Plotting scatter plot matrix')
         scatter_matrix(data, figsize = (18,18))
         plt.title('Scatter plot matrix' + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
         plt.savefig(dir + 'scatter_plot_matrix' + fname + frmt)
+
+    # plot correlation matrix
+    else:
+        print('Plotting correlation matrix')
+        fig = plt.figure(figsize=(20,18))
+        ax = fig.add_subplot(111)
+        cax = ax.matshow(correlations, vmin=-1, vmax=1)
+        fig.colorbar(cax)
+        for (i, j), z in np.ndenumerate(correlations):
+            ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
+        ticks = np.arange(0,len(names),1)
+        xtcks = np.arange(0,len(names),1, dtype = 'float64')
+        try :
+            xtcks[[5,17]] += 0.35
+        except:
+            pass
+        ax.set_xticks(xtcks)
+        ax.set_yticks(ticks)
+        ax.set_xticklabels(names, fontsize = 14)
+        ax.set_yticklabels(names, fontsize = 14)
+        plt.xticks(rotation=[30,90][fname == '_with_tracks'])
+        plt.title('Correlation matrix' + mode, fontsize = 20)
+        plt.tight_layout()
+        plt.savefig(dir + 'corr_matrix' + fname + frmt)
+
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################

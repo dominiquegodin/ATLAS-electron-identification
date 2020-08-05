@@ -55,7 +55,7 @@ parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
 parser.add_argument( '--impOut'      , default = 'importances.pkl'   )
 parser.add_argument( '--correlation' , default = 'OFF'               )
-parser.add_argument( '--tracks'      , default = 'OFF')
+parser.add_argument( '--tracks'      , default = 'OFF'               )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -70,23 +70,17 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 
 
-# DATAFILE
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    try: os.mkdir(path)
-    except FileExistsError: pass
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
-if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
-#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
-
-
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
         (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
         (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
+# DATAFILE
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+if args.data_file == ''          : args.data_file = '/scratch/odenis/el_data/0.0_1.3/el_data.h5', region = 'barrel'
+if args.data_file == 'transition': args.data_file = '/scratch/odenis/el_data/1.3_1.6/el_data.h5', region = 'transition'
+if args.data_file == 'endcap'    : args.data_file = '/scratch/odenis/el_data/1.6_2.5/el_data.h5', region = 'endcap'
+#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # TRAINING VARIABLES
 images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
@@ -96,7 +90,7 @@ images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_
 scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits', 'p_EoverP']
+            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits']
 tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
                 'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
                 'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
@@ -134,7 +128,7 @@ if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scal
 if g >= 0 :
     images  = [key for key in images  if key not in groups[g]]
     scalars = [key for key in scalars if key not in groups[g]]
-    feat = 'group {}'.format(g)
+    feat = 'group_{}'.format(g)
 elif args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF': feat = 'full'
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
@@ -212,7 +206,7 @@ if args.model_in != '':
 
 
 # EVALUATING CORRELATIONS
-if args.correlation == 'ON':
+if args.correlation == 'ON' or args.correlation == 'SCATTER':
     if args.scaling:
         scaler_out = args.output_dir+'/'+args.scaler_out
         train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
@@ -228,8 +222,10 @@ if args.correlation == 'ON':
     print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
-    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/', mode = '\n(Background' + mode + ')', fname=fname)
-    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' , mode = '\n(Signal' + mode + ')', fname=fname)
+    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/',
+                 scatter=args.correlation,  mode = '\n(Background' + mode + ')', fname=fname)
+    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' ,
+                 scatter=args.correlation, mode = '\n(Signal' + mode + ')', fname=fname)
     sys.exit() # No need for training or validation
 
 
