@@ -210,7 +210,7 @@ if args.model_in != '':
 
 
 # EVALUATING CORRELATIONS
-if args.correlation == 'ON' or args.correlation == 'SCATTER':
+if args.correlation in ['ON','SCATTER']:
     if args.scaling:
         scaler_out = args.output_dir+'/'+args.scaler_out
         train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)

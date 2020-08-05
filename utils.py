@@ -923,7 +923,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         plt.title('Scatter plot matrix' + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
-        plt.savefig(dir + 'scatter_plot_matrix' + fname + frmt)
+        plt.savefig(dir + 'scatter_plot_matrix' + fname + '.png')
 
     # plot correlation matrix
     else:
