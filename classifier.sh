@@ -1,5 +1,8 @@
 # FEATURE REMOVAL IMPORTANCE (BELUGA)
-python plot_rm_imp.py
+python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
+                      --verbose=2  --output_dir='/scratch/odenis/removal_importance'                            \
+                      --impOut='removal_importance.pkl' --rm_features=${VAR} --data_file='endcap'
+
 
 exit
 
@@ -71,4 +74,5 @@ python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.
 
 # FEATURE REMOVAL IMPORTANCE (BELUGA)
 python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --impOut='removal_importance.pkl' --rm_scalars=${VAR}
+                      --verbose=2  --output_dir='/scratch/odenis/removal_importance'                            \
+                      --impOut='removal_importance.pkl' --rm_features=${VAR} --data_file='endcap'
