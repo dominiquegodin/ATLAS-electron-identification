@@ -129,13 +129,13 @@ s = args.rm_features - len(images)                                              
 g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
 feat = ''
 print('i : {}, s : {}, g : {}'.format(i,s,g))
+if args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF': feat = 'full'
 if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[i]                                                   # Removes the specified image
 if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                               # Removes the specified scalar
 if g >= 0 :
     images  = [key for key in images  if key not in groups[g]]
     scalars = [key for key in scalars if key not in groups[g]]
     feat = 'group_{}'.format(g)
-elif args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF': feat = 'full'
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
