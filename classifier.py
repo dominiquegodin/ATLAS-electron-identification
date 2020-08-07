@@ -298,7 +298,6 @@ if args.removal == 'ON' :
 if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
-    g = [g,None][g<0]
     feats += groups
     file = args.output_dir+'/'+args.impOut
     feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], g, args.n_reps, file)

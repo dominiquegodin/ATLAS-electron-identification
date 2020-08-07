@@ -855,7 +855,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_r
         fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
 
-    name = [feats[0],'group_{}'.format(g)][bool(g+1)]
+    name = [feats[0],'group_{}'.format(g)][g>=0]
     importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
     imp_tup = name, np.mean(importance), np.std(importance)
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
