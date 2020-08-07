@@ -49,7 +49,7 @@ parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
-parser.add_argument( '--featImp'     , default = 'OFF'               )
+parser.add_argument( '--permutation' , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10 , type = int     )
 parser.add_argument( '--feat'        , default = 0, type = int       )
 parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
@@ -287,14 +287,15 @@ if args.results_out != '':
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
 # FEATURE REMOVAL IMPORTANCE
-if i >= 0 or s >= 0:
+if i >= 0 :
     file = args.output_dir+'/'+args.impOut
     removal_bkg_rej(model,valid_probs,valid_labels,feat,file)
     print_importances(file)
 
 # FEATURE PERMUTATION IMPORTANCE
-if args.featImp == 'ON':
-    feats = images + scalars
+if args.permutation == 'ON':
+    feats = [[var] for var in images + scalars] + groups
+    print(feats)
     file = args.output_dir+'/'+args.impOut
     feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, file)
     print_importances(file)
