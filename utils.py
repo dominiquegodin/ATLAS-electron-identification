@@ -904,8 +904,8 @@ def plot_importances(results, path, title):
 def removal_bkg_rej(model,valid_probs,labels,feat,file):
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
-    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
-        pickle.dump(bkg_rej_tup, afp)
+    with open(file,'wb') as wfp:                                                            # Saving the results in a pickle
+        pickle.dump(bkg_rej_tup, wfp)
 
 
 def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fname=''):
