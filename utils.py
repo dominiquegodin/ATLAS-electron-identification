@@ -837,7 +837,7 @@ def LaTeXizer(names=[]):
     return converter,Lnames
 
 
-def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep, file):      # feats must be a list
+def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_rep, file):      # feats must be a list
     features = ' + '.join(feats)
     print('PERMUTATION DE : ' + features)
     bkg_rej = np.empty(n_rep)
@@ -855,8 +855,9 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep, 
         fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
 
+    name = [feats[0],'group_{}'.format(g)][bool(g+1)]
     importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-    imp_tup = feat, np.mean(importance), np.std(importance)
+    imp_tup = name, np.mean(importance), np.std(importance)
     with open(file,'ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(imp_tup, afp)
 
