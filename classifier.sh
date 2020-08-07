@@ -1,7 +1,7 @@
 # FEATURE REMOVAL IMPORTANCE (BELUGA)
 python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --verbose=2  --output_dir='/scratch/odenis/removal_importance'                            \
-                      --impOut='removal_importance.pkl' --data_file='endcap'
+                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --model_in='model.h5'        \
+                      --scaler_in='scaler.pkl' --impOut='removal_importance.pkl' --data_file='endcap'
 exit
 
 
