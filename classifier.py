@@ -36,7 +36,6 @@ parser.add_argument( '--valid_cuts'  , default = ''                  )
 parser.add_argument( '--NN_type'     , default = 'CNN'               )
 parser.add_argument( '--images'      , default = 'ON'                )
 parser.add_argument( '--scalars'     , default = 'ON'                )
-parser.add_argument( '--rm_features' , default = -1, type = int      ) # 0-19 : images, 20-41 : scalars, 42- : groups of features
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
@@ -49,6 +48,8 @@ parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
+parser.add_argument( '--removal'     , default = 'OFF'               )
+parser.add_argument( '--rm_features' , default = -1,    type = int   )
 parser.add_argument( '--permutation' , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10 , type = int     )
 parser.add_argument( '--feat'        , default = 0, type = int       )
@@ -122,23 +123,24 @@ groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel
             ['p_d0' , 'p_d0Sig'], ['p_d0' , 'p_d0Sig' , 'p_qd0Sig'], ['p_f1' , 'p_f3'],
             ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo']
             ]
-i = args.rm_features                                                                                            # image indices
-s = args.rm_features - len(images)                                                                              # scalar indices
-g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
-feat = ''
-print('i : {}, s : {}, g : {}'.format(i,s,g))
-if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[i]                                                   # Removes the specified image
-if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                                               # Removes the specified scalar
-if g >= 0 :
-    images  = [key for key in images  if key not in groups[g]]
-    scalars = [key for key in scalars if key not in groups[g]]
-    feat = 'group_{}'.format(g)
-elif args.images == 'ON' and args.scalars == 'ON' and args.correlation == 'OFF': feat = 'full'
+
+if args.removal == 'ON':
+    i = args.rm_features                                                                                            # image indices
+    s = args.rm_features - len(images)                                                                              # scalar indices
+    g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
+    print('i : {}, s : {}, g : {}'.format(i,s,g))
+    if args.images == 'ON' and args.scalars == 'ON' : feat = 'full'
+    if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
+    if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
+    if g >= 0 :
+        images  = [key for key in images  if key not in groups[g]]
+        scalars = [key for key in scalars if key not in groups[g]]
+        feat = 'group_{}'.format(g)
+    args.output_dir = args.output_dir + '/' + feat
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
-args.output_dir = args.output_dir + '/' + feat
 
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
@@ -287,7 +289,7 @@ if args.results_out != '':
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
 # FEATURE REMOVAL IMPORTANCE
-if i >= 0 :
+if args.removal == 'ON' :
     file = args.output_dir+'/'+args.impOut
     removal_bkg_rej(model,valid_probs,valid_labels,feat,file)
     print_importances(file)
