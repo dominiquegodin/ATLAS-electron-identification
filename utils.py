@@ -838,7 +838,7 @@ def LaTeXizer(names=[]):
 
 
 def feature_permutation(model, valid_sample, labels, valid_probs, feats, n_rep, file):      # feats must be a list
-    feature = ' + ' + '.join(feats)
+    feature = ' + '.join(feats)
     print('PERMUTATION DE : ' + features)
     bkg_rej = np.empty(n_rep)
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
