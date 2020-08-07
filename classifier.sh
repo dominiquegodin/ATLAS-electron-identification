@@ -1,5 +1,7 @@
-# CORRELATIONS
-python classifier.py  --correlation='SCATTER' --n_valid=1e6 --scaling='ON'
+# SINGLE TRAINING
+python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=6           \
+                      --n_tracks=5    --l2=1e-8      --dropout=0.05    --verbose=2     --NN_type=CNN           \
+		                  --plotting=ON   --weight_type=None --output_dir=outputs/6c_10m
 
 exit
 
@@ -71,4 +73,4 @@ python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.
 
 # FEATURE REMOVAL IMPORTANCE (BELUGA)
 python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --impOut='removal_importance.pkl' --rm_scalars=${VAR}
+                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --impOut='removal_importance.pkl' --rm_features=${VAR}
