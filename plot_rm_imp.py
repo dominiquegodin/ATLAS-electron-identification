@@ -24,7 +24,7 @@ bkg_rej = {}
 absent = []
 for folder in feats:
     try:
-        with open('/scratch/odenis/removal_importance/' + args.region + folder + '/removal_importance.pkl', 'rb') as rfp:
+        with open('/scratch/odenis/removal_importance/' + args.region + '/' + folder + '/removal_importance.pkl', 'rb') as rfp:
             bkg_tup = pickle.load(rfp)
             key = bkg_tup[0].replace(' ', '_')
             bkg_rej[key] = bkg_tup[1]
