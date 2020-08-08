@@ -102,6 +102,8 @@ tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0' 
                 'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
                 'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
                 'p_mean_sigmad0']
+
+# ADDING TRACKS SCALARS FOR CORRELATIONS
 if args.tracks == 'ON':
     scalars += tracks_means
     fname = '_with_tracks'
@@ -118,32 +120,39 @@ with h5py.File(args.data_file, 'r') as data:
     scalars = [key for key in scalars if key in data]
     others  = [key for key in others  if key in data]
 
+# FEATURE REMOVAL
 groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],
             ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],
             ['lar_endcap_Lr0','lar_endcap_Lr1','lar_endcap_Lr2','lar_endcap_Lr3'],
             ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'],
             ['p_d0' , 'p_d0Sig'], ['p_d0' , 'p_d0Sig' , 'p_qd0Sig'], ['p_f1' , 'p_f3'],
-            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo']
-            ]
+            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo']]
 
 if args.removal == 'ON':
     i = args.rm_features                                                                                            # image indices
     s = args.rm_features - len(images)                                                                              # scalar indices
     g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
     print('i : {}, s : {}, g : {}'.format(i,s,g))
-    if args.images == 'ON' and args.scalars == 'ON' : feat = 'full'
+    if g > len(groups) :
+        print('Argument out of range, aborting...')
+        sys.exit()
     if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
-    if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
-    if g >= 0 :
+    elif s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
+    elif g >= 0 :
+        if groups[g][0] not in images + scalars:
+            print("Cannot remove features not in the sample, aborting...")
+            sys.exit()
         images  = [key for key in images  if key not in groups[g]]
         scalars = [key for key in scalars if key not in groups[g]]
         feat = 'group_{}'.format(g)
+    elif args.images == 'ON' and args.scalars == 'ON' : feat = 'full'
     args.output_dir = args.output_dir + '/' + feat
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
+# CREATING OUTPUT DIRECTORY IF IT DOESN'T EXIST
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except OSError: continue
