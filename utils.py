@@ -809,6 +809,12 @@ def merge_presamples(n_e, n_tasks, output_path, output_file):
     #################################################################################
 
 def LaTeXizer(names=[]):
+    '''
+    Converts variables' names to be compatible with LaTeX format.
+
+    Returns a dictionary maping each name to its LaTeX conterpart
+    and the converted list of variables names.
+    '''
     vars  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
              'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
              'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
@@ -837,7 +843,11 @@ def LaTeXizer(names=[]):
     return converter,Lnames
 
 
-def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_rep, file):      # feats must be a list
+def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_rep, file):
+    '''
+    Takes a pretrained model and saves the permutation importance of a feature or a group
+    of features to a dictionary in a pickle file.
+    '''
     features = ' + '.join(feats)
     print('PERMUTATION DE : ' + features)
     bkg_rej = np.empty(n_rep)
@@ -862,6 +872,9 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_r
         pickle.dump(imp_tup, afp)
 
 def print_importances(file):
+    '''
+    Read the specified pickle file containing feature importances data and print it.
+    '''
     with open(file,'rb') as rfp:
         record = dict()
         while True:
@@ -874,6 +887,9 @@ def print_importances(file):
     return record
 
 def plot_importances(results, path, title):
+    '''
+    Plots a horizontal bar plot ranking of the feature importances from a dictionary.
+    '''
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
     labels = [tup[0] for tup in sortedResults]
     newLabels = LaTeXizer(labels)[1]
@@ -906,6 +922,9 @@ def plot_importances(results, path, title):
     return fig, ax
 
 def removal_bkg_rej(model,valid_probs,labels,feat,file):
+    '''
+    Computes and saves background rejection of the given model to a pickle file.
+    '''
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
     with open(file,'wb') as wfp:                                                            # Saving the results in a pickle
@@ -913,6 +932,15 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
 
 
 def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fname=''):
+    '''
+    Computes correlation coefficient between the given variables of a sample, then plots
+    a matrix of those coefficients.
+
+    OR
+
+    If scatter=True, plots scatter plots between the given variables and their distrubution
+    into a matrix.
+    '''
     data = pd.DataFrame(sample)
     if LaTeX:
         print("LaTeX : ", "ON" if LaTeX else 'OFF')
