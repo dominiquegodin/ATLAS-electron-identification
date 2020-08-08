@@ -146,7 +146,7 @@ if args.removal == 'ON':
         scalars = [key for key in scalars if key not in groups[g]]
         feat = 'group_{}'.format(g)
     elif args.images == 'ON' and args.scalars == 'ON' : feat = 'full'
-    args.output_dir = args.output_dir + '/' + feat
+    args.output_dir = args.output_dir + '/' + region + '/' + feat
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
