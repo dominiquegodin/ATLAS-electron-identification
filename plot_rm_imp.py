@@ -18,7 +18,7 @@ feats = [
             'group_0'  , 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7','group_8',  'group_9', 'group_10'
         ]
 
-eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'encap': r'$1.6<\eta<2.5$'}
+eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
 
 bkg_rej = {}
 absent = []
