@@ -222,7 +222,7 @@ if args.correlation in ['ON','SCATTER']:
     for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
-    if args.scaling == 'ON':
+    if args.scaling:
         scaler_out = output_dir + args.scaler_out
         train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
         trans = 'QT'
