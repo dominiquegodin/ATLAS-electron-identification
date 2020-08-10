@@ -579,7 +579,7 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
 def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, diff_plots):
     global print_dict; print_dict = {n:'' for n in np.arange(1,4)}
     compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] #+[1, 2, 3, 4, 5]
+    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] +[1, 2, 3, 4, 5]
     arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
@@ -845,6 +845,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_r
     print('fpr : ',fpr)
     print('tpr : ',tpr)
     bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+    print(bkg_rej_full)
     shuffled_sample = {key:value for (key,value) in valid_sample.items() if key not in feats}
     for feat in feats:
         shuffled_sample[feat] = deepcopy(valid_sample[feat])                                # Copy of the feature to be shuffled in order to keep valid_sample intact
