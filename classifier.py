@@ -218,12 +218,12 @@ if args.model_in != '':
 
 # EVALUATING CORRELATIONS
 if args.correlation in ['ON','SCATTER']:
-    output_dir = args.output_dir + '/correlations/' + region
+    output_dir = args.output_dir + '/correlations/' + region + '/'
     for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
     if args.scaling:
-        scaler_out = output_dir + '/' + args.scaler_out
+        scaler_out = output_dir + args.scaler_out
         train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
         trans = 'QT'
         mode = ' with quantile transform'
