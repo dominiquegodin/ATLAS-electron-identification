@@ -869,8 +869,9 @@ def print_importances(file):
         record = dict()
         while True:
             try:
-                imp = pickle.load(rfp)
-                record[imp[0]] = imp[1:]
+                print(pickle.load(rfp))
+                #imp = pickle.load(rfp)
+                #record[imp[0]] = imp[1:]
             except EOFError:
                 break
     print(record)
