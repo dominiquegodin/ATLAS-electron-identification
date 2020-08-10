@@ -851,6 +851,8 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_r
         print('PERMUTATION DE ' + features + " " + str(k+1))
         for feat in feats:
             rdm.shuffle(shuffled_sample[feat])                                              # Shuffling of one feature
+        for key in shuffled_sample:
+            shuffled_sample[key] = tf.convert_to_tensor(shuffled_sample[key])
         probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
         fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
