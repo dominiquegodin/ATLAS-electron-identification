@@ -904,9 +904,9 @@ def plot_importances(results, path, title):
     fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
     widths = data
-    print(labels)
+    #print(labels)
     color = ['g' if 'variables' in label or 'and' in label else 'tab:blue' for label in newLabels]
-    print(color)
+    #print(color)
     ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
     xcenters = widths / 2
 
