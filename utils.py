@@ -842,6 +842,8 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_r
     print('PERMUTATION DE : ' + features)
     bkg_rej = np.empty(n_rep)
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
+    print('fpr : ',fpr)
+    print('tpr : ',tpr)
     bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
     shuffled_sample = {key:value for (key,value) in valid_sample.items() if key not in feats}
     for feat in feats:
