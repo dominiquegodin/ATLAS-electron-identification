@@ -2,7 +2,7 @@
 #SBATCH --account=def-arguinj
 #SBATCH --time=0-03:00     # time limit (DD-HH:MM)
 #SBATCH --nodes=1          # number of nodes
-#SBATCH --mem=186G         # memory per node (uncomment on Beluga)
+#SBATCH --mem=128G         # memory per node (uncomment on Beluga)
 #SBATCH --cpus-per-task=8  # number of CPU threads per node
 #SBATCH --gres=gpu:4       # number of GPU(s) per node
 #SBATCH --job-name=el-id
