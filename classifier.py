@@ -233,8 +233,8 @@ if args.correlation in ['ON','SCATTER']:
     print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
-    correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')', fmode = '_bkg_' + trans + fmode)
-    correlations(sig_sample, output_dir, scatter=args.correlation, mode = '\n(Signal' + mode + ')', fmode = '_sig_' + trans + fmode)
+    correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')', fmode = '_bkg' + trans + fmode)
+    correlations(sig_sample, output_dir, scatter=args.correlation, mode = '\n(Signal' + mode + ')', fmode = '_sig' + trans + fmode)
     sys.exit() # No need for training or validation
 
 
