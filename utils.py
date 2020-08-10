@@ -912,7 +912,7 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
         pickle.dump(bkg_rej_tup, wfp)
 
 
-def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fname=''):
+def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode=''):
     data = pd.DataFrame(sample)
     if LaTeX:
         print("LaTeX : ", "ON" if LaTeX else 'OFF')
@@ -927,7 +927,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         plt.suptitle('Scatter plot matrix' + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
-        plt.savefig(dir + 'scatter_plot_matrix' + fname + '.png')
+        plt.savefig(dir + 'scatter_plot_matrix' + fmode + '.png')
 
     # plot correlation matrix
     else:
@@ -948,10 +948,10 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         ax.set_yticks(ticks)
         ax.set_xticklabels(names, fontsize = 14)
         ax.set_yticklabels(names, fontsize = 14)
-        plt.xticks(rotation=[30,90][fname == '_with_tracks'])
+        plt.xticks(rotation=[30,90][fmode == '_with_tracks'])
         plt.title('Correlation matrix' + mode, fontsize = 20)
         plt.tight_layout()
-        plt.savefig(dir + 'corr_matrix' + fname + frmt)
+        plt.savefig(dir + 'corr_matrix' + fmode + frmt)
 
 
         #################################################################################

@@ -75,9 +75,15 @@ for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')
     try: os.mkdir(path)
     except FileExistsError: pass
 #if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
-if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
+if args.data_file == '':
+    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
+    region = 'barrel'
+if args.data_file == 'transition':
+     args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
+     region = 'transition'
+if args.data_file == 'endcap':
+    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
+    region = 'endcap'
 #if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
@@ -96,18 +102,17 @@ scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_
             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits']
-tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
-                'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
-                'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
-                'p_mean_sigmad0']
+tracks_means = ['p_mean_efrac', 'p_mean_deta', 'p_mean_dphi', 'p_mean_d0', 'p_mean_z0'  ,  'p_mean_charge',
+                'p_mean_vertex'  ,  'p_mean_chi2' ,  'p_mean_ndof',  'p_mean_pixhits'  ,  'p_mean_scthits',
+                'p_mean_trthits', 'p_mean_sigmad0']
 if args.tracks == 'ON':
     scalars += tracks_means
-    fname = '_with_tracks'
+    fmode = '_with_tracks'
 elif args.tracks == 'ONLY':
     scalars = tracks_means
-    fname = '_tracks_only'
+    fmode = '_tracks_only'
 else :
-    fname = ''
+    fmode = ''
 others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
             'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
@@ -136,7 +141,7 @@ if args.removal == 'ON':
         images  = [key for key in images  if key not in groups[g]]
         scalars = [key for key in scalars if key not in groups[g]]
         feat = 'group_{}'.format(g)
-    args.output_dir = args.output_dir + '/' + feat
+    args.output_dir = args.output_dir + '/' + region + '/' + feat
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
@@ -213,25 +218,23 @@ if args.model_in != '':
 
 # EVALUATING CORRELATIONS
 if args.correlation in ['ON','SCATTER']:
-    if args.scaling:
-        scaler_out = args.output_dir+'/'+args.scaler_out
-        train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
-        dir = 'QT'
-        mode = ' with quantile transform'
-    else :
-        dir = 'NoQT'
-        mode = ''
-    for path in [args.output_dir + '/correlations/', args.output_dir + '/correlations/' + dir,
-                 args.output_dir + '/correlations/' + dir + '/signal/', args.output_dir + '/correlations/' + dir + '/bkg/']:
+    output_dir = args.output_dir + '/correlations/' + region
+    for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
+    if args.scaling:
+        scaler_out = output_dir + '/' + args.scaler_out
+        train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
+        trans = 'QT'
+        mode = ' with quantile transform'
+    else :
+        trans = ''
+        mode = ''
     print('CLASSIFIER : evaluating variables correlations')
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
-    correlations(bkg_sample, args.output_dir + '/correlations/' + dir + '/bkg/',
-                 scatter=args.correlation,  mode = '\n(Background' + mode + ')', fname=fname)
-    correlations(sig_sample, args.output_dir + '/correlations/' + dir + '/signal/' ,
-                 scatter=args.correlation, mode = '\n(Signal' + mode + ')', fname=fname)
+    correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')', fmode = '_bkg_' + trans + fmode)
+    correlations(sig_sample, output_dir, scatter=args.correlation, mode = '\n(Signal' + mode + ')', fmode = '_sig_' + trans + fmode)
     sys.exit() # No need for training or validation
 
 
