@@ -837,7 +837,7 @@ def LaTeXizer(names=[]):
     return converter,Lnames
 
 
-def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_rep, file):      # feats must be a list
+def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_rep, fname):      # feats must be a list
     features = ' + '.join(feats)
     print('PERMUTATION DE : ' + features)
     bkg_rej = np.empty(n_rep)
@@ -861,7 +861,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_r
     name = [feats[0],'group_{}'.format(g)][g>=0]
     importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
     imp_tup = name, np.mean(importance), np.std(importance)
-    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
+    with open(fname + '.pkl','ab') as afp:                                                            # Saving the results in a pickle
         pickle.dump(imp_tup, afp)
 
 def print_importances(file):
@@ -869,9 +869,8 @@ def print_importances(file):
         record = dict()
         while True:
             try:
-                print(pickle.load(rfp))
-                #imp = pickle.load(rfp)
-                #record[imp[0]] = imp[1:]
+                imp = pickle.load(rfp)
+                record[imp[0]] = imp[1:]
             except EOFError:
                 break
     print(record)
@@ -909,10 +908,10 @@ def plot_importances(results, path, title):
     plt.savefig(path)
     return fig, ax
 
-def removal_bkg_rej(model,valid_probs,labels,feat,file):
+def removal_bkg_rej(model,valid_probs,labels,feat,fname):
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
-    with open(file,'wb') as wfp:                                                            # Saving the results in a pickle
+    with open(fname + '.pkl','wb') as wfp:                                                  # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, wfp)
 
 

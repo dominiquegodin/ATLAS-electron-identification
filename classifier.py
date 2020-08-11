@@ -47,14 +47,14 @@ parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
 parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
-parser.add_argument( '--runDiffPlots', default = 0, type = int       )
+parser.add_argument( '--runDiffPlots', default =  0, type = int      )
 parser.add_argument( '--removal'     , default = 'OFF'               )
-parser.add_argument( '--rm_features' , default = -1,    type = int   )
+parser.add_argument( '--rm_features' , default = -1, type = int      )
 parser.add_argument( '--permutation' , default = 'OFF'               )
-parser.add_argument( '--n_reps'      , default = 10 , type = int     )
-parser.add_argument( '--feat'        , default = 0, type = int       )
-parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
-parser.add_argument( '--impOut'      , default = 'importances.pkl'   )
+parser.add_argument( '--n_reps'      , default = 10, type = int      )
+parser.add_argument( '--feat'        , default =  0, type = int      )
+parser.add_argument( '--impPlot'     , default = 'perm_imp.pdf'      )
+parser.add_argument( '--impOut'      , default = 'importances'       )
 parser.add_argument( '--correlation' , default = 'OFF'               )
 parser.add_argument( '--tracks'      , default = 'OFF'               )
 args = parser.parse_args()
@@ -160,7 +160,7 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 #args.train_cuts += '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
 #args.valid_cuts += '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
 
-print_importances(args.output_dir + '/'+ args.results_in)
+
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     variables = {'others':others, 'scalars':scalars, 'images':[]}
@@ -169,7 +169,7 @@ if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.ou
 elif args.results_in !='':
     print("\noption [--results_in] was given but no matching file found in the right path, aborting..")
     print("results_in file =", args.output_dir+'/'+args.results_in, '\n')
-if args.results_in != '': sys.exit()
+if args.results_in != '' : sys.exit()
 
 
 # MULTI-GPU DISTRIBUTION
@@ -293,15 +293,24 @@ if args.results_out != '':
 
 # FEATURE REMOVAL IMPORTANCE
 if args.removal == 'ON' :
-    file = args.output_dir+'/'+args.impOut
-    removal_bkg_rej(model,valid_probs,valid_labels,feat,file)
-    print_importances(file)
+    fname = args.output_dir + '/' + args.impOut
+    removal_bkg_rej(model,valid_probs,valid_labels,feat,fname)
+    print_importances(fname)
 
 # FEATURE PERMUTATION IMPORTANCE
 if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
     feats += groups
-    file = args.output_dir+'/'+args.impOut
-    feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], g, args.n_reps, file)
-    print_importances(file)
+    fname = args.output_dir + '/' + args.impOut
+    if args.n_classes == 2:
+        feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], g, args.n_reps, fname)
+        print_importances(fname)
+    elif args.n_classes == 6:
+        bkg_sample = []
+        for i in range(5):
+            if not i: bkg_sample[i] = {key:valid_sample[key][np.where(valid_labels >= 1)[0]] for key in valid_sample}
+            else: bkg_sample[i] = {key:valid_sample[key][np.where(valid_labels == i)[0]] for key in valid_sample}
+            fname += str(i) 
+            feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], g, args.n_reps, fname)
+            print_importances(fname)
