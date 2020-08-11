@@ -205,16 +205,16 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d', get_weights=True):
     if sampling_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max']:
         return sample, labels, None
-    pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
     eta = abs(sample['eta']); eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
-    pt_ind  = np.digitize( pt, pt_bins , right=True)
-    eta_ind = np.digitize(eta, eta_bins, right=True)
-    if hist == 'eta':  pt_bins = [ pt_bins[0],  pt_bins[-1]]
-    else            :  pt_bins =  pt_bins[min( pt_ind)-1:max( pt_ind)+1]
+    pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500        ]
+    eta_bins[-1] = max(eta_bins[-1], max(eta)) + 1e-6
+    pt_bins [-1] = max( pt_bins [1], max( pt)) + 1e-6
+    eta_bins = eta_bins[np.where(eta_bins<=min(eta))[0][-1]:np.where(eta_bins>=max(eta))[0][0]+1]
+    pt_bins  =  pt_bins[np.where( pt_bins<=min( pt))[0][-1]:np.where( pt_bins>=max( pt))[0][0]+1]
     if hist == 'pt' : eta_bins = [eta_bins[0], eta_bins[-1]]
-    else            : eta_bins = eta_bins[min(eta_ind)-1:max(eta_ind)+1]
-    pt_ind  = np.minimum( pt_ind-min( pt_ind), len( pt_bins)-2)
-    eta_ind = np.minimum(eta_ind-min(eta_ind), len(eta_bins)-2)
+    if hist == 'eta':  pt_bins = [ pt_bins[0],  pt_bins[-1]]
+    eta_ind  = np.digitize(eta, eta_bins, right=False) -1
+    pt_ind   = np.digitize( pt,  pt_bins, right=False) -1
     hist_sig = np.histogram2d(pt[labels==0], eta[labels==0], bins=[pt_bins,eta_bins])[0]
     hist_bkg = np.histogram2d(pt[labels!=0], eta[labels!=0], bins=[pt_bins,eta_bins])[0]
     if bkg_ratio == None: bkg_ratio = np.sum(hist_bkg)/np.sum(hist_sig)

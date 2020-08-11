@@ -19,7 +19,7 @@ parser.add_argument( '--batch_size'  , default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    , default =  100,  type = int   )
 parser.add_argument( '--n_classes'   , default =    2,  type = int   )
 parser.add_argument( '--n_tracks'    , default =    5,  type = int   )
-parser.add_argument( '--bkg_ratio'   , default =    2,  type = int   )
+parser.add_argument( '--bkg_ratio'   , default =    2,  type = float )
 parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
@@ -64,8 +64,8 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except FileExistsError: pass
-#args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
-args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
+args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
+#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
 #args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
 #args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
 #args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
@@ -108,7 +108,7 @@ args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
 if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 #args.train_cuts += '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
-#args.valid_cuts = '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
+#args.valid_cuts += '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
@@ -135,20 +135,6 @@ with strategy.scope():
     model     = multi_CNN(*func_args, **train_var)
     print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-
-
-'''
-# FOR SGD ENTROPY (NOT WORKING)
-sample, _ = make_sample(args.data_file, variables, [0,1], args.n_tracks, args.n_classes)
-func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
-model     = multi_CNN(*func_args, **train_var)
-print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
-from EntropySGD import EntropySgd; from History import History
-sgd_optimizer = EntropySgd(lr=.001, sgld_step=0.1, L=20, gamma=0.03, sgld_noise=1e-4,
-                           alpha=0.75, scoping=1e-3, momentum=0., nesterov=False, decay=.0)
-history = History()
-model.compile(optimizer=sgd_optimizer, loss='sparse_categorical_crossentropy')
-'''
 
 
 # ARGUMENTS AND VARIABLES TABLES
