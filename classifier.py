@@ -304,13 +304,13 @@ if args.permutation == 'ON':
     feats += groups
     fname = args.output_dir + '/' + args.impOut
     if args.n_classes == 2:
-        feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], g, args.n_reps, fname)
+        feature_permutation(model, valid_sample, valid_labels, feats[args.feat], g, args.n_reps, fname)
         print_importances(fname)
     elif args.n_classes == 6:
         bkg_sample = []
         for i in range(5):
             if not i: bkg_sample[i] = {key:valid_sample[key][np.where(valid_labels >= 1)[0]] for key in valid_sample}
             else: bkg_sample[i] = {key:valid_sample[key][np.where(valid_labels == i)[0]] for key in valid_sample}
-            fname += str(i) 
-            feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], g, args.n_reps, fname)
+            fname += str(i)
+            feature_permutation(model, bkg_sample[i], valid_labels, feats[args.feat], g, args.n_reps, fname)
             print_importances(fname)

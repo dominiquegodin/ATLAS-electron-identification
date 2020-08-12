@@ -837,15 +837,13 @@ def LaTeXizer(names=[]):
     return converter,Lnames
 
 
-def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_rep, fname):      # feats must be a list
+def feature_permutation(model, valid_sample, labels, feats, g , n_rep, fname):      # feats must be a list
     features = ' + '.join(feats)
     print('PERMUTATION DE : ' + features)
     bkg_rej = np.empty(n_rep)
+    valid_probs = model.predict(valid_sample, batch_size=20000, verbose=1)
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
-    print('fpr : ',fpr)
-    print('tpr : ',tpr)
     bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-    print(bkg_rej_full)
     shuffled_sample = {key:value for (key,value) in valid_sample.items() if key not in feats}
     for feat in feats:
         shuffled_sample[feat] = deepcopy(valid_sample[feat])                                # Copy of the feature to be shuffled in order to keep valid_sample intact
@@ -861,7 +859,7 @@ def feature_permutation(model, valid_sample, labels, valid_probs, feats, g , n_r
     name = [feats[0],'group_{}'.format(g)][g>=0]
     importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
     imp_tup = name, np.mean(importance), np.std(importance)
-    with open(fname + '.pkl','ab') as afp:                                                            # Saving the results in a pickle
+    with open(fname + '.pkl','ab') as afp:                                                  # Saving the results in a pickle
         pickle.dump(imp_tup, afp)
 
 def print_importances(file):
