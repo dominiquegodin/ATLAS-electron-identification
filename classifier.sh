@@ -1,7 +1,7 @@
 # FEATURE REMOVAL IMPORTANCE (BELUGA)
-python classifier.py  --n_train=8e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2             \
-                      --verbose=2  --output_dir='/scratch/odenis/removal_importance' --data_file=transition     \
-                      --impOut='removal_importance.pkl' --removal=ON --rm_features=${VAR}
+python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
+                      --verbose=2  --output_dir='/scratch/odenis/singular_importance/Eratio' --data_file=transition \
+                      --impOut='sing_importance.pkl'
 
 exit
 
