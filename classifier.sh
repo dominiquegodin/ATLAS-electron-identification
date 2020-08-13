@@ -1,6 +1,6 @@
 # SINGLE TRAINING
 python classifier.py  --n_train=10e3  --n_valid=15e3  --batch_size=5e1  --n_epochs=10  --n_classes=6           \
-                      --n_tracks=5    --output_dir=outputs/tests --model_in=model.h5 --scaler_in=scaler.pkl  \
+                      --n_tracks=5    --output_dir=outputs/tests --model_out=model6c.h5 --scaler_out=scaler6c.pkl  \
 
 
 exit
