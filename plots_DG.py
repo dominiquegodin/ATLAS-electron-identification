@@ -1,4 +1,4 @@
-import numpy as np, h5py, sys, time
+import numpy as np, h5py, sys, time, pickle
 from   sklearn           import metrics
 from   scipy.spatial     import distance
 from   matplotlib        import pylab
@@ -147,7 +147,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     colors = [ 'red', 'blue', 'green' ]
     labels = [ 'LLH tight', 'LLH medium', 'LLH loose' ]
     sig_eff, bkg_eff = '$\epsilon_{\operatorname{sig}}$', '$\epsilon_{\operatorname{bkg}}$'
-    plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+    fig_handle = plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     if ROC_type == 1:
         plt.xlim([0.6, 1]); plt.ylim([0.9, 1-1e-4])
         plt.xticks([0.6, 0.7, 0.8, 0.9, 1], [60, 70, 80, 90, 100])
@@ -249,6 +249,9 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
     file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
     print('Saving test sample ROC'+str(ROC_type)+' curve to:   ', file_name); plt.savefig(file_name)
 
+    pklpath = file_name.replace('.png','.pkl')
+    pickle.dump(fig_handle,open(pklpath,'wb'))
+    plt.close()
 
 def combine_ROC_curves(output_dir, cuts=''):
     import multiprocessing as mp, pickle
