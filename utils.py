@@ -921,8 +921,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         data = data.rename(columns = LaTeXizer()[0])
     names = data.columns
     correlations = data.corr()
-    print(correlations)
-
+    #print(correlations)
 
     # plot scatter plot matrix
     if scatter == 'SCATTER':
@@ -943,17 +942,11 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         for (i, j), z in np.ndenumerate(correlations):
             ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
         ticks = np.arange(0,len(names),1)
-        xtcks = np.arange(0,len(names),1, dtype = 'float64')
-        try :
-            xtcks[[5,17]] += 0.35
-        except:
-            pass
-        mod = fmode in ('_with_tracks', '_with_im_means')
-        ax.set_xticks([xtcks,ticks][mod])
+        ax.set_xticks(ticks)
         ax.set_yticks(ticks)
         ax.set_xticklabels(names, fontsize = 14)
         ax.set_yticklabels(names, fontsize = 14)
-        plt.xticks(rotation=[30,90][mod])
+        plt.xticks(rotation=90)
         plt.title(r'Correlation matrix for {}'.format(eta[region]) + mode, fontsize = 20)
         plt.tight_layout()
         path = dir + 'corr_matrix' + fmode + frmt
