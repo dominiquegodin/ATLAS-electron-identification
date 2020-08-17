@@ -952,7 +952,9 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         plt.xticks(rotation=[30,90][fmode == '_with_tracks'])
         plt.title('Correlation matrix' + mode, fontsize = 20)
         plt.tight_layout()
-        plt.savefig(dir + 'corr_matrix' + fmode + frmt)
+        path = dir + 'corr_matrix' + fmode + frmt
+        print('Saving matrix to '+ path)
+        plt.savefig(path)
 
 
         #################################################################################

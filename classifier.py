@@ -230,12 +230,12 @@ if args.correlation in ['ON','SCATTER']:
     else :
         trans = ''
         mode = ''
-    print(valid_sample['em_barrel_Lr1'])
     print('CLASSIFIER : evaluating variables correlations')
     if args.images == 'ON':
         for image in images:
-            valid_sample[image + 'mean'] = np.mean(valid_sample[image], axis = (1,2))
+            valid_sample[image + '_mean'] = np.mean(valid_sample[image], axis = (1,2))
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
+    print(sig_sample)
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
 
     correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')', fmode = '_bkg' + trans + fmode)
