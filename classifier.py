@@ -116,8 +116,14 @@ others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p
             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
             'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
 with h5py.File(args.data_file, 'r') as data:
-    images  = [key for key in images  if key in data or key=='tracks_image']
-    scalars = [key for key in scalars if key in data]
+    if args.images == 'ON':
+        images  = [key for key in images  if key in data or key=='tracks_image']
+    else :
+        images = []
+        tracks = []
+    if args.scalars == 'ON':
+        scalars = [key for key in scalars if key in data]
+    else : scalars = []
     others  = [key for key in others  if key in data]
 
 # FEATURE REMOVAL
@@ -152,8 +158,7 @@ if args.removal == 'ON':
     else : feat = 'full'
     args.output_dir = args.output_dir + '/' + region + '/' + feat
 
-train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
-             'scalars':scalars if args.scalars =='ON' else []}
+train_var = {'images' : images, 'scalars': scalars}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 # CREATING OUTPUT DIRECTORY IF IT DOESN'T EXIST
