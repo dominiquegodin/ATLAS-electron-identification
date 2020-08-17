@@ -913,13 +913,15 @@ def removal_bkg_rej(model,valid_probs,labels,feat,fname):
         pickle.dump(bkg_rej_tup, wfp)
 
 
-def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode=''):
+def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode='',region='barrel'):
+    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
     data = pd.DataFrame(sample)
     if LaTeX:
         print("LaTeX : ", "ON" if LaTeX else 'OFF')
         data = data.rename(columns = LaTeXizer()[0])
     names = data.columns
     correlations = data.corr()
+
 
     # plot scatter plot matrix
     if scatter == 'SCATTER':
@@ -950,7 +952,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         ax.set_xticklabels(names, fontsize = 14)
         ax.set_yticklabels(names, fontsize = 14)
         plt.xticks(rotation=[30,90][fmode == '_with_tracks'])
-        plt.title('Correlation matrix' + mode, fontsize = 20)
+        plt.title(r'Correlation matrix for {}'.format(eta[region]) + mode, fontsize = 20)
         plt.tight_layout()
         path = dir + 'corr_matrix' + fmode + frmt
         print('Saving matrix to '+ path)

@@ -238,8 +238,10 @@ if args.correlation in ['ON','SCATTER']:
     print(sig_sample)
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
 
-    correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')', fmode = '_bkg' + trans + fmode)
-    correlations(sig_sample, output_dir, scatter=args.correlation, mode = '\n(Signal' + mode + ')', fmode = '_sig' + trans + fmode)
+    correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')',
+                 fmode = '_bkg' + trans + fmode, region=region)
+    correlations(sig_sample, output_dir, scatter=args.correlation, mode = '\n(Signal' + mode + ')',
+                 fmode = '_sig' + trans + fmode, region=region)
     sys.exit() # No need for training or validation
 
 
