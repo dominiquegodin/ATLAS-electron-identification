@@ -947,11 +947,12 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
             xtcks[[5,17]] += 0.35
         except:
             pass
-        ax.set_xticks(xtcks)
+        mod = fmode in ('_with_tracks', '_with_im_means')
+        ax.set_xticks([xtcks,ticks][mod])
         ax.set_yticks(ticks)
         ax.set_xticklabels(names, fontsize = 14)
         ax.set_yticklabels(names, fontsize = 14)
-        plt.xticks(rotation=[30,90][fmode == '_with_tracks'])
+        plt.xticks(rotation=[30,90][mod])
         plt.title(r'Correlation matrix for {}'.format(eta[region]) + mode, fontsize = 20)
         plt.tight_layout()
         path = dir + 'corr_matrix' + fmode + frmt
