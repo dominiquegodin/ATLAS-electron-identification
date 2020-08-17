@@ -237,6 +237,7 @@ if args.correlation in ['ON','SCATTER']:
             scalars += [image + '_mean']
             fmode = '_with_im_means'
     print(valid_sample['lar_endcap_Lr0'])
+    print(valid_sample['lar_endcap_Lr0_mean'])
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
 
