@@ -234,6 +234,7 @@ if args.correlation in ['ON','SCATTER']:
     if args.images == 'ON':
         for image in images:
             valid_sample[image + '_mean'] = np.mean(valid_sample[image], axis = (1,2))
+            fmode = '_with_im_means'
     sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
     print(sig_sample)
     bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
