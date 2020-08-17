@@ -921,6 +921,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         data = data.rename(columns = LaTeXizer()[0])
     names = data.columns
     correlations = data.corr()
+    print(correlations)
 
 
     # plot scatter plot matrix
