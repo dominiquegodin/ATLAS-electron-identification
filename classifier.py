@@ -157,7 +157,7 @@ if args.removal == 'ON':
     else : feat = 'full'
     args.output_dir = args.output_dir + '/' + region + '/' + feat
 
-train_var = {'images' : images,'tracks'= [], 'scalars': scalars}
+train_var = {'images' : images,'tracks' : [], 'scalars': scalars}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 # CREATING OUTPUT DIRECTORY IF IT DOESN'T EXIST
