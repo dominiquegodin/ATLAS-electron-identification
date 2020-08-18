@@ -15,7 +15,7 @@ feats = [
             'p_Rhad'   , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits' , 'p_ndof'  , 'p_dPOverP', 'p_deltaEta1',
             'p_f1'     , 'p_f3'    , 'p_deltaPhiRescaled2','p_weta2'  , 'p_d0'    , 'p_d0Sig'  , 'p_qd0Sig',
             'p_nTracks', 'p_sct_weight_charge' , 'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits',
-            'group_0'  , 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7','group_8',  'group_9', 'group_10'
+            'group_0'  , 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7','group_8',  'group_9', 'group_10', 'group_11'
         ]
 
 eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}

@@ -836,7 +836,7 @@ def LaTeXizer(names=[]):
               r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
     Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
               'lar_endcap variables', 'tile variables', r'$d_0$ variables 1', r'$d_0$ variables 2', r'$f_1$ and $f_3$',
-              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'group 11']
+              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'detrimental variables']
 
     converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}
     Lnames = [converter[name] for name in names]
@@ -905,7 +905,7 @@ def plot_importances(results, path, title):
     ax.invert_yaxis()
     widths = data
     #print(labels)
-    color = ['g' if 'variables' in label or 'and' in label else 'tab:blue' for label in newLabels]
+    color = ['r' if label == 'detrimental variables' else 'g' if 'variables' in label or 'and' in label else 'tab:blue' for label in newLabels]
     #print(color)
     ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
     xcenters = widths / 2
