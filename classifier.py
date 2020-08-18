@@ -120,7 +120,6 @@ with h5py.File(args.data_file, 'r') as data:
         images  = [key for key in images  if key in data or key=='tracks_image']
     else :
         images = []
-        tracks = []
     if args.scalars == 'ON':
         scalars = [key for key in scalars if key in data]
     else : scalars = []
@@ -158,7 +157,7 @@ if args.removal == 'ON':
     else : feat = 'full'
     args.output_dir = args.output_dir + '/' + region + '/' + feat
 
-train_var = {'images' : images, 'scalars': scalars}
+train_var = {'images' : images,'tracks'= [], 'scalars': scalars}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
 # CREATING OUTPUT DIRECTORY IF IT DOESN'T EXIST
