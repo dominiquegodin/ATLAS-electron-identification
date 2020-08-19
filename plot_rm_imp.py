@@ -4,6 +4,7 @@ from utils import plot_importances
 
 parser = ArgumentParser()
 parser.add_argument('--region', default='barrel')
+parser.add_argument('images'  , default='ON'   )
 args = parser.parse_args()
 
 feats = [
@@ -19,12 +20,16 @@ feats = [
         ]
 
 eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
+if args.images == 'OFF':
+    images = 'ImagesOFF/'
+else:
+    images = ''
 
 bkg_rej = {}
 absent = []
 for folder in feats:
     try:
-        with open('/scratch/odenis/removal_importance/' + args.region + '/' + folder + '/removal_importance.pkl', 'rb') as rfp:
+        with open('/scratch/odenis/removal_importance/' + images + args.region + '/' + folder + '/removal_importance.pkl', 'rb') as rfp:
             bkg_tup = pickle.load(rfp)
             key = bkg_tup[0].replace(' ', '_')
             bkg_rej[key] = bkg_tup[1]
