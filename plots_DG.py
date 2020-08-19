@@ -44,29 +44,31 @@ def plot_history(history, output_dir, key='accuracy'):
 
 
 def var_histogram(sample, labels, weights, output_dir, prefix, var):
-    variable  = sample[var]; sig = variable[labels==0]; bkg = variable[labels!=0]
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
-    if var == 'pt' :
+    if var == 'pt':
+        variable = sample[var]
         bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
-        plt.xticks(np.arange(0,bins[-1]+1,step=100))
+        plt.xticks(np.arange(0,bins[-1]+1,step=100)); plt.xlabel('$p_t$ (GeV)', fontsize=25)
     if var == 'eta':
-        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37]
-        plt.xticks(bins)
+        variable = abs(sample[var])
+        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
+        plt.xticks(bins); plt.xlabel('abs($\eta$)', fontsize=25)
+    sig = variable[labels==0]; bkg = variable[labels!=0]
     if weights is None:
         sig_weights = len(sig)*[100/len(variable)]
         bkg_weights = len(bkg)*[100/len(variable)]
     else:
         sig_weights = 100*weights[labels==0]/len(variable)
         bkg_weights = 100*weights[labels!=0]/len(variable)
+    pylab.xlim(bins[0], bins[-1]); bins[-1] = max(bins[-1], max(variable))
     hs = pylab.hist(sig, bins, label='signal'    , histtype='step', weights=sig_weights, lw=2)[0]
     hb = pylab.hist(bkg, bins, label='background', histtype='step', weights=bkg_weights, lw=2)[0]
-    pylab.xlim(bins[0],bins[-1])
     axes.xaxis.set_minor_locator(FixedLocator(bins)) #axes.xaxis.set_minor_locator(AutoMinorLocator(10))
     step = 5; y_max = step*(max(np.append(hs,hb))//step+1)
     pylab.ylim(0, y_max); plt.yticks(np.arange(0, y_max+1, step))
-    plt.xlabel('$p_t$ (GeV)', fontsize=25); plt.ylabel('Distribution (% per bin)', fontsize=25)
+    plt.ylabel('Distribution (% per bin)', fontsize=25)
     plt.legend(loc='upper right', fontsize=16); file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
-    print('Saving test sample distributions to:', file_name); plt.savefig(file_name)
+    print('Saving', prefix, 'sample distributions to:', file_name); plt.savefig(file_name)
 
 
 def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, bkg='bkg'):
