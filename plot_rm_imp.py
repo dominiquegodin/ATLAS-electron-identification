@@ -4,7 +4,7 @@ from utils import plot_importances
 
 parser = ArgumentParser()
 parser.add_argument('--region', default='barrel')
-parser.add_argument('images'  , default='ON'   )
+parser.add_argument('--images'  , default='ON'    )
 args = parser.parse_args()
 
 feats = [
