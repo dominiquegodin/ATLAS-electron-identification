@@ -41,6 +41,6 @@ print('\n', bkg_rej)
 imp = {}
 for feat in [f for f in feats if f not in absent + ['full']]:
     imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
-path = '/scratch/odenis/removal_importance/{}/rm_imp.pdf'.format(args.region)
+path = '/scratch/odenis/removal_importance/{}/rm_imp.pdf'.format(images + args.region)
 title = r'Feature removal importance without reweighting ({})'.format(eta[args.region])
 plot_importances(imp, path, title)
