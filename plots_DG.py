@@ -319,7 +319,7 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
     def get_image(sample, labels, e_class, key, mode, image_dict):
         start_time = time.time()
         if mode == 'random':
-            while True:
+            for counter in np.arange(10000):
                 image = abs(sample[key][np.random.choice(np.where(labels==e_class)[0])])
                 if np.max(image) !=0: break
         if mode == 'mean': image = np.mean(sample[key][labels==e_class], axis=0)
@@ -364,7 +364,9 @@ def plot_image(image, n_classes, e_class, layers, key, vmax, soft=True):
     n_layers = len(layers)
     plot_idx = n_classes*e_layer + e_class+1
     plt.subplot(n_layers, n_classes, plot_idx)
-    title   = class_dict[e_class]+'\n('+layer_dict[key]+')' #layer_dict[key]+'\n('+class_dict[e_class]+')'
+    #title   = class_dict[e_class]+'\n('+layer_dict[key]+')'
+    #title   = layer_dict[key]+'\n('+class_dict[e_class]+')'
+    title   = class_dict[e_class]+'\n('+str(key)+')'
     limits  = [-0.13499031, 0.1349903, -0.088, 0.088]
     x_label = '$\phi$'                             if e_layer == n_layers-1 else ''
     x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer == n_layers-1 else []

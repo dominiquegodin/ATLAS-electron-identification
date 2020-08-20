@@ -17,9 +17,9 @@ parser.add_argument( '--file_path'   , default = ''                       )
 args = parser.parse_args()
 
 
-#data_path = '/opt/tmp/godin/el_data/2019-06-20'
-#data_path = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3'
-data_path = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6'
+#data_path = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3'
+data_path = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3'
+#data_path = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6'
 #data_path = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5'
 
 
@@ -34,6 +34,8 @@ data_files  = sorted(data_files)[0:args.n_files]
 #data = h5py.File(data_files[0], 'r')
 #for key in data: print(key)
 #for key, val in data['train'].items(): print(key, val.shape)
+#for key, val in data['train'].items():
+#    if val.ndim > 1: print(key, val.shape, np.sum(np.abs(val)))
 #sys.exit()
 
 

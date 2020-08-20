@@ -674,12 +674,14 @@ def print_channels(sample, col=0, reverse=False):
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #for key in sample: print(key, sample[key].shape)
     #sys.exit()
-    verify_sample(sample); sys.exit()
+    #verify_sample(sample); sys.exit()
     # CALORIMETER IMAGES
     from plots_DG import cal_images
-    layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
-              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    cal_images(sample, labels, layers, output_dir, mode='random')
+    layers = ['em_barrel_Lr0' , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' ,
+              'em_endcap_Lr0' , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' ,
+              'lar_endcap_Lr0', 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3',
+              'tile_gap_Lr1'  , 'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+    cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
     # TRACKS DISTRIBUTIONS
     #from plots_DG import plot_tracks
     #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
