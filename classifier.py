@@ -321,7 +321,7 @@ if args.permutation == 'ON':
         feature_permutation(model, valid_sample, valid_labels, feats[args.feat], g, args.n_reps, fname)
         print_importances(fname)
     elif args.n_classes == 6:
-        bkg_sample = []
+        prm_sample = []
         for i in range(5):
             print('Creating sample ' + str(i))
             if not i:
