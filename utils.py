@@ -589,11 +589,12 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
         bkg_rej_list = []
         for bkg in bkg_list:
             #print("".join(list(return_dict[bkg].values())))
-            bkg_rejs = return_dict[bkg].values())[-1]
+            bkg_rejs = list(return_dict[bkg].values())[-1]
             print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
             print(list(bkg_rejs)
             print('////////////////////////////////////////////////////////////////////////////')
-            bkg_rej_list.append(bkg_rejs.split()[-1])
+            bkg_rej_list.append(bkg_rejs.split()[-1]
+        print(bkg_rej_list)
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
