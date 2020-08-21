@@ -591,9 +591,9 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
             #print("".join(list(return_dict[bkg].values())))
             bkg_rejs = list(return_dict[bkg].values())[-1]
             print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-            print(list(bkg_rejs)
+            print(bkg_rejs)
             print('////////////////////////////////////////////////////////////////////////////')
-            bkg_rej_list.append(bkg_rejs.split()[-1]
+            bkg_rej_list.append(bkg_rejs.split()[-1])
         print(bkg_rej_list)
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
