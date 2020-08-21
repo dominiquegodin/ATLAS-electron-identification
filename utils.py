@@ -587,8 +587,9 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     for job in processes: job.join()
     if plotting=='OFF':
         for bkg in bkg_list:
+            #print("".join(list(return_dict[bkg].values())))
             print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-            print("".join(list(return_dict[bkg].values())))
+            print(return_dict[bkg].values())
             print('////////////////////////////////////////////////////////////////////////////')
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
@@ -842,7 +843,7 @@ def LaTeXizer(names=[]):
 
 def feature_permutation(model, sample, labels, feats, g , n_rep, fname):                    # feats must be a list
     features = ' + '.join(feats)
-    print('PERMUTATION OF : ' + features)
+    print('\nPERMUTATION OF : ' + features)
     bkg_rej = np.empty(n_rep)
     valid_probs = model.predict(sample, batch_size=20000, verbose=1)
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
@@ -854,7 +855,7 @@ def feature_permutation(model, sample, labels, feats, g , n_rep, fname):        
         shuffled_sample[feat] = deepcopy(sample[feat])                                      # Copy of the feature to be shuffled in order to keep sample intact
 
     for k in range(n_rep):                                                                  # Reshuffling loop
-        print('\nPERMUTATION OF ' + features + " " + str(k+1))
+        print('PERMUTATION OF ' + features + " " + str(k+1))
         for feat in feats:
             rdm.shuffle(shuffled_sample[feat])                                              # Shuffling of one feature
         probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
