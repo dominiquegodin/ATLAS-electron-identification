@@ -325,8 +325,8 @@ if args.permutation == 'ON':
         for i in range(5):
             print('Creating sample ' + str(i))
             if not i:
-                continue
                 bkg_sample.append({key:valid_sample[key][valid_labels >= 1] for key in valid_sample})
+                continue
                 bkg_labels = valid_labels[valid_labels >= 1]
             else:
                 bkg_sample.append({key:valid_sample[key][valid_labels == i] for key in valid_sample})
