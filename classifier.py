@@ -316,7 +316,7 @@ if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
     feats += groups
-    fname = args.output_dir + '/' + args.impOut
+    fname = args.output_dir + '/permutation_importance/' + args.impOut
     if args.n_classes == 2:
         feature_permutation(model, valid_sample, valid_labels, feats[args.feat], g, args.n_reps, fname)
         print_importances(fname)

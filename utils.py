@@ -579,14 +579,17 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
 def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, diff_plots):
     global print_dict; print_dict = {n:'' for n in np.arange(1,4)}
     compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] +[1, 2, 3, 4, 5]
+    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] + [1, 2, 3, 4, 5]
     arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
     for job in processes: job.start()
     for job in processes: job.join()
     if plotting=='OFF':
-        for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
+        for bkg in bkg_list:
+            print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+            print("".join(list(return_dict[bkg].values())))
+            print('////////////////////////////////////////////////////////////////////////////')
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
@@ -851,7 +854,7 @@ def feature_permutation(model, sample, labels, feats, g , n_rep, fname):        
         shuffled_sample[feat] = deepcopy(sample[feat])                                      # Copy of the feature to be shuffled in order to keep sample intact
 
     for k in range(n_rep):                                                                  # Reshuffling loop
-        print('PERMUTATION OF ' + features + " " + str(k+1))
+        print('\nPERMUTATION OF ' + features + " " + str(k+1))
         for feat in feats:
             rdm.shuffle(shuffled_sample[feat])                                              # Shuffling of one feature
         probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
