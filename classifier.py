@@ -324,10 +324,10 @@ if args.permutation == 'ON':
         bkg_sample = []
         for i in range(5):
             if not i:
-                bkg_sample[i] = {key:valid_sample[key][np.where(valid_labels >= 1)[0]] for key in valid_sample}
-                bkg_labels = valid_labels[np.where(valid_labels >= 1)[0]]
+                bkg_sample.append({key:valid_sample[key][valid_labels >= 1] for key in valid_sample})
+                bkg_labels = valid_labels[valid_labels >= 1]
             else:
-                bkg_sample[i] = {key:valid_sample[key][np.where(valid_labels == i)[0]] for key in valid_sample}
-                bkg_labels = valid_labels[np.where(valid_labels == i)[0]]
+                bkg_sample.append({key:valid_sample[key][valid_labels == i] for key in valid_sample})
+                bkg_labels = valid_labels[valid_labels == i]
             feature_permutation(model, bkg_sample[i], valid_labels, feats[args.feat], g, args.n_reps, fname + str(i))
             print_importances(fname)
