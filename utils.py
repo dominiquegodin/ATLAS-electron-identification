@@ -839,18 +839,19 @@ def LaTeXizer(names=[]):
 
 def feature_permutation(model, sample, labels, feats, g , n_rep, fname):                    # feats must be a list
     features = ' + '.join(feats)
-    print('PERMUTATION DE : ' + features)
+    print('PERMUTATION OF : ' + features)
     bkg_rej = np.empty(n_rep)
     valid_probs = model.predict(sample, batch_size=20000, verbose=1)
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
-    print('DEBUG\n',np.argwhere(tpr>=0.7))
+    #print('DEBUG\n',np.argwhere(tpr>=0.7))
     bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+    print('Bkg reg =', bkg_rej_full)
     shuffled_sample = {key:value for (key,value) in sample.items() if key not in feats}
     for feat in feats:
         shuffled_sample[feat] = deepcopy(sample[feat])                                      # Copy of the feature to be shuffled in order to keep sample intact
 
     for k in range(n_rep):                                                                  # Reshuffling loop
-        print('PERMUTATION DE ' + features + " " + str(k+1))
+        print('PERMUTATION OF ' + features + " " + str(k+1))
         for feat in feats:
             rdm.shuffle(shuffled_sample[feat])                                              # Shuffling of one feature
         probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled

@@ -322,7 +322,7 @@ if args.permutation == 'ON':
         print_importances(fname)
     elif args.n_classes == 6:
         prm_sample = []
-        for i in range(5):
+        for i in range(6):
             print('Creating sample ' + str(i))
             if not i:
                 prm_sample.append(valid_sample)
