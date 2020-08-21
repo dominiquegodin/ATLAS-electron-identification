@@ -586,11 +586,14 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     for job in processes: job.start()
     for job in processes: job.join()
     if plotting=='OFF':
+        bkg_rej_list = []
         for bkg in bkg_list:
             #print("".join(list(return_dict[bkg].values())))
+            bkg_rejs = return_dict[bkg].values())[-1]
             print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-            print(list(return_dict[bkg].values())[-1])
+            print(list(bkg_rejs)
             print('////////////////////////////////////////////////////////////////////////////')
+            bkg_rej_list.append(bkg_rejs.split()[-1])
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
