@@ -328,7 +328,7 @@ if args.permutation == 'ON':
                 prm_sample.append(valid_sample)
                 prm_labels = valid_labels
             else:
-                prm_sample.append({key:valid_sample[key][valid_labels == i or valid_labels == 0] for key in valid_sample})
-                prm_labels = valid_labels[valid_labels == i or valid_labels == 0]
+                prm_sample.append({key:valid_sample[key][np.logical_or(valid_labels == i, valid_labels == 0)] for key in valid_sample})
+                prm_labels = valid_labels[np.logical_or(valid_labels == i, valid_labels == 0)]
             feature_permutation(model, prm_sample[i], prm_labels, feats[args.feat], g, args.n_reps, fname + str(i))
             print_importances(fname)
