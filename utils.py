@@ -1,11 +1,14 @@
 import tensorflow as tf, matplotlib.pyplot as plt
 import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
+import pandas as pd
+from pandas.plotting import scatter_matrix
 from   sklearn    import metrics, utils, preprocessing
 from   tabulate   import tabulate
 from   skimage    import transform
 from   plots_DG   import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves
 from   plots_KM   import plot_distributions_KM, differential_plots
 from   copy       import deepcopy
+from   itertools  import accumulate
 rdm = np.random
 
 
@@ -581,7 +584,7 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
 def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, diff_plots):
     global print_dict; print_dict = {n:'' for n in np.arange(1,4)}
     compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] #+[1, 2, 3, 4, 5]
+    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] + [1, 2, 3, 4, 5]           # Comment the second list for 2 classes trainings
     arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
@@ -589,6 +592,7 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     for job in processes: job.join()
     if plotting=='OFF':
         for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
+        bkg_rej_list = np.array([int(return_dict[bkg][3].split()[-1]) for bkg in bkg_list])                 # Array of the bkg rej for each class
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
@@ -609,7 +613,7 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
                            pt_bin_indices,  varname='pt',  output_dir=output_dir)
         differential_plots(sample, labels, prob_LLH   , pt_boundaries,
                            pt_bin_indices,  varname='pt',  output_dir=output_dir, evalLLH=True)
-
+    return bkg_rej_list
 
 def verify_sample(sample):
     def scan(sample, batch_size, index, return_dict):
@@ -695,64 +699,6 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = sample.copy()
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
-
-def feature_permutation(model, valid_sample, labels, valid_probs, feat, n_rep, file):
-    print('PERMUTATION DE : ' + feat)
-    bkg_rej = np.empty(n_rep)
-    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
-    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-    shuffled_sample = {key:value for (key,value) in valid_sample.items() if key != feat}
-    shuffled_sample[feat] = deepcopy(valid_sample[feat])                                    # Copy of the feature to be shuffled in order to keep valid_sample intact
-
-    for k in range(n_rep):                                                                  # Reshuffling loop
-        print('PERMUTATION DE ' + feat + " " + str(k+1))
-        rdm.shuffle(shuffled_sample[feat])                                                  # Shuffling of one feature
-        probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
-        fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
-        bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
-
-    importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-    imp_tup = feat, np.mean(importance), np.std(importance)
-    with open(file,'ab') as afp:                                                            # Saving the results in a pickle
-        pickle.dump(imp_tup, afp)
-
-def print_importances(file):
-    with open(file,'rb') as rfp:
-        record = dict()
-        while True:
-            try:
-                imp = pickle.load(rfp)
-                record[imp[0]] = imp[1:]
-            except EOFError:
-                break
-    print(record)
-    return record
-
-def plot_importances(results, path, n_reps):
-    sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
-    labels = [tup[0] for tup in sortedResults]
-    data = [tup[1][0] for tup in sortedResults]
-    error = [tup[1][1] for tup in sortedResults]
-
-    data = np.array(data)
-    error = np.array(error)
-
-    fig, ax = plt.subplots(figsize=(18.4, 10))
-    ax.invert_yaxis()
-
-    widths = data
-    ax.barh(labels, widths, height=0.75, xerr=error, capsize=5)
-    xcenters = widths / 2
-
-    text_color = 'white'
-    for y, (x, c) in enumerate(zip(xcenters, widths)):
-            ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
-
-    plt.title('Feature permutations importance (averaged over {} repetitions)'.format(n_reps), fontsize=20)
-    ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
-    ax.set_ylabel('Features', fontsize=18)
-    plt.savefig(path)
-    return fig, ax
 
 
 #################################################################################
@@ -870,12 +816,243 @@ def merge_presamples(n_e, n_tasks, output_path, output_file):
     print(' (', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
 
 
+    #################################################################################
+    #####  FEATURE IMPORTANCE  ######################################################
+    #################################################################################
+
+def LaTeXizer(names=[]):
+    '''
+    Converts variables' names to be compatible with LaTeX format.
+
+    Returns a dictionary maping each name to its LaTeX conterpart
+    and the converted list of variables names.
+    '''
+    vars  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+             'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+             'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
+             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+    vars += ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits', 'p_EoverP' ]
+    vars += ['group_0', 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7',
+             'group_8',  'group_9', 'group_10', 'group_11']
+
+    Lvars =  ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+              'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+              'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
+              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+    Lvars += [r'$E_{ratio}$', r'$R_{\eta}$', r'$R_{had}$', r'$R_{\phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
+              'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
+              r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
+              r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
+    Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
+              'lar_endcap variables', 'tile variables', r'$d_0$ variables 1', r'$d_0$ variables 2', r'$f_1$ and $f_3$',
+              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'detrimental variables']
+
+    converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}
+    Lnames = [converter[name] for name in names]
+    return converter,Lnames
+
+def create_shuffle_sample(sample,feats):
+    '''
+    Initialize a copy of the valid sample that is going to be partially shuffled.
+    '''
+    shuffled_sample = {key:value for (key,value) in sample.items() if key not in feats}
+    for feat in feats:
+        shuffled_sample[feat] = deepcopy(sample[feat])                                      # Copy of the feature to be shuffled in order to keep sample intact
+    return shuffled_sample
+
+def shuffling_sample(sample, feats, k=0):
+    '''
+    Shuffles the specified features in the given sample.
+    '''
+    print('PERMUTATION #' + str(k+1))
+    for feat in feats:
+        rdm.shuffle(sample[feat])                                                           # Shuffling of one feature
+
+def bkg_rej_70(model, sample, labels):
+    '''
+    Computes the background rejection at 70%.
+    '''
+    probs = model.predict(sample, batch_size=20000, verbose=1)                              # Predictions
+    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+    bkg_rej = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+    return bkg_rej
+
+def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
+                       output_dir):
+    '''
+    Takes a pretrained model and saves the permutation importance of a feature or a group
+    of features to a dictionary in a pickle file.
+    '''
+    name = [feats[0],'group_{}'.format(g)][g>=0]
+    output_dir += '/permutation_importance'
+    fname = output_dir + '/importance'
+    for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):            # Creating the output folder if it doesn't exist
+        try: os.mkdir(path)
+        except FileExistsError: pass
+    if type(feats) == str :
+        feats = [feats]
+
+    if n_classes == 2 :
+        bkg_rej = np.empty(n_rep)
+        features = ' + '.join(feats)
+        print('\nPERMUTATION OF : ' + features)
+        bkg_rej_full = bkg_rej_70(model, sample, labels)
+        print('Background rejection =', bkg_rej_full)
+        shuffled_sample = create_shuffle_sample(sample,feats)
+        for k in range(n_rep):                                                                  # Reshuffling loop
+            shuffling_sample(shuffled_sample, feats, k)
+            bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
+        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+        imp_tup = name, np.mean(importance), np.std(importance)
+        with open(fname + '.pkl','ab') as afp:                                                   # Saving the results in a pickle
+            pickle.dump(imp_tup, afp)
+        print_importances(fname)
+
+    elif n_classes == 6 :
+        bkg_rej = np.empty((n_classes, n_reps))
+        features = ' + '.join(feats)
+        print('\nPERMUTATION OF : ' + features)
+        bkg_rej_full = np.reshape(bkg_rej_full,(n_classes,1))
+        shuffled_sample = create_shuffle_sample(sample, feats)
+        for k in range(n_reps) :
+            shuffling_sample(shuffled_sample,feats, k)
+            probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
+            bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
+                                train_labels, training, output_dir, 'OFF', False)               # Background rejection with one feature shuffled
+        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+        imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
+        for i in range(n_classes):
+            imp_tup = name, imp_mean[i], imp_mean[i]
+            fname += '_{}.pkl'.format(i if i else 'bkg')
+            with open(fname,'ab') as afp:                                                           # Saving the results in a pickle
+                pickle.dump(imp_tup, afp)
+            print_importances(fname)
+
+def print_importances(file):
+    '''
+    Read the specified pickle file containing feature importances data and print it.
+    '''
+    with open(file,'rb') as rfp:
+        record = dict()
+        while True:
+            try:
+                imp = pickle.load(rfp)
+                record[imp[0]] = imp[1:]
+            except EOFError:
+                break
+    print(record)
+    return record
+
+def plot_importances(results, path, title):
+    '''
+    Plots a horizontal bar plot ranking of the feature importances from a dictionary.
+    '''
+    sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
+    labels = [tup[0] for tup in sortedResults]
+    newLabels = LaTeXizer(labels)[1]
+    data = [tup[1][0] for tup in sortedResults]
+    try :
+        error = [tup[1][1] for tup in sortedResults]
+    except:
+        error = np.zeros(len(sortedResults))
+    data = np.array(data)
+    error = np.array(error)
+
+    fig, ax = plt.subplots(figsize=(18.4, 10))
+    ax.invert_yaxis()
+    widths = data
+    color = []
+    for label in newLabels:
+        if label == 'detrimental variables':
+            colors.append('r')
+        elif 'variables' in label or 'and' in label:
+            colors.append('gold')
+        elif label.startswith('em_') or label.startwith('lar_') or labels.startwith('tile_'):
+            colors.append('m')
+        elif label == 'tracks_image':
+            colors.append('g')
+        else :
+            colors.append('tab:blue')
+    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
+    xcenters = widths / 2
+
+    text_color = 'white'
+    for y, (x, c) in enumerate(zip(xcenters, widths)):
+            ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
+
+    plt.axvline(1,color='r', ls=':')
+    plt.title(title, fontsize=20)
+    ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
+    ax.set_ylabel('Features', fontsize=18)
+    plt.savefig(path)
+    return fig, ax
+
+def removal_bkg_rej(model,valid_probs,labels,feat,file):
+    '''
+    Computes and saves background rejection of the given model to a pickle file.
+    '''
+    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
+    bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
+    with open(fname + '.pkl','wb') as wfp:                                                  # Saving the results in a pickle
+        pickle.dump(bkg_rej_tup, wfp)
 
 
-#################################################################################
-#####  UNDER DEVELOPMENT   ######################################################
-#################################################################################
+def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode='',region='barrel'):
+    '''
+    Computes correlation coefficient between the given variables of a sample, then plots
+    a matrix of those coefficients.
 
+    OR
+
+    If scatter=True, plots scatter plots between the given variables and their distrubution
+    into a matrix.
+    '''
+    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
+    data = pd.DataFrame(sample)
+    if LaTeX:
+        print("LaTeX : ", "ON" if LaTeX else 'OFF')
+        data = data.rename(columns = LaTeXizer()[0])
+    names = data.columns
+    correlations = data.corr()
+    #print(correlations)
+
+    # plot scatter plot matrix
+    if scatter == 'SCATTER':
+        print('Plotting scatter plot matrix')
+        scatter_matrix(data, figsize = (18,18))
+        plt.suptitle(r'Scatter plot matrix for {}'.format(eta[region]) + mode, fontsize = 20)
+        plt.yticks(rotation=-90)
+        plt.tight_layout()
+        plt.savefig(dir + 'scatter_plot_matrix' + fmode + '.png')
+
+    # plot correlation matrix
+    else:
+        print('Plotting correlation matrix')
+        fig = plt.figure(figsize=(20,18))
+        ax = fig.add_subplot(111)
+        cax = ax.matshow(correlations, vmin=-1, vmax=1)
+        fig.colorbar(cax)
+        for (i, j), z in np.ndenumerate(correlations):
+            ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
+        ticks = np.arange(0,len(names),1)
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
+        ax.set_xticklabels(names, fontsize = 14)
+        ax.set_yticklabels(names, fontsize = 14)
+        plt.xticks(rotation=90)
+        plt.title(r'Correlation matrix for {}'.format(eta[region]) + mode, fontsize = 20)
+        plt.tight_layout()
+        path = dir + 'corr_matrix' + fmode + frmt
+        print('Saving matrix to '+ path)
+        plt.savefig(path)
+
+
+        #################################################################################
+        #####  UNDER DEVELOPMENT   ######################################################
+        #################################################################################
 
 class Batch_Generator(tf.keras.utils.Sequence):
     def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):

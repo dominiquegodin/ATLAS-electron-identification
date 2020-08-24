@@ -7,7 +7,7 @@ from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
-from   utils      import feature_permutation, print_importances, plot_importances
+from   utils      import feature_permutation, print_importances, plot_importances, removal_bkg_rej, correlations
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
@@ -47,12 +47,15 @@ parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
 parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
-parser.add_argument( '--runDiffPlots', default = 0, type = int       )
-parser.add_argument( '--featImp'     , default = 'OFF'               )
-parser.add_argument( '--n_reps'      , default = 10 , type = int     )
-parser.add_argument( '--feat'        , default = 0, type = int       )
-parser.add_argument( '--impPlot'     , default = 'feat_importances.png')
-parser.add_argument( '--impOut'      , default = 'importances.pkl'       )
+parser.add_argument( '--runDiffPlots', default =  0, type = int      )
+parser.add_argument( '--removal'     , default = 'OFF'               )
+parser.add_argument( '--permutation' , default = 'OFF'               )
+parser.add_argument( '--n_reps'      , default = 10, type = int      )
+parser.add_argument( '--feat'        , default = -1, type = int      )
+parser.add_argument( '--impPlot'     , default = 'perm_imp.pdf'      )
+parser.add_argument( '--impOut'      , default = 'importances'       )
+parser.add_argument( '--correlation' , default = 'OFF'               )
+parser.add_argument( '--tracks'      , default = 'OFF'               )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -66,18 +69,34 @@ if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'ma
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 
-
 # DATAFILE
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except FileExistsError: pass
-args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
-#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
-#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
-#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
-#args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
+if args.data_file in ['','barrel']:
+    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
+    region = 'barrel'
+if args.data_file == 'transition':
+     args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
+     region = 'transition'
+if args.data_file == 'endcap':
+    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
+    region = 'endcap'
+#if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+#if args.data_file == ''          :
+#    args.data_file = '/scratch/odenis/el_data/0.0_1.3/el_data.h5'
+#    region = 'barrel'
+#if args.data_file == 'transition':
+#    args.data_file = '/scratch/odenis/el_data/1.3_1.6/el_data.h5'
+#    region = 'transition'
+#if args.data_file == 'endcap'    :
+#    args.data_file = '/scratch/odenis/el_data/1.6_2.5/el_data.h5'
+#    region = 'endcap'
+#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
@@ -85,28 +104,74 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
         #(7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
-
 # TRAINING VARIABLES
 images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
-            'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
-            'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
-            'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
-scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'           ,
-            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2'         ,
-            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge'         ,
-            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfInnermostPixelHits']
-others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
-            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
-            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'         ]
+            'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine']
+#images  += ['lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3']
+images  += ['tile_gap_Lr1']
+#images  += ['tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+images  += ['tracks_image']
+scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits']
+others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
+            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
+            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
 with h5py.File(args.data_file, 'r') as data:
     images  = [key for key in images  if key in data or key=='tracks_image']
     scalars = [key for key in scalars if key in data]
     others  = [key for key in others  if key in data]
-train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
-             'scalars':scalars if args.scalars=='ON' else []}
 
+# FEATURE REMOVAL
+groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],
+            ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],
+            ['lar_endcap_Lr0','lar_endcap_Lr1','lar_endcap_Lr2','lar_endcap_Lr3'],
+            ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'],
+            ['p_d0' , 'p_d0Sig'], ['p_d0' , 'p_d0Sig' , 'p_qd0Sig'], ['p_f1' , 'p_f3'],
+            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo'],
+            ['em_endcap_Lr2', 'tile_barrel_Lr1', 'p_f1', 'p_qd0Sig', 'p_TRTPID', 'em_endcap_Lr1_fine',
+             'p_sct wt charge', 'p_wstot1', 'p_weta2', 'p_d0', 'p_d0Sig', 'tile_barrel_Lr3', 'em_endcap_Lr0',
+             'em_endcap_Lr3', 'lar_endcap_Lr0', 'p_nTracks', 'tile_gap_Lr1', 'p_EptRatio', 'lar_endcap_Lr1',
+             'p_dPOverP', 'p_numberOfSCTHits', 'lar_endcap_Lr3', 'p_Rphi' , 'p_f3', 'p_ndof', 'p_Eratio']]
+
+if args.removal == 'ON':
+    i = args.feat                                                                                            # image indices
+    s = args.feat - len(images)                                                                              # scalar indices
+    g = args.feat - len(images + scalars)                                                                    # Feature group indices
+    print('i : {}, s : {}, g : {}'.format(i,s,g))
+    if g > len(groups) :
+        print('Argument out of range, aborting...')
+        sys.exit()
+
+    if i >= 0 and i < len(images)  :
+        if args.images == 'OFF':
+            print('Cannot remove image if images are OFF, aborting...')
+            sys.exit()
+        images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
+    elif s >= 0 and s < len(scalars) :
+        if args.scalars == 'OFF':
+            print('Cannot remove scalar if scalars are OFF, aborting...')
+            sys.exit()
+        scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
+    elif g >= 0 :
+        if  groups[g][0] not in images + scalars:
+            print("Cannot remove features not in the sample, aborting...")
+            sys.exit()
+        images  = [key for key in images  if key not in groups[g]]
+        scalars = [key for key in scalars if key not in groups[g]]
+        feat = 'group_{}'.format(g)
+    else : feat = 'full'
+    args.output_dir = args.output_dir + '/' + region + '/' + feat
+
+train_var = {'images' :images  if args.images  == 'ON' else [], 'tracks':[],
+             'scalars':scalars if args.scalars == 'ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])): # Create the output directory if it doesn't exist.
+    try: os.mkdir(path)
+    except OSError: continue
+    except FileExistsError: pass
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
 sample_size  = len(h5py.File(args.data_file, 'r')['mcChannelNumber'])
@@ -125,7 +190,7 @@ if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.ou
 elif args.results_in !='':
     print("\noption [--results_in] was given but no matching file found in the right path, aborting..")
     print("results_in file =", args.output_dir+'/'+args.results_in, '\n')
-if args.results_in != '': sys.exit()
+if args.results_in != '' : sys.exit()
 
 
 # MULTI-GPU DISTRIBUTION
@@ -170,6 +235,57 @@ if args.model_in != '':
     print('CLASSIFIER: loading pre-trained weights from', args.output_dir+'/'+args.model_in, '\n')
     model.load_weights(args.output_dir+'/'+args.model_in)
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
+
+
+# ADDING TRACKS SCALARS FOR CORRELATIONS
+tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
+                'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
+                'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
+                'p_mean_sigmad0']
+
+if args.tracks == 'ON':
+    scalars += tracks_means
+    fmode = '_with_tracks'
+elif args.tracks == 'ONLY':
+    scalars = tracks_means
+    fmode = '_tracks_only'
+else :
+    fmode = ''
+
+# EVALUATING CORRELATIONS
+if args.correlation in ['ON','SCATTER']:
+    output_dir = args.output_dir + '/correlations/' + region + '/'
+    for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):
+        try: os.mkdir(path)
+        except FileExistsError: pass
+    if args.scaling:
+        scaler_out = output_dir + args.scaler_out
+        train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
+        trans = 'QT'
+        mode = ' with quantile transform'
+    else :
+        trans = ''
+        mode = ''
+    print('CLASSIFIER : evaluating variables correlations')
+    if args.images == 'ON':
+        for image in images:
+            if np.amin(valid_sample[image]) == np.amax(valid_sample[image]) :
+                print(image,'is empty')
+                continue
+            valid_sample[image + '_mean'] = np.mean(valid_sample[image], axis = (1,2))
+            scalars += [image + '_mean']
+        fmode = '_with_im_means'
+            #print(image)
+            #print(np.all(np.isfinite(valid_sample[image])))
+            #print('min :', np.amin(valid_sample[image]), 'max :', np.amax(valid_sample[image]))
+    sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
+    bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
+
+    correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')',
+                 fmode = '_bkg_' + trans + fmode, region=region)
+    correlations(sig_sample, output_dir, scatter=args.correlation, mode = '\n(Signal' + mode + ')',
+                 fmode = '_sig_' + trans + fmode, region=region)
+    sys.exit() # No need for training or validation
 
 
 # TRAINING LOOP
@@ -217,7 +333,7 @@ if args.n_folds > 1:
 else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
+bkg_rej_full = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
               args.output_dir, args.plotting, args.runDiffPlots)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
@@ -225,10 +341,16 @@ if args.results_out != '':
     else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
+# FEATURE REMOVAL IMPORTANCE
+if args.removal == 'ON' :
+    fname = args.output_dir + '/' + args.impOut
+    removal_bkg_rej(model,valid_probs,valid_labels,feat,fname)
+    print_importances(fname)
+
 # FEATURE PERMUTATION IMPORTANCE
-if args.featImp == 'ON':
-    feats = images + scalars
-    file = args.output_dir+'/'+args.impOut
-    feature_permutation(model, valid_sample, valid_labels, valid_probs, feats[args.feat], args.n_reps, file)
-    #plot_importances(results,args.output_dir+'/'+args.impPlot, args.n_reps)
-    print_importances(file)
+if args.permutation == 'ON':
+    feats = [[var] for var in images + scalars]
+    g = args.feat-len(feats)
+    feats += groups
+    feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
+                        training, args.n_classes, args.n_reps, args.output_dir)
