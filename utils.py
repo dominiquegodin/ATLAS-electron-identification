@@ -889,9 +889,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     name = [feats[0],'group_{}'.format(g)][g>=0]
     output_dir += '/permutation_importance'
     fname = output_dir + '/importance'
-    for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):            # Creating the output folder if it doesn't exist
-        try: os.mkdir(path)
-        except FileExistsError: pass
+    create_path(output_dir)
     if type(feats) == str :
         feats = [feats]
 
@@ -990,6 +988,38 @@ def plot_importances(results, path, title):
     plt.savefig(path)
     return fig, ax
 
+def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
+    '''
+    Removes the specified features from the input variables.
+    '''
+    i = arg_feat                                                                                            # image indices
+    s = arg_feat - len(images)                                                                              # scalar indices
+    g = arg_feat - len(images + scalars)                                                                    # Feature group indices
+    print('i : {}, s : {}, g : {}'.format(i,s,g))
+    if g > len(groups) :
+        print('Argument out of range, aborting...')
+        sys.exit()
+
+        if i >= 0 and i < len(images)  :
+            if arg_im == 'OFF':
+                print('Cannot remove image if images are OFF, aborting...')
+                sys.exit()
+                images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
+            elif s >= 0 and s < len(scalars) :
+                if arg_sc == 'OFF':
+                    print('Cannot remove scalar if scalars are OFF, aborting...')
+                    sys.exit()
+                    scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
+                elif g >= 0 :
+                    if  groups[g][0] not in images + scalars:
+                        print("Cannot remove features not in the sample, aborting...")
+                        sys.exit()
+                        images  = [key for key in images  if key not in groups[g]]
+                        scalars = [key for key in scalars if key not in groups[g]]
+                        feat = 'group_{}'.format(g)
+                        else : feat = 'full'
+                        return feat
+
 def removal_bkg_rej(model,valid_probs,labels,feat,file):
     '''
     Computes and saves background rejection of the given model to a pickle file.
@@ -999,8 +1029,39 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
     with open(fname + '.pkl','wb') as wfp:                                                  # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, wfp)
 
+def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr):
+    create_path(output_dir)
+    if scaling:
+        scaler_out = output_dir + scaler_out
+        train_sample, sample = apply_scaler(sample, sample, scalars, scaler_out)
+        trans = 'QT'
+        mode = ' with quantile transform'
+    else :
+        trans = ''
+        mode = ''
+    print('CLASSIFIER : evaluating variables correlations')
+    if arg_im == 'ON':
+        for image in images:
+            if np.amin(sample[image]) == np.amax(sample[image]) :
+                print(image,'is empty')
+                continue
+            sample[image + '_mean'] = np.mean(sample[image], axis = (1,2))
+            scalars += [image + '_mean']
+        fmode = '_with_im_means'
+    else : fmode = ''
+            #print(image)
+            #print(np.all(np.isfinite(sample[image])))
+            #print('min :', np.amin(sample[image]), 'max :', np.amax(sample[image]))
+    sig_sample = {key : sample[key][np.where(labels == 0)[0]] for key in scalars}
+    bkg_sample = {key : sample[key][np.where(labels == 1)[0]] for key in scalars}
 
-def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode='',region='barrel'):
+    plot_correlations(bkg_sample, output_dir, scatter=arg_corr, mode = '\n(Background' + mode + ')',
+                 fmode = '_bkg_' + trans + fmode, region=region)
+    plot_correlations(sig_sample, output_dir, scatter=arg_corr, mode = '\n(Signal' + mode + ')',
+                 fmode = '_sig_' + trans + fmode, region=region)
+    sys.exit() # No need for training or validation
+
+def plot_correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode='',region='barrel'):
     '''
     Computes correlation coefficient between the given variables of a sample, then plots
     a matrix of those coefficients.
@@ -1049,37 +1110,12 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         print('Saving matrix to '+ path)
         plt.savefig(path)
 
-def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
-    '''
-    Removes the specified features from the input variables. 
-    '''
-    i = arg_feat                                                                                            # image indices
-    s = arg_feat - len(images)                                                                              # scalar indices
-    g = arg_feat - len(images + scalars)                                                                    # Feature group indices
-    print('i : {}, s : {}, g : {}'.format(i,s,g))
-    if g > len(groups) :
-        print('Argument out of range, aborting...')
-        sys.exit()
+def create_path(output_dir):
+    for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):                                # Create the output directory if it doesn't exist.
+        try: os.mkdir(path)
+        except OSError: continue
+        except FileExistsError: pass
 
-    if i >= 0 and i < len(images)  :
-        if arg_im == 'OFF':
-            print('Cannot remove image if images are OFF, aborting...')
-            sys.exit()
-        images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
-    elif s >= 0 and s < len(scalars) :
-        if arg_sc == 'OFF':
-            print('Cannot remove scalar if scalars are OFF, aborting...')
-            sys.exit()
-        scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
-    elif g >= 0 :
-        if  groups[g][0] not in images + scalars:
-            print("Cannot remove features not in the sample, aborting...")
-            sys.exit()
-        images  = [key for key in images  if key not in groups[g]]
-        scalars = [key for key in scalars if key not in groups[g]]
-        feat = 'group_{}'.format(g)
-    else : feat = 'full'
-    return feat
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################

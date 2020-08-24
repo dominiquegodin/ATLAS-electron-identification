@@ -7,7 +7,8 @@ from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
-from   utils      import feature_permutation, print_importances, plot_importances, removal_bkg_rej, correlations
+from   utils      import feature_permutation, feature_removal, print_importances, plot_importances
+from   utils      import removal_bkg_rej, correlations, create_path
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
@@ -70,9 +71,7 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 
 # DATAFILE
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    try: os.mkdir(path)
-    except FileExistsError: pass
+create_path(args.output_dir)
 #if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
 if args.data_file in ['','barrel']:
     args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
@@ -138,6 +137,7 @@ groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel
 if args.removal == 'ON':
     feat = feature_removal(args.feat, images, scalars, groups, args.images, args.scalars)
     args.output_dir = args.output_dir + '/' + region + '/' + feat                                                   # The output directory will be different for each region and each feature.
+create_path(args.output_dir)
                                                                                                                     # That way the model.h5 and their corresponding plots aren't mixed with
                                                                                                                     # the other trainings.
 # TRAINING VARIABLES
@@ -145,10 +145,6 @@ train_var = {'images' :images  if args.images  == 'ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars == 'ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):                                # Create the output directory if it doesn't exist.
-    try: os.mkdir(path)
-    except OSError: continue
-    except FileExistsError: pass
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
 sample_size  = len(h5py.File(args.data_file, 'r')['mcChannelNumber'])
@@ -231,38 +227,9 @@ else :
 
 # EVALUATING CORRELATIONS
 if args.correlation in ['ON','SCATTER']:
-    output_dir = args.output_dir + '/correlations/' + region + '/'
-    for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):
-        try: os.mkdir(path)
-        except FileExistsError: pass
-    if args.scaling:
-        scaler_out = output_dir + args.scaler_out
-        train_sample, valid_sample = apply_scaler(valid_sample, valid_sample, scalars, scaler_out)
-        trans = 'QT'
-        mode = ' with quantile transform'
-    else :
-        trans = ''
-        mode = ''
-    print('CLASSIFIER : evaluating variables correlations')
-    if args.images == 'ON':
-        for image in images:
-            if np.amin(valid_sample[image]) == np.amax(valid_sample[image]) :
-                print(image,'is empty')
-                continue
-            valid_sample[image + '_mean'] = np.mean(valid_sample[image], axis = (1,2))
-            scalars += [image + '_mean']
-        fmode = '_with_im_means'
-            #print(image)
-            #print(np.all(np.isfinite(valid_sample[image])))
-            #print('min :', np.amin(valid_sample[image]), 'max :', np.amax(valid_sample[image]))
-    sig_sample = {key : valid_sample[key][np.where(valid_labels == 0)[0]] for key in scalars}
-    bkg_sample = {key : valid_sample[key][np.where(valid_labels == 1)[0]] for key in scalars}
-
-    correlations(bkg_sample, output_dir, scatter=args.correlation, mode = '\n(Background' + mode + ')',
-                 fmode = '_bkg_' + trans + fmode, region=region)
-    correlations(sig_sample, output_dir, scatter=args.correlation, mode = '\n(Signal' + mode + ')',
-                 fmode = '_sig_' + trans + fmode, region=region)
-    sys.exit() # No need for training or validation
+    output_dir =
+    correlations(images, scalars, valid_sample, valid_labels, region, args.output_dir + '/correlations/' + region + '/',
+                 args.scaling, args.scaler_out, args.images, arg.correlation)
 
 
 # TRAINING LOOP
