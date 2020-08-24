@@ -316,5 +316,5 @@ if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
     feats += groups
-    feature_permutation(feats[args.feat], g, valid_sample, valid_label, model, valid_probs, train_labels, training, args.n_classes,
+    feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, valid_probs, train_labels, training, args.n_classes,
                         args.n_reps, args.output_dir)
