@@ -891,7 +891,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         shuffled_sample = create_shuffle_sample(sample, feats)
         for k in range(n_reps) :
             shuffling_sample(shuffled_sample,feats, k)
-            probs = model.predict(shuffled_sample, batch_size=20000, verbose=args.verbose)
+            probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
             bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
                                 train_labels, training, output_dir, 'OFF', False)               # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
