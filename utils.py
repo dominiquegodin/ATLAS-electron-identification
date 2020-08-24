@@ -878,7 +878,7 @@ def feature_permutation(feats, g, sample, label, model, valid_probs, train_label
             bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
         imp_tup = name, np.mean(importance), np.std(importance)
-        with open(fname + '.pkl,'ab') as afp:                                                   # Saving the results in a pickle
+        with open(fname + '.pkl','ab') as afp:                                                   # Saving the results in a pickle
             pickle.dump(imp_tup, afp)
         print_importances(fname)
 
