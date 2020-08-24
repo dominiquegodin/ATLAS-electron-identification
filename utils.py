@@ -856,7 +856,7 @@ def bkg_rej_70(model, sample, labels):
     bkg_rej = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
     return bkg_rej
 
-def feature_permutation(feats, g, sample, label, model, valid_probs, train_labels, training, n_classes, n_reps,
+def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
                        output_dir):
     name = [feats[0],'group_{}'.format(g)][g>=0]
     output_dir += '/permutation_importance'
@@ -887,8 +887,7 @@ def feature_permutation(feats, g, sample, label, model, valid_probs, train_label
         bkg_rej = np.empty((n_classes, n_reps))
         features = ' + '.join(feats)
         print('\nPERMUTATION OF : ' + features)
-        bkg_rej_full = np.reshape(valid_results(sample, labels, valid_probs, train_labels,
-                                  training, output_dir, 'OFF', False), (6,1))
+        bkg_rej_full = np.reshape(bkg_rej_full,(6,1))
         shuffled_sample = create_shuffle_sample(sample, feats)
         for k in range(n_reps) :
             shuffling_sample(shuffled_sample,feats, k)

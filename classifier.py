@@ -297,7 +297,7 @@ if args.n_folds > 1:
 else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
+bkg_rej_full = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
               args.output_dir, args.plotting, args.runDiffPlots)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
@@ -316,5 +316,5 @@ if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
     feats += groups
-    feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, valid_probs, train_labels, training, args.n_classes,
-                        args.n_reps, args.output_dir)
+    feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
+                        training, args.n_classes, args.n_reps, args.output_dir)
