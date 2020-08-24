@@ -316,19 +316,5 @@ if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
     feats += groups
-    fname = args.output_dir + '/permutation_importance/' + args.impOut
-    if args.n_classes == 2:
-        feature_permutation(model, valid_sample, valid_labels, feats[args.feat], g, args.n_reps, fname)
-        print_importances(fname)
-    elif args.n_classes == 6:
-        prm_sample = []
-        for i in range(6):
-            print('Creating sample ' + str(i))
-            if not i:
-                prm_sample.append(valid_sample)
-                prm_labels = valid_labels
-            else:
-                prm_sample.append({key:valid_sample[key][np.logical_or(valid_labels == i, valid_labels == 0)] for key in valid_sample})
-                prm_labels = valid_labels[np.logical_or(valid_labels == i, valid_labels == 0)]
-            feature_permutation(model, prm_sample[i], prm_labels, feats[args.feat], g, args.n_reps, fname + '_' + str(i))
-            print_importances(fname +  '_' + str(i) + '.pkl')
+    feature_permutation(feats[args.feat], g, valid_sample, valid_label, model, valid_probs, train_labels, training, args.n_classes,
+                        args.n_reps, args.output_dir)

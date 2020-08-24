@@ -586,15 +586,9 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     for job in processes: job.start()
     for job in processes: job.join()
     if plotting=='OFF':
-        bkg_rej_list = []
-        for bkg in bkg_list:
-            #print("".join(list(return_dict[bkg].values())))
-            bkg_rejs = list(return_dict[bkg].values())[-1]
-            print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-            print(bkg_rejs)
-            print('////////////////////////////////////////////////////////////////////////////')
-            bkg_rej_list.append(bkg_rejs.split()[-1])
-        print(bkg_rej_list)
+        for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
+        bkg_rej_list = np.array([int(return_dict[bkg][3].split()[-1]) for bkg in bkg_list])
+        print(bkg_rej_list) #DEBUG
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
@@ -615,7 +609,7 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
                            pt_bin_indices,  varname='pt',  output_dir=output_dir)
         differential_plots(sample, labels, prob_LLH   , pt_boundaries,
                            pt_bin_indices,  varname='pt',  output_dir=output_dir, evalLLH=True)
-
+    return bkg_rej_list
 
 def verify_sample(sample):
     def scan(sample, batch_size, index, return_dict):
@@ -844,33 +838,69 @@ def LaTeXizer(names=[]):
     Lnames = [converter[name] for name in names]
     return converter,Lnames
 
-
-def feature_permutation(model, sample, labels, feats, g , n_rep, fname):                    # feats must be a list
-    features = ' + '.join(feats)
-    print('\nPERMUTATION OF : ' + features)
-    bkg_rej = np.empty(n_rep)
-    valid_probs = model.predict(sample, batch_size=20000, verbose=1)
-    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
-    #print('DEBUG\n',np.argwhere(tpr>=0.7))
-    bkg_rej_full = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
-    print('Bkg reg =', bkg_rej_full)
+def create_shuffle_sample(sample,feats):
     shuffled_sample = {key:value for (key,value) in sample.items() if key not in feats}
     for feat in feats:
         shuffled_sample[feat] = deepcopy(sample[feat])                                      # Copy of the feature to be shuffled in order to keep sample intact
+    return shuffled_sample
 
-    for k in range(n_rep):                                                                  # Reshuffling loop
-        print('PERMUTATION OF ' + features + " " + str(k+1))
-        for feat in feats:
-            rdm.shuffle(shuffled_sample[feat])                                              # Shuffling of one feature
-        probs = model.predict(shuffled_sample, batch_size=20000, verbose=1)                 # Prediction with only one feature shuffled
-        fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
-        bkg_rej[k] = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                     # Background rejection with one feature shuffled
+def shuffling_sample(sample, feats, k=0):
+    print('PERMUTATION #' + str(k+1))
+    for feat in feats:
+        rdm.shuffle(sample[feat])                                                           # Shuffling of one feature
 
+def bkg_rej_70(model, sample, labels):
+    probs = model.predict(sample, batch_size=20000, verbose=1)                              # Predictions
+    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+    bkg_rej = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
+    return bkg_rej
+
+def feature_permutation(feats, g, sample, label, model, valid_probs, train_labels, training, n_classes, n_reps,
+                       output_dir):
     name = [feats[0],'group_{}'.format(g)][g>=0]
-    importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-    imp_tup = name, np.mean(importance), np.std(importance)
-    with open(fname + '.pkl','ab') as afp:                                                  # Saving the results in a pickle
-        pickle.dump(imp_tup, afp)
+    output_dir += '/permutation_importance'
+    fname = output_dir + '/importance'
+    for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):            # Creating the output folder if it doesn't exist
+        try: os.mkdir(path)
+        except FileExistsError: pass
+    if type(feats) == str :
+        feats = [feats]
+
+    if n_classes == 2 :
+        bkg_rej = np.empty(n_rep)
+        features = ' + '.join(feats)
+        print('\nPERMUTATION OF : ' + features)
+        bkg_rej_full = bkg_rej_70(model, sample, labels)
+        print('Background rejection =', bkg_rej_full)
+        shuffled_sample = create_shuffle_sample(sample,feats)
+        for k in range(n_rep):                                                                  # Reshuffling loop
+            shuffling_sample(shuffled_sample, feats, k)
+            bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
+        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+        imp_tup = name, np.mean(importance), np.std(importance)
+        with open(fname + '.pkl,'ab') as afp:                                                   # Saving the results in a pickle
+            pickle.dump(imp_tup, afp)
+        print_importances(fname)
+
+    elif n_classes == 6 :
+        bkg_rej = np.empty((n_classes, n_reps))
+        features = ' + '.join(feats)
+        print('\nPERMUTATION OF : ' + features)
+        bkg_rej_full = np.reshape(valid_results(sample, labels, valid_probs, train_labels,
+                                  training, output_dir, 'OFF', False), (6,1))
+        shuffled_sample = create_shuffle_sample(sample, feats)
+        for k in range(n_reps) :
+            shuffling_sample(shuffled_sample,feats, k)
+            probs = model.predict(shuffled_sample, batch_size=20000, verbose=args.verbose)
+            bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
+                                train_labels, training, output_dir, 'OFF', False)               # Background rejection with one feature shuffled
+        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+        imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
+        for i in range(n_classes):
+            imp_tup = name, imp_mean[i], imp_mean[i]
+            with open(fname + '_{}.pkl'.format(i if i else 'bkg'),'ab') as afp:                                                           # Saving the results in a pickle
+                pickle.dump(imp_tup, afp)
+            print_importances(fname)
 
 def print_importances(file):
     with open(file,'rb') as rfp:
