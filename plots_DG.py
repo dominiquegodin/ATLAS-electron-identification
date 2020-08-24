@@ -44,23 +44,25 @@ def plot_history(history, output_dir, key='accuracy'):
 
 
 def var_histogram(sample, labels, weights, output_dir, prefix, var):
-    variable  = sample[var]; sig = variable[labels==0]; bkg = variable[labels!=0]
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+    if var == 'pt':
+        variable = sample[var]
+        bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
+        plt.xticks(np.arange(0,bins[-1]+1,step=100)); plt.xlabel('$p_t$ (GeV)', fontsize=25)
+    if var == 'eta':
+        variable = abs(sample[var])
+        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
+        plt.xticks(bins); plt.xlabel('abs($\eta$)', fontsize=25)
+    sig = variable[labels==0]; bkg = variable[labels!=0]
     if weights is None:
         sig_weights = len(sig)*[100/len(variable)]
         bkg_weights = len(bkg)*[100/len(variable)]
     else:
         sig_weights = 100*weights[labels==0]/len(variable)
         bkg_weights = 100*weights[labels!=0]/len(variable)
-    if var == 'pt' :
-        bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
-        plt.xticks(np.arange(0,bins[-1]+1,step=100)); plt.xlabel('$p_t$ (GeV)', fontsize=25)
-    if var == 'eta':
-        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37]
-        plt.xticks(bins); plt.xlabel('abs($\eta$)', fontsize=25)
+    pylab.xlim(bins[0], bins[-1]); bins[-1] = max(bins[-1], max(variable))
     hs = pylab.hist(sig, bins, label='signal'    , histtype='step', weights=sig_weights, lw=2)[0]
     hb = pylab.hist(bkg, bins, label='background', histtype='step', weights=bkg_weights, lw=2)[0]
-    pylab.xlim(bins[0],bins[-1])
     axes.xaxis.set_minor_locator(FixedLocator(bins)) #axes.xaxis.set_minor_locator(AutoMinorLocator(10))
     step = 5; y_max = step*(max(np.append(hs,hb))//step+1)
     pylab.ylim(0, y_max); plt.yticks(np.arange(0, y_max+1, step))
@@ -317,7 +319,7 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
     def get_image(sample, labels, e_class, key, mode, image_dict):
         start_time = time.time()
         if mode == 'random':
-            while True:
+            for counter in np.arange(10000):
                 image = abs(sample[key][np.random.choice(np.where(labels==e_class)[0])])
                 if np.max(image) !=0: break
         if mode == 'mean': image = np.mean(sample[key][labels==e_class], axis=0)
@@ -362,7 +364,9 @@ def plot_image(image, n_classes, e_class, layers, key, vmax, soft=True):
     n_layers = len(layers)
     plot_idx = n_classes*e_layer + e_class+1
     plt.subplot(n_layers, n_classes, plot_idx)
-    title   = class_dict[e_class]+'\n('+layer_dict[key]+')' #layer_dict[key]+'\n('+class_dict[e_class]+')'
+    #title   = class_dict[e_class]+'\n('+layer_dict[key]+')'
+    #title   = layer_dict[key]+'\n('+class_dict[e_class]+')'
+    title   = class_dict[e_class]+'\n('+str(key)+')'
     limits  = [-0.13499031, 0.1349903, -0.088, 0.088]
     x_label = '$\phi$'                             if e_layer == n_layers-1 else ''
     x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer == n_layers-1 else []

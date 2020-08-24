@@ -9,7 +9,7 @@ from   utils     import presample, merge_presamples
 parser = ArgumentParser()
 parser.add_argument( '--n_e'         , default = None        , type=float )
 parser.add_argument( '--n_tasks'     , default = 12          , type=int   )
-parser.add_argument( '--n_files'     , default = 10          , type=int   )
+parser.add_argument( '--n_files'     , default = 20          , type=int   )
 parser.add_argument( '--output_file' , default = 'el_data.h5'             )
 parser.add_argument( '--sampling'    , default = 'ON'                     )
 parser.add_argument( '--merging'     , default = 'ON'                     )
@@ -17,7 +17,7 @@ parser.add_argument( '--file_path'   , default = ''                       )
 args = parser.parse_args()
 
 
-#data_path = '/opt/tmp/godin/el_data/2019-06-20'
+#data_path = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3'
 data_path = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3'
 #data_path = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6'
 #data_path = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5'
@@ -34,23 +34,25 @@ data_files  = sorted(data_files)[0:args.n_files]
 #data = h5py.File(data_files[0], 'r')
 #for key in data: print(key)
 #for key, val in data['train'].items(): print(key, val.shape)
+#for key, val in data['train'].items():
+#    if val.ndim > 1: print(key, val.shape, np.sum(np.abs(val)))
 #sys.exit()
 
 
 # MERGING FILES/ NO PRESAMPLING
-if args.sampling != 'ON' and args.merging == 'ON':
-    temp_files = [output_path+h5_file for h5_file in os.listdir(output_path) if 'temp' in h5_file]
+if args.sampling == 'OFF' and args.merging == 'ON':
+    temp_files = [output_path+'/'+h5_file for h5_file in os.listdir(output_path) if 'temp' in h5_file]
     sum_e      = [len(h5py.File(h5_file, 'r')['mcChannelNumber']) for h5_file in temp_files]
     print(); merge_presamples(sum_e[0], len(temp_files), output_path, args.output_file)
-    print(sum(sum_e), 'ELECTRONS COLLECTED\n'); print(); sys.exit()
-if args.sampling != 'ON' and args.merging != 'ON': sys.exit()
+    print(sum(sum_e), 'ELECTRONS COLLECTED\n'); sys.exit()
+if args.sampling == 'OFF' and args.merging == 'OFF': sys.exit()
 
 
 # ELECTRONS VARIABLES
-images  =  ['em_barrel_Lr0'   , 'em_barrel_Lr1'   , 'em_barrel_Lr2'   , 'em_barrel_Lr3'    ,
-            'em_endcap_Lr0'   , 'em_endcap_Lr1'   , 'em_endcap_Lr2'   , 'em_endcap_Lr3'    ,
-            'lar_endcap_Lr0'  , 'lar_endcap_Lr1'  , 'lar_endcap_Lr2'  , 'lar_endcap_Lr3'   ,
-            'tile_barrel_Lr1' , 'tile_barrel_Lr2' , 'tile_barrel_Lr3' , 'tile_gap_Lr1'     ]
+images  =  ['em_barrel_Lr0'   , 'em_barrel_Lr1'   , 'em_barrel_Lr2'   , 'em_barrel_Lr3'                   ,
+            'em_endcap_Lr0'   , 'em_endcap_Lr1'   , 'em_endcap_Lr2'   , 'em_endcap_Lr3'                   ,
+            'lar_endcap_Lr0'  , 'lar_endcap_Lr1'  , 'lar_endcap_Lr2'  , 'lar_endcap_Lr3'                  ,
+            'tile_barrel_Lr1' , 'tile_barrel_Lr2' , 'tile_barrel_Lr3' , 'tile_gap_Lr1'                    ]
 tracks  =  ['tracks_pt'       , 'tracks_phi'      , 'tracks_eta'      , 'tracks_d0'        , 'tracks_z0'  ,
             'p_tracks_pt'     , 'p_tracks_phi'    , 'p_tracks_eta'    , 'p_tracks_d0'      , 'p_tracks_z0',
             'p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof'    ,
@@ -76,12 +78,7 @@ for h5_file in temp_files: os.remove(output_path+'/'+h5_file)
 # STARTING SAMPLING AND COLLECTING DATA
 n_tasks = min(multiprocessing.cpu_count(), args.n_tasks)
 max_e   = [len(h5py.File(h5_file, 'r')['train']['mcChannelNumber']) for h5_file in data_files]
-
-#print(max_e)
-#if args.n_e != None: max_e = [min(np.sum(max_e), int(args.n_e))//(len(data_files))] * len(data_files)
 if args.n_e != None: max_e = [min(max_e+[int(args.n_e)//len(data_files)])] * len(data_files)
-#print(max_e); sys.exit()
-
 max_e = np.array(max_e)//n_tasks*n_tasks; sum_e = 0
 print('\nSTARTING ELECTRONS COLLECTION (', '\b'+str(sum(max_e)), end=' ', flush=True)
 print('electrons from', len(data_files),'files, using', n_tasks,'threads):')

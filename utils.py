@@ -207,12 +207,16 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d', get_weights=True):
     if sampling_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max']:
         return sample, labels, None
-    pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
-    eta = abs(sample['eta']); eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37]
+    eta = abs(sample['eta']); eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
+    pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500        ]
+    eta_bins[-1] = max(eta_bins[-1], max(eta)) + 1e-6
+    pt_bins [-1] = max( pt_bins [1], max( pt)) + 1e-6
+    eta_bins = eta_bins[np.where(eta_bins<=min(eta))[0][-1]:np.where(eta_bins>=max(eta))[0][0]+1]
+    pt_bins  =  pt_bins[np.where( pt_bins<=min( pt))[0][-1]:np.where( pt_bins>=max( pt))[0][0]+1]
     if hist == 'pt' : eta_bins = [eta_bins[0], eta_bins[-1]]
     if hist == 'eta':  pt_bins = [ pt_bins[0],  pt_bins[-1]]
-    pt_ind   = np.digitize(pt , pt_bins , right=True) -1
-    eta_ind  = np.digitize(eta, eta_bins, right=True) -1
+    eta_ind  = np.digitize(eta, eta_bins, right=False) -1
+    pt_ind   = np.digitize( pt,  pt_bins, right=False) -1
     hist_sig = np.histogram2d(pt[labels==0], eta[labels==0], bins=[pt_bins,eta_bins])[0]
     hist_bkg = np.histogram2d(pt[labels!=0], eta[labels!=0], bins=[pt_bins,eta_bins])[0]
     if bkg_ratio == None: bkg_ratio = np.sum(hist_bkg)/np.sum(hist_sig)
@@ -272,8 +276,8 @@ def downsampling(sample, labels, bkg_ratio=None):
 
 
 def match_distributions(sample, labels, target_sample, target_labels):
-    bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 501]
     pt = sample['p_et_calo']; target_pt = target_sample['p_et_calo']
+    bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
     indices         = np.digitize(pt, bins, right=False) -1
     hist_sig        = np.histogram(       pt[labels==0]       , bins)[0]
     hist_bkg        = np.histogram(       pt[labels!=0]       , bins)[0]
@@ -670,14 +674,16 @@ def print_channels(sample, col=0, reverse=False):
 
 
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
-    for key in sample: print(key, sample[key].shape)
-    sys.exit()
-    verify_sample(sample); sys.exit()
+    #for key in sample: print(key, sample[key].shape)
+    #sys.exit()
+    #verify_sample(sample); sys.exit()
     # CALORIMETER IMAGES
     from plots_DG import cal_images
-    layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
-              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    cal_images(sample, labels, layers, output_dir, mode='random')
+    layers = ['em_barrel_Lr0' , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' ,
+              'em_endcap_Lr0' , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' ,
+              'lar_endcap_Lr0', 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3',
+              'tile_gap_Lr1'  , 'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+    cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
     # TRACKS DISTRIBUTIONS
     #from plots_DG import plot_tracks
     #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
@@ -757,16 +763,17 @@ def plot_importances(results, path, n_reps):
 def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, integers, index):
     idx = index*batch_size, (index+1)*batch_size
     with h5py.File(h5_file, 'r') as data:
-        images   = list(set(data['train']) & set(images))
-        tracks   = list(set(data['train']) & set(tracks))
-        scalars  = list(set(data['train']) & set(scalars+integers))
-        sample = {key:data['train'][key][idx[0]:idx[1]] for key in images+tracks+scalars}
+        images  = list(set(images)   & set(data['train']))
+        tracks  = list(set(tracks)   & set(data['train']))
+        scalars = list(set(scalars)  & set(data['train']))
+        int_val = list(set(integers) & set(data['train']))
+        sample = {key:data['train'][key][idx[0]:idx[1]] for key in images + tracks + scalars + int_val}
     for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
     for key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
         try: sample[key+'_fine'] = sample[key]
         except KeyError: pass
     for key in images: sample[key] = resize_images(sample[key])
-    for key in images+scalars: sample[key] = np.float16(sample[key])
+    for key in images + scalars: sample[key] = np.float16(np.clip(sample[key],-5e4,5e4))
     try: sample['p_TruthType'] = sample.pop('p_truthType')
     except KeyError: pass
     try: sample['p_TruthOrigin'] = sample.pop('p_truthOrigin')
@@ -822,11 +829,14 @@ def get_tracks(sample, idx, max_tracks=20, p='', scalars=False):
             except KeyError: tracks += [np.zeros(sample['p_tracks_charge'][idx].shape)]
     tracks      = np.float16(np.vstack(tracks).T)
     tracks      = tracks[np.isfinite(np.sum(abs(tracks), axis=1))][:max_tracks,:]
+    #tracks      = np.float16(np.clip(np.vstack(tracks).T,-5e4,5e4))[:max_tracks,:]
     if p == 'p_' and scalars:
         tracks_means       = np.mean(tracks,axis=0) if len(tracks)!=0 else tracks.shape[1]*[0]
         qd0Sig             = sample['p_charge'][idx] * sample['p_d0'][idx] / sample['p_sigmad0'][idx]
-        sct_weight_charge  = sample['p_tracks_charge'][idx] @     sample['p_tracks_scthits'][idx]
-        sct_weight_charge *= sample['p_charge'       ][idx] / sum(sample['p_tracks_scthits'][idx])
+        if np.any(sample['p_tracks_scthits'][idx]!=0):
+            sct_weight_charge  = sample['p_tracks_charge'][idx] @     sample['p_tracks_scthits'][idx]
+            sct_weight_charge *= sample['p_charge'       ][idx] / sum(sample['p_tracks_scthits'][idx])
+        else: sct_weight_charge = 0
         return np.concatenate([tracks_means, np.array([qd0Sig, len(tracks), sct_weight_charge])])
     else:
         return np.vstack([tracks, np.zeros((max(0, max_tracks-len(tracks)), tracks.shape[1]))])

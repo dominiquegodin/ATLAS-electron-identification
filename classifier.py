@@ -21,14 +21,14 @@ parser.add_argument( '--batch_size'  , default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    , default =  100,  type = int   )
 parser.add_argument( '--n_classes'   , default =    2,  type = int   )
 parser.add_argument( '--n_tracks'    , default =    5,  type = int   )
-parser.add_argument( '--bkg_ratio'   , default =    2,  type = int   )
+parser.add_argument( '--bkg_ratio'   , default =    2,  type = float )
 parser.add_argument( '--n_folds'     , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
 parser.add_argument( '--patience'    , default =   10,  type = int   )
 parser.add_argument( '--sbatch_var'  , default =    0,  type = int   )
 parser.add_argument( '--l2'          , default = 1e-8,  type = float )
-parser.add_argument( '--dropout'     , default = 0.05,  type = float )
+parser.add_argument( '--dropout'     , default =  0.1,  type = float )
 parser.add_argument( '--FCN_neurons' , default = [200, 200], type = int, nargs='+')
 parser.add_argument( '--weight_type' , default = 'none'              )
 parser.add_argument( '--train_cuts'  , default = ''                  )
@@ -71,18 +71,19 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
     try: os.mkdir(path)
     except FileExistsError: pass
-if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
-#if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
+args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
+#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
+#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
+#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
+#args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
-        (7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
-        (5,13):{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
+        (7,11):{'maps':[200,200], 'kernels':[ (2,3) , (2,3) ], 'pools':[ (1,1) , (1,1) ]},
+        #(7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+      'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # TRAINING VARIABLES
@@ -90,13 +91,13 @@ images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_
             'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
             'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
-scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
-            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
-            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'    ]
-others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
-            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
-            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
+scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'           ,
+            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2'         ,
+            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge'         ,
+            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfInnermostPixelHits']
+others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
+            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
+            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'         ]
 with h5py.File(args.data_file, 'r') as data:
     images  = [key for key in images  if key in data or key=='tracks_image']
     scalars = [key for key in scalars if key in data]
@@ -136,9 +137,9 @@ with strategy.scope():
     if tf.__version__ >= '2.1.0' and len(variables['images']) >= 1:
         tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
     sample, _ = make_sample(args.data_file, variables, [0,1], args.n_tracks, args.n_classes)
+    CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
-    model     = multi_CNN(*func_args, **train_var)
-    print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
+    model     = multi_CNN(*func_args, **train_var); print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
 

@@ -185,11 +185,12 @@ def plot_ROC_curves(test_sample, y_true, y_prob, ROC_type, postfix='',output_dir
     #print([x_array.size, y_array.size])
     return [x_array, y_array]
 
-def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname='pt',output_dir='outputs/',evalLLH=False,makeOutput=True):
+def differential_plots(test_sample, y_true, y_prob, boundaries, bin_indices, varname='pt',output_dir='outputs/',evalLLH=False,makeOutput=True):
+    verbose=False
 
     roc_curves = dict()
 
-    roc_curves["roc_inclusive"]= plot_ROC_curves(test_LLH, y_true, y_prob, ROC_type=2,output_dir=output_dir+"/differential/")
+    roc_curves["roc_inclusive"]= plot_ROC_curves(test_sample, y_true, y_prob, ROC_type=2,output_dir=output_dir+"/differential/")
 
     tmp_idx=0
 
@@ -206,6 +207,8 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
     bkg_errs_gEff  = {}
     sig_effs_gEff  = {}
     sig_errs_gEff  = {}
+    cuts_fEff = {}
+
     for sigEff in sigEffs:
         bkg_rejs_fEff.update({sigEff:[]})
         bkg_errs_fEff.update({sigEff:[]})
@@ -213,6 +216,7 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         bkg_errs_gEff.update({sigEff:[]})
         sig_effs_gEff.update({sigEff:[]})
         sig_errs_gEff.update({sigEff:[]})
+        cuts_fEff    .update({sigEff:[]})
         pCut = np.percentile(y_prob_sig,(1-sigEff)*100,axis=0) [0] #global cut
         globalCuts.append(pCut)
         pass
@@ -239,14 +243,13 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
             fill_rej=True
             pass
 
-        new_test_labels=y_true.take(bin_idx)
-        new_y_prob     =y_prob.take(bin_idx,axis=0)
+        new_test_labels=y_true.take(bin_idx)        #KM:test labels for this particular bin
+        new_y_prob     =y_prob.take(bin_idx,axis=0) #KM:test prob for this particular bin
 
         new_test_LLH=dict()
-        #for llh in test_LLH:
         for llh in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']:
             #print(llh)
-            new_test_LLH[llh]=test_LLH[llh][bin_idx]
+            new_test_LLH[llh]=test_sample[llh][bin_idx]
             pass
 
         if not (len(new_y_prob)==len(new_test_labels) and len(new_test_labels)==len(new_test_LLH['p_LHTight'])):
@@ -264,14 +267,13 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 
         if fill_rej:
             fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,
-                            new_y_prob,new_test_labels,sigEffs)
+                            new_y_prob,new_test_labels,sigEffs,cuts_fEff)
             fill_info_g    (bkg_rejs_gEff,bkg_errs_gEff,
                             sig_effs_gEff,sig_errs_gEff,
                             new_y_prob,new_test_labels,sigEffs,globalCuts)
 
         tmp_idx+=1
-        pass
-
+        pass #KM: end of loop over bin indices
 #    print(x_centers)
 #    print(x_errs)
 #    print(bkg_rejs_fEff[.7])
@@ -282,10 +284,45 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
 #    print()
 #    print(bkg_rejs_fEff[.9])
 #    print(bkg_errs_fEff[.9])
-#
+
     plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_fEff,bkg_errs_fEff, sigEffs,varname,output_dir,boundaries[-1],cType="Flat" ,makeOutput=True,evalLLH=evalLLH)
     plot_rej_vsX_curves(x_centers,x_errs, bkg_rejs_gEff,bkg_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobB",makeOutput=True,evalLLH=evalLLH)
     plot_rej_vsX_curves(x_centers,x_errs, sig_effs_gEff,sig_errs_gEff, sigEffs,varname,output_dir,boundaries[-1],cType="GlobS",makeOutput=True,evalLLH=evalLLH)
+
+    llh_effs ={}
+    llh_cuts ={}
+    if not evalLLH:
+        llh_effs['loose'],llh_effs['medium'],llh_effs['tight'] = get_llh_effs(test_sample,y_true,varname,boundaries,output_dir)
+
+        #for llh_eff_key in llh_effs: print(llh_eff_key,llh_effs[llh_eff_key])
+        llh_eff_key='tight'
+        if verbose: print(llh_eff_key,llh_effs[llh_eff_key])
+
+        if varname=='pt':
+            #eff_shift = np.array( [   -2,    -2,    -2,    -2,    -1,    -1,    -1,     0,     1,     2,       2,  2] )
+            #eff_shift = np.array( [   -2,    -2,    -2,    -2,    -2,    -2,    -2,     -1,     1,     2,       2,  2] )
+            #eff_shift = np.array( [   0,    0,    -5,    -5,    -4,    -4,    -12,     -3,     5,    2.5,     2.5,  3] )
+            #eff_shift = np.array( [   0,    -35, -30,  -5,     10,    2.5,     2.5,  3] )
+            #eff_shift = np.array( [   0,   5, 15,  5,     10,    2.5,     2.5,  3] ) #becoming good
+            #eff_shift = np.array( [   0,   -5, 10,  10,     15,    5,     2.5,  3] ) #works more or less for flattening
+            eff_shift = np.array( [   0,   -10, 10,  15,     20,    10,     2.5,  3] )
+            #llh_effs['loose'] += eff_shift/100.
+            #llh_effs['medium']+= eff_shift/100.
+            #llh_effs['tight'] += eff_shift/100.
+            pass
+
+        #for llh_eff_key in llh_effs: print(llh_eff_key,llh_effs[llh_eff_key])
+        if verbose: print(llh_eff_key,llh_effs[llh_eff_key])
+
+        #print (llh_effs)
+        llh_cuts = get_cuts_LLHeffs(test_sample,y_prob,y_true,varname,boundaries,llh_effs)
+        #get_perf_vsLLH()
+        if verbose: 
+            for llh_cut_key in llh_cuts: print(llh_cut_key,llh_cuts[llh_cut_key])
+
+            print ("globalCuts",sigEffs,"=",globalCuts)
+        if verbose: plot_bfraft(test_sample,y_true,y_prob,varname,sigEffs,globalCuts,cuts_fEff,llh_cuts,boundaries,output_dir)
+        pass
 
     #print(roc_curves)
     if makeOutput:
@@ -294,6 +331,184 @@ def differential_plots(test_LLH, y_true, y_prob, boundaries, bin_indices,varname
         outfilename+="_vs_"+varname+".pkl"
         print('Writing ROC pickle file:', outfilename)
         pickle.dump(roc_curves,open(outfilename, 'wb'))
+
+    return
+
+def get_cuts_LLHeffs(test_sample,y_prob,y_true,varname,boundaries,llh_effs):
+    var2use="p_et_calo"
+    if varname=='eta': var2use="p_eta"
+
+    cuts_llh = {}
+    cuts_llh['loose'] = list()
+    cuts_llh['medium'] = list()
+    cuts_llh['tight'] = list()
+    
+    #print("KM",len(boundaries),len(llh_effs['medium']))
+    for op_name in ['loose','medium','tight']:
+        for tmp_idx in range(1,len(boundaries)):
+            prob_sig_binned = y_prob[ (y_true==0) & (boundaries[tmp_idx-1] < test_sample[var2use]) & (test_sample[var2use] <  boundaries[tmp_idx]) ]
+            pCut = np.percentile( prob_sig_binned, (1-llh_effs[op_name][tmp_idx-1])*100, axis=0) [0]
+            cuts_llh[op_name].append(pCut)
+            pass
+        pass
+    #print(cuts_llh)
+
+    return cuts_llh
+                          
+def get_llh_effs(test_sample,y_true,varname,boundaries,output_dir):
+    plt.clf() #clear plot        
+
+    var2draw="p_et_calo"
+    if varname=='eta': var2draw="p_eta"
+    if varname=='pt': var2draw="pt"
+
+    (binCounts_bfr,_,_) = plt.hist(test_sample[var2draw][ (y_true==0)                                 ],bins=boundaries,label="sig_aft_cut",histtype='step',color='black')
+    (binCounts_loo,_,_) = plt.hist(test_sample[var2draw][ (y_true==0) & (test_sample['p_LHLoose']==0) ],bins=boundaries,label="sig_aft_cut",histtype='step',color='grey')
+    (binCounts_med,_,_) = plt.hist(test_sample[var2draw][ (y_true==0) & (test_sample['p_LHMedium']==0)],bins=boundaries,label="sig_aft_cut",histtype='step',color='cyan')
+    (binCounts_tig,_,_) = plt.hist(test_sample[var2draw][ (y_true==0) & (test_sample['p_LHTight']==0) ],bins=boundaries,label="sig_aft_cut",histtype='step',color='blue')
+    plt.hist(test_sample[var2draw][ (y_true==1)                                 ],bins=boundaries,label="bkg_aft_cut",histtype='step',color='red' )
+    plt.hist(test_sample[var2draw][ (y_true==1) & (test_sample['p_LHLoose']==0) ],bins=boundaries,label="bkg_aft_cut",histtype='step',color='orangered' )
+    plt.hist(test_sample[var2draw][ (y_true==1) & (test_sample['p_LHMedium']==0)],bins=boundaries,label="bkg_aft_cut",histtype='step',color='brown' )
+    plt.hist(test_sample[var2draw][ (y_true==1) & (test_sample['p_LHTight']==0) ],bins=boundaries,label="bkg_aft_cut",histtype='step',color='magenta' )
+    plt.yscale("log")
+    plt.savefig("tmp.png")
+
+    #print()
+    #print(binCounts_bfr)
+    #print(binCounts_loo,binCounts_loo/binCounts_bfr)
+    #print(binCounts_med,binCounts_med/binCounts_bfr)
+    #print(binCounts_tig,binCounts_tig/binCounts_bfr)
+    #print()
+    
+    return binCounts_loo/binCounts_bfr, binCounts_med/binCounts_bfr, binCounts_tig/binCounts_bfr
+    
+def plot_bfraft(test_sample,y_true,y_prob,varname,sigEffs,globalCuts,cuts_fEff,llh_cuts,boundaries,output_dir):
+    var2draw='p_et_calo'
+    #bin_range = range(0,500,5)
+    bin_range = range(0,250,1)
+    if varname=='eta':
+        var2draw='p_eta'
+        bin_range= np.arange(-1.5,1.5,0.05)
+        pass
+
+    ### ================================================================================================================================================================
+    ### KM: below for glob-efficiency conditions
+
+    plt.clf() #clear plot
+    plt.hist(test_sample[var2draw][ y_true==0 ],bins=bin_range,label="sig_bfr_cut",histtype='step',color='black')
+    plt.hist(test_sample[var2draw][ y_true==1 ],bins=bin_range,label="bkg_bfr_cut",histtype='step',color='red')
+
+    #             70%    80%    90%
+    colors_sig=['blue','black','grey']
+    colors_bkg=['magenta','black','orangered']
+    #for sigEff,globCut,style in zip(sigEffs,globalCuts,styles):
+    tmp_i=0
+    for sigEff,globCut in zip(sigEffs,globalCuts):
+        if sigEff==0.8: 
+            tmp_i+=1
+            continue
+            pass
+        plt.hist(test_sample[var2draw][ (y_true==0) & (y_prob[:,0] > globCut) ], bins=bin_range,label=("sig_aft_cut{}",sigEff),histtype='step',color=colors_sig[tmp_i])#,linestyle=style)
+        plt.hist(test_sample[var2draw][ (y_true==1) & (y_prob[:,0] > globCut) ], bins=bin_range,label=("sig_aft_cut{}",sigEff),histtype='step',color=colors_bkg[tmp_i])#,linestyle=style)
+        tmp_i+=1
+        pass
+    #plt.hist(test_sample[var2draw][ (y_true==0) & (test_sample['p_LHTight'] ==0) ], bins=bin_range,label=("sig_aft_cut{}",sigEff),histtype='step',color='green')#,linestyle=style)
+    #plt.hist(test_sample[var2draw][ (y_true==1) & (test_sample['p_LHTight'] ==0) ], bins=bin_range,label=("sig_aft_cut{}",sigEff),histtype='step',color='lightsalmon')#,linestyle=style)
+
+    plt.yscale("log")
+    plt.title("distribution before/after glob-eff. cut")
+    plt.ylabel("Bin count (raw)")
+    plt.xlabel(varname+" [GeV]")
+    #plt.xscale("log")
+    outname=output_dir+'/differential/'+varname+"_bfraft_globCut.png"
+    plt.savefig(outname)
+    print("saving hist file as:", outname)
+
+    ### ================================================================================================================================================================
+    ### KM: below for flat-efficiency conditions
+    for sigEff in sigEffs: print (sigEff,"sig. eff. cuts=",cuts_fEff[sigEff])
+    plt.clf() #clear plot
+    plt.hist(test_sample[var2draw][ (y_true==0) ],bins=bin_range,label="sig_bfr_cut",histtype='step',color='black')
+    plt.hist(test_sample[var2draw][ (y_true==1) ],bins=bin_range,label="bkg_bfr_cut",histtype='step',color='red')
+
+    tag_condition70 = False
+    tag_condition90 = False
+    print("loEdge \t hiEdge \t cut70 \t cut80")
+    for tmp_idx in range(1,len(boundaries)):
+        print(boundaries[tmp_idx-1], "\t", boundaries[tmp_idx], "\t", cuts_fEff[0.7][tmp_idx-1], "\t", cuts_fEff[0.9][tmp_idx-1])
+        tag_condition70 = tag_condition70 | (boundaries[tmp_idx-1] < test_sample[var2draw]) & (test_sample[var2draw] < boundaries[tmp_idx]) & (y_prob[:,0] > cuts_fEff[0.7][tmp_idx-1])
+        tag_condition90 = tag_condition90 | (boundaries[tmp_idx-1] < test_sample[var2draw]) & (test_sample[var2draw] < boundaries[tmp_idx]) & (y_prob[:,0] > cuts_fEff[0.9][tmp_idx-1])
+
+    #flat eff cut for 70% signal efficiency
+    plt.hist(test_sample[var2draw][ (y_true==0) & tag_condition70 ],bins=bin_range,label="sig_aft_cut",histtype='step',color='blue')
+    plt.hist(test_sample[var2draw][ (y_true==1) & tag_condition70 ],bins=bin_range,label="bkg_aft_cut",histtype='step',color='magenta')
+    #flat eff cut for 90% signal efficiency
+    plt.hist(test_sample[var2draw][ (y_true==0) & tag_condition90 ],bins=bin_range,label="sig_aft_cut",histtype='step',color='grey')
+    plt.hist(test_sample[var2draw][ (y_true==1) & tag_condition90 ],bins=bin_range,label="bkg_aft_cut",histtype='step',color='orangered')
+
+    plt.title("distribution before/after flat-eff. cuts")
+    plt.ylabel("Bin count (raw)")
+    plt.xlabel(varname+" [GeV]")
+    #plt.xscale("log")
+    outname=output_dir+'/differential/'+varname+"_bfraft_flatEffCuts.png"
+    plt.savefig(outname)
+    plt.yscale("log")
+    outname=output_dir+'/differential/'+varname+"_bfraft_flatEffCuts_log.png"
+    plt.savefig(outname)
+    print("saving hist file as:", outname)
+    plt.clf() #clear plot        
+
+    ### ================================================================================================================================================================
+    ### KM: below for LLH plots conditions
+
+    plt.hist(test_sample[var2draw][ (y_true==0) ],bins=bin_range,label="sig_bfr_cut",histtype='step',color='black')
+    plt.hist(test_sample[var2draw][ (y_true==1) ],bins=bin_range,label="bkg_bfr_cut",histtype='step',color='red')
+    #LLH working point Tight
+    plt.hist(test_sample[var2draw][ (y_true==0) & (test_sample['p_LHTight']==0) ],bins=bin_range,label="sig_aft_cut",histtype='step',color='blue'       )#,linestyle='dotted')
+    plt.hist(test_sample[var2draw][ (y_true==1) & (test_sample['p_LHTight']==0) ],bins=bin_range,label="bkg_aft_cut",histtype='step',color='magenta' )#,linestyle='dotted')
+    #LLH working point Loose
+    plt.hist(test_sample[var2draw][ (y_true==0) & (test_sample['p_LHLoose']==0) ],bins=bin_range,label="sig_aft_cut",histtype='step',color='grey'       )#,linestyle='dotted')
+    plt.hist(test_sample[var2draw][ (y_true==1) & (test_sample['p_LHLoose']==0) ],bins=bin_range,label="bkg_aft_cut",histtype='step',color='orangered' )#,linestyle='dotted')
+
+    plt.title("distribution before/after LLH-cuts")
+    plt.ylabel("Bin count (raw)")
+    plt.xlabel(varname+" [GeV]")
+    outname=output_dir+'/differential/'+varname+"_bfraft_LLH.png"
+    plt.savefig(outname)
+    plt.yscale("log")
+    outname=output_dir+'/differential/'+varname+"_bfraft_LLH_log.png"
+    plt.savefig(outname)
+    print("saving hist file as:", outname)
+
+    ### ================================================================================================================================================================
+    ### KM: below for LLH-eff conditions
+
+    plt.clf() #clear plot
+    plt.hist(test_sample[var2draw][ y_true==0 ],bins=bin_range,label="sig_bfr_cut",histtype='step',color='black')
+    plt.hist(test_sample[var2draw][ y_true==1 ],bins=bin_range,label="bkg_bfr_cut",histtype='step',color='red')
+
+    tag_conditionLO = False
+    tag_conditionTI = False
+    for tmp_idx in range(1,len(boundaries)):
+        tag_conditionLO = tag_conditionLO | (boundaries[tmp_idx-1] < test_sample[var2draw]) & (test_sample[var2draw] < boundaries[tmp_idx]) & (y_prob[:,0] > llh_cuts['loose'][tmp_idx-1])
+        tag_conditionTI = tag_conditionTI | (boundaries[tmp_idx-1] < test_sample[var2draw]) & (test_sample[var2draw] < boundaries[tmp_idx]) & (y_prob[:,0] > llh_cuts['tight'][tmp_idx-1])
+
+    #LLH eff cut for Tight efficiencies
+    plt.hist(test_sample[var2draw][ (y_true==0) & tag_conditionTI ],bins=bin_range,label="sig_aft_cut",histtype='step',color='blue')
+    plt.hist(test_sample[var2draw][ (y_true==1) & tag_conditionTI ],bins=bin_range,label="bkg_aft_cut",histtype='step',color='magenta')
+    #LLH eff cut for Loose efficiencies
+    plt.hist(test_sample[var2draw][ (y_true==0) & tag_conditionLO ],bins=bin_range,label="sig_aft_cut",histtype='step',color='grey')
+    plt.hist(test_sample[var2draw][ (y_true==1) & tag_conditionLO ],bins=bin_range,label="bkg_aft_cut",histtype='step',color='orangered')
+
+    plt.title("distribution before/after LLH-eff. cuts")
+    plt.ylabel("Bin count (raw)")
+    plt.xlabel(varname+" [GeV]")
+    outname=output_dir+'/differential/'+varname+"_bfraft_llhEffCuts.png"
+    plt.savefig(outname)
+    plt.yscale("log")
+    outname=output_dir+'/differential/'+varname+"_bfraft_llhEffCuts_log.png"
+    plt.savefig(outname)
+    print("saving hist file as:", outname)
 
     return
 
@@ -364,7 +579,8 @@ def plot_rej_vsX_curves(x_centers,x_errs,
 
     return
 
-def fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,new_y_prob,new_test_labels,sigEffs):
+def fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,new_y_prob,new_test_labels,sigEffs,cuts_fEff):
+    #KM: for flat signal efficiency plots
 
     for sigEff in sigEffs:
         new_y_prob_sig = new_y_prob[new_test_labels==0]
@@ -372,9 +588,9 @@ def fill_bkg_rejs_f(bkg_rejs_fEff,bkg_errs_fEff,new_y_prob,new_test_labels,sigEf
         #KM: get percentile cut value
         pCut = np.percentile(new_y_prob_sig,(1-sigEff)*100,axis=0) [0] #70% from right side --> 1 - sig_eff
         binaryClassified_bkg = new_y_prob_bkg[:,0] > pCut
+        cuts_fEff[sigEff].append(pCut)
 
-        bkgRej    = 0
-        bkgRejErr = 0
+        bkgRej,bkgRejErr = 0,0
         if binaryClassified_bkg.sum()>0:
             bkgRej = binaryClassified_bkg.size / binaryClassified_bkg.sum()    #inverted bkg-eff as rejection
             bkgRejErr = math.sqrt(bkgRej * (bkgRej-1) / binaryClassified_bkg.sum())
