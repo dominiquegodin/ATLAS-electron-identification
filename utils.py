@@ -589,7 +589,6 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     if plotting=='OFF':
         for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
         bkg_rej_list = np.array([int(return_dict[bkg][3].split()[-1]) for bkg in bkg_list])
-        print(bkg_rej_list) #DEBUG
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
@@ -887,12 +886,10 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         bkg_rej = np.empty((n_classes, n_reps))
         features = ' + '.join(feats)
         print('\nPERMUTATION OF : ' + features)
-        bkg_rej_full = np.reshape(bkg_rej_full,(6,1))
+        bkg_rej_full = np.reshape(bkg_rej_full,(n_classes,1))
         shuffled_sample = create_shuffle_sample(sample, feats)
         for k in range(n_reps) :
-            print('Before shuffling', shuffled_sample[feats[0]][20:30])
             shuffling_sample(shuffled_sample,feats, k)
-            print('After shuffling', shuffled_sample[feats[0]][20:30])
             probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
             bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
                                 train_labels, training, output_dir, 'OFF', False)               # Background rejection with one feature shuffled
