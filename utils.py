@@ -1049,6 +1049,37 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
         print('Saving matrix to '+ path)
         plt.savefig(path)
 
+def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
+    '''
+    Removes the specified features from the input variables. 
+    '''
+    i = arg_feat                                                                                            # image indices
+    s = arg_feat - len(images)                                                                              # scalar indices
+    g = arg_feat - len(images + scalars)                                                                    # Feature group indices
+    print('i : {}, s : {}, g : {}'.format(i,s,g))
+    if g > len(groups) :
+        print('Argument out of range, aborting...')
+        sys.exit()
+
+    if i >= 0 and i < len(images)  :
+        if arg_im == 'OFF':
+            print('Cannot remove image if images are OFF, aborting...')
+            sys.exit()
+        images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
+    elif s >= 0 and s < len(scalars) :
+        if arg_sc == 'OFF':
+            print('Cannot remove scalar if scalars are OFF, aborting...')
+            sys.exit()
+        scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
+    elif g >= 0 :
+        if  groups[g][0] not in images + scalars:
+            print("Cannot remove features not in the sample, aborting...")
+            sys.exit()
+        images  = [key for key in images  if key not in groups[g]]
+        scalars = [key for key in scalars if key not in groups[g]]
+        feat = 'group_{}'.format(g)
+    else : feat = 'full'
+    return feat
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################

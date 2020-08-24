@@ -107,9 +107,9 @@ CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) ,
 # TRAINING VARIABLES
 images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
             'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine']
-#images  += ['lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3']
+#images  += ['lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3']                             # Removes the empty images temporarily
 images  += ['tile_gap_Lr1']
-#images  += ['tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+#images  += ['tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']                                               # Removes the empty images temporarily
 images  += ['tracks_image']
 scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
@@ -123,9 +123,8 @@ with h5py.File(args.data_file, 'r') as data:
     scalars = [key for key in scalars if key in data]
     others  = [key for key in others  if key in data]
 
-# FEATURE REMOVAL
-groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],
-            ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],
+groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],            # To compute the feature importance of a group of variables,
+            ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],            # simply add the list of variables into groups.
             ['lar_endcap_Lr0','lar_endcap_Lr1','lar_endcap_Lr2','lar_endcap_Lr3'],
             ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'],
             ['p_d0' , 'p_d0Sig'], ['p_d0' , 'p_d0Sig' , 'p_qd0Sig'], ['p_f1' , 'p_f3'],
@@ -135,40 +134,18 @@ groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel
              'em_endcap_Lr3', 'lar_endcap_Lr0', 'p_nTracks', 'tile_gap_Lr1', 'p_EptRatio', 'lar_endcap_Lr1',
              'p_dPOverP', 'p_numberOfSCTHits', 'lar_endcap_Lr3', 'p_Rphi' , 'p_f3', 'p_ndof', 'p_Eratio']]
 
+# FEATURE REMOVAL
 if args.removal == 'ON':
-    i = args.feat                                                                                            # image indices
-    s = args.feat - len(images)                                                                              # scalar indices
-    g = args.feat - len(images + scalars)                                                                    # Feature group indices
-    print('i : {}, s : {}, g : {}'.format(i,s,g))
-    if g > len(groups) :
-        print('Argument out of range, aborting...')
-        sys.exit()
-
-    if i >= 0 and i < len(images)  :
-        if args.images == 'OFF':
-            print('Cannot remove image if images are OFF, aborting...')
-            sys.exit()
-        images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
-    elif s >= 0 and s < len(scalars) :
-        if args.scalars == 'OFF':
-            print('Cannot remove scalar if scalars are OFF, aborting...')
-            sys.exit()
-        scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
-    elif g >= 0 :
-        if  groups[g][0] not in images + scalars:
-            print("Cannot remove features not in the sample, aborting...")
-            sys.exit()
-        images  = [key for key in images  if key not in groups[g]]
-        scalars = [key for key in scalars if key not in groups[g]]
-        feat = 'group_{}'.format(g)
-    else : feat = 'full'
-    args.output_dir = args.output_dir + '/' + region + '/' + feat
-
+    feat = feature_removal(args.feat, images, scalars, groups, args.images, args.scalars)
+    args.output_dir = args.output_dir + '/' + region + '/' + feat                                                   # The output directory will be different for each region and each feature.
+                                                                                                                    # That way the model.h5 and their corresponding plots aren't mixed with
+                                                                                                                    # the other trainings.
+# TRAINING VARIABLES
 train_var = {'images' :images  if args.images  == 'ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars == 'ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])): # Create the output directory if it doesn't exist.
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):                                # Create the output directory if it doesn't exist.
     try: os.mkdir(path)
     except OSError: continue
     except FileExistsError: pass
