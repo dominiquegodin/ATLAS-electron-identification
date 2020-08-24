@@ -49,10 +49,9 @@ parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default =  0, type = int      )
 parser.add_argument( '--removal'     , default = 'OFF'               )
-parser.add_argument( '--rm_features' , default = -1, type = int      )
 parser.add_argument( '--permutation' , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10, type = int      )
-parser.add_argument( '--feat'        , default =  0, type = int      )
+parser.add_argument( '--feat'        , default = -1, type = int      )
 parser.add_argument( '--impPlot'     , default = 'perm_imp.pdf'      )
 parser.add_argument( '--impOut'      , default = 'importances'       )
 parser.add_argument( '--correlation' , default = 'OFF'               )
@@ -87,6 +86,18 @@ if args.data_file == 'endcap':
 #if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
 #for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
+# DATAFILE
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+#if args.data_file == ''          :
+#    args.data_file = '/scratch/odenis/el_data/0.0_1.3/el_data.h5'
+#    region = 'barrel'
+#if args.data_file == 'transition':
+#    args.data_file = '/scratch/odenis/el_data/1.3_1.6/el_data.h5'
+#    region = 'transition'
+#if args.data_file == 'endcap'    :
+#    args.data_file = '/scratch/odenis/el_data/1.6_2.5/el_data.h5'
+#    region = 'endcap'
+#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
@@ -102,9 +113,12 @@ scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_
             'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits']
-tracks_means = ['p_mean_efrac', 'p_mean_deta', 'p_mean_dphi', 'p_mean_d0', 'p_mean_z0'  ,  'p_mean_charge',
-                'p_mean_vertex'  ,  'p_mean_chi2' ,  'p_mean_ndof',  'p_mean_pixhits'  ,  'p_mean_scthits',
-                'p_mean_trthits', 'p_mean_sigmad0']
+tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
+                'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
+                'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
+                'p_mean_sigmad0']
+
+# ADDING TRACKS SCALARS FOR CORRELATIONS
 if args.tracks == 'ON':
     scalars += tracks_means
     fmode = '_with_tracks'
@@ -121,33 +135,52 @@ with h5py.File(args.data_file, 'r') as data:
     scalars = [key for key in scalars if key in data]
     others  = [key for key in others  if key in data]
 
+# FEATURE REMOVAL
 groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3'],
             ['em_endcap_Lr0','em_endcap_Lr2','em_endcap_Lr3'], ['em_endcap_Lr1' , 'em_endcap_Lr1_fine'],
             ['lar_endcap_Lr0','lar_endcap_Lr1','lar_endcap_Lr2','lar_endcap_Lr3'],
             ['tile_gap_Lr1' ,'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'],
             ['p_d0' , 'p_d0Sig'], ['p_d0' , 'p_d0Sig' , 'p_qd0Sig'], ['p_f1' , 'p_f3'],
-            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo']
-            ]
+            ['p_nTracks', 'p_sct_weight_charge'], ['p_nTracks', 'p_et_calo'],
+            ['em_endcap_Lr2', 'tile_barrel_Lr1', 'p_f1', 'p_qd0Sig', 'p_TRTPID', 'em_endcap_Lr1_fine',
+             'p_sct wt charge', 'p_wstot1', 'p_weta2', 'p_d0', 'p_d0Sig', 'tile_barrel_Lr3', 'em_endcap_Lr0',
+             'em_endcap_Lr3', 'lar_endcap_Lr0', 'p_nTracks', 'tile_gap_Lr1', 'p_EptRatio', 'lar_endcap_Lr1',
+             'p_dPOverP', 'p_numberOfSCTHits', 'lar_endcap_Lr3', 'p_Rphi' , 'p_f3', 'p_ndof', 'p_Eratio']]
 
 if args.removal == 'ON':
-    i = args.rm_features                                                                                            # image indices
-    s = args.rm_features - len(images)                                                                              # scalar indices
-    g = args.rm_features - len(images + scalars)                                                                    # Feature group indices
+    i = args.feat                                                                                            # image indices
+    s = args.feat - len(images)                                                                              # scalar indices
+    g = args.feat - len(images + scalars)                                                                    # Feature group indices
     print('i : {}, s : {}, g : {}'.format(i,s,g))
-    if args.images == 'ON' and args.scalars == 'ON' : feat = 'full'
-    if i >= 0 and i < len(images)  : images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
-    if s >= 0 and s < len(scalars) : scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
-    if g >= 0 :
+    if g > len(groups) :
+        print('Argument out of range, aborting...')
+        sys.exit()
+
+    if i >= 0 and i < len(images)  :
+        if args.images == 'OFF':
+            print('Cannot remove image if images are OFF, aborting...')
+            sys.exit()
+        images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
+    elif s >= 0 and s < len(scalars) :
+        if args.scalars == 'OFF':
+            print('Cannot remove scalar if scalars are OFF, aborting...')
+            sys.exit()
+        scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
+    elif g >= 0 :
+        if  groups[g][0] not in images + scalars:
+            print("Cannot remove features not in the sample, aborting...")
+            sys.exit()
         images  = [key for key in images  if key not in groups[g]]
         scalars = [key for key in scalars if key not in groups[g]]
         feat = 'group_{}'.format(g)
+    else : feat = 'full'
     args.output_dir = args.output_dir + '/' + region + '/' + feat
 
 train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars =='ON' else []}
 variables = {**train_var, 'others':others}; scalars = train_var['scalars']
 
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])): # Create the output directory if it doesn't exist.
     try: os.mkdir(path)
     except OSError: continue
     except FileExistsError: pass

@@ -811,6 +811,12 @@ def merge_presamples(n_e, n_tasks, output_path, output_file):
     #################################################################################
 
 def LaTeXizer(names=[]):
+    '''
+    Converts variables' names to be compatible with LaTeX format.
+
+    Returns a dictionary maping each name to its LaTeX conterpart
+    and the converted list of variables names.
+    '''
     vars  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
              'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
              'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
@@ -832,7 +838,7 @@ def LaTeXizer(names=[]):
               r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
     Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
               'lar_endcap variables', 'tile variables', r'$d_0$ variables 1', r'$d_0$ variables 2', r'$f_1$ and $f_3$',
-              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'group 11']
+              r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'detrimental variables']
 
     converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}
     Lnames = [converter[name] for name in names]
@@ -857,6 +863,10 @@ def bkg_rej_70(model, sample, labels):
 
 def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
                        output_dir):
+    '''
+    Takes a pretrained model and saves the permutation importance of a feature or a group
+    of features to a dictionary in a pickle file.
+    '''
     name = [feats[0],'group_{}'.format(g)][g>=0]
     output_dir += '/permutation_importance'
     fname = output_dir + '/importance'
@@ -903,6 +913,9 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
             print_importances(fname)
 
 def print_importances(file):
+    '''
+    Read the specified pickle file containing feature importances data and print it.
+    '''
     with open(file,'rb') as rfp:
         record = dict()
         while True:
@@ -915,6 +928,9 @@ def print_importances(file):
     return record
 
 def plot_importances(results, path, title):
+    '''
+    Plots a horizontal bar plot ranking of the feature importances from a dictionary.
+    '''
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True)
     labels = [tup[0] for tup in sortedResults]
     newLabels = LaTeXizer(labels)[1]
@@ -929,9 +945,18 @@ def plot_importances(results, path, title):
     fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
     widths = data
-    print(labels)
-    color = ['g' if 'variables' in label or 'and' in label else 'tab:blue' for label in newLabels]
-    print(color)
+    color = []
+    for label in newLabels:
+        if label == 'detrimental variables':
+            colors.append('r')
+        elif 'variables' in label or 'and' in label:
+            colors.append('gold')
+        elif label.startswith('em_') or label.startwith('lar_') or labels.startwith('tile_'):
+            colors.append('m')
+        elif label == 'tracks_image':
+            colors.append('g')
+        else :
+            colors.append('tab:blue')
     ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
     xcenters = widths / 2
 
@@ -946,7 +971,10 @@ def plot_importances(results, path, title):
     plt.savefig(path)
     return fig, ax
 
-def removal_bkg_rej(model,valid_probs,labels,feat,fname):
+def removal_bkg_rej(model,valid_probs,labels,feat,file):
+    '''
+    Computes and saves background rejection of the given model to a pickle file.
+    '''
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
     with open(fname + '.pkl','wb') as wfp:                                                  # Saving the results in a pickle
@@ -954,6 +982,15 @@ def removal_bkg_rej(model,valid_probs,labels,feat,fname):
 
 
 def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode='',region='barrel'):
+    '''
+    Computes correlation coefficient between the given variables of a sample, then plots
+    a matrix of those coefficients.
+
+    OR
+
+    If scatter=True, plots scatter plots between the given variables and their distrubution
+    into a matrix.
+    '''
     eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
     data = pd.DataFrame(sample)
     if LaTeX:
@@ -967,7 +1004,7 @@ def correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='',
     if scatter == 'SCATTER':
         print('Plotting scatter plot matrix')
         scatter_matrix(data, figsize = (18,18))
-        plt.suptitle('Scatter plot matrix' + mode, fontsize = 20)
+        plt.suptitle(r'Scatter plot matrix for {}'.format(eta[region]) + mode, fontsize = 20)
         plt.yticks(rotation=-90)
         plt.tight_layout()
         plt.savefig(dir + 'scatter_plot_matrix' + fmode + '.png')
