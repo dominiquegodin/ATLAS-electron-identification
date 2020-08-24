@@ -846,6 +846,7 @@ def create_shuffle_sample(sample,feats):
     return shuffled_sample
 
 def shuffling_sample(sample, feats, k=0):
+    global sample
     print('PERMUTATION #' + str(k+1))
     for feat in feats:
         rdm.shuffle(sample[feat])                                                           # Shuffling of one feature
@@ -890,7 +891,9 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         bkg_rej_full = np.reshape(bkg_rej_full,(6,1))
         shuffled_sample = create_shuffle_sample(sample, feats)
         for k in range(n_reps) :
+            print('Before shuffling', shuffled_sample[feats[0]][20:30])
             shuffling_sample(shuffled_sample,feats, k)
+            print('After shuffling', shuffled_sample[feats[0]][20:30])
             probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
             bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
                                 train_labels, training, output_dir, 'OFF', False)               # Background rejection with one feature shuffled
