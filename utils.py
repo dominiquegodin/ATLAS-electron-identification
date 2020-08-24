@@ -846,7 +846,6 @@ def create_shuffle_sample(sample,feats):
     return shuffled_sample
 
 def shuffling_sample(sample, feats, k=0):
-    global sample
     print('PERMUTATION #' + str(k+1))
     for feat in feats:
         rdm.shuffle(sample[feat])                                                           # Shuffling of one feature
