@@ -898,7 +898,8 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
         for i in range(n_classes):
             imp_tup = name, imp_mean[i], imp_mean[i]
-            with open(fname + '_{}.pkl'.format(i if i else 'bkg'),'ab') as afp:                                                           # Saving the results in a pickle
+            fname += '_{}.pkl'.format(i if i else 'bkg'
+            with open(fname),'ab') as afp:                                                           # Saving the results in a pickle
                 pickle.dump(imp_tup, afp)
             print_importances(fname)
 
