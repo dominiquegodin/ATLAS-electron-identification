@@ -906,7 +906,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
         imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
         for i in range(n_classes):
-            imp_tup = name, imp_mean[i], imp_mean[i]
+            imp_tup = name, imp_mean[i], imp_std[i]
             file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
             with open(file_name,'ab') as afp:                                                           # Saving the results in a pickle
                 pickle.dump(imp_tup, afp)
@@ -954,7 +954,7 @@ def plot_importances(results, path, title):
         if label == 'detrimental variables':
             colors.append('r')
         elif 'variables' in label or 'and' in label:
-            colors.append('gold')
+            colors.append('tab:orange')
         elif label.startswith('em_') or label.startswith('lar_') or label.startswith('tile_'):
             colors.append('m')
         elif label == 'tracks_image':
