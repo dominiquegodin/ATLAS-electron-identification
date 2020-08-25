@@ -19,6 +19,6 @@ for i in range(6):
         suf = '_' + str(i)
     else :
         suf = file + '_bkg'
-    title = 'Permutation importance against {} background.\n(averaged over {} repetitions)'.format(bck_list[i], n_reps)
+    title = 'Permutation importance against {} background.\n(averaged over {} repetitions)'.format(bgk_list[i], n_reps)
     results = print_importances(fname + suf + '.pkl')
     plot_importances(results, path + suf + 'pdf', title)
