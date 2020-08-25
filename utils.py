@@ -946,8 +946,11 @@ def plot_importances(results, path, title):
     ax.invert_yaxis()
     widths = data
     colors = []
+    k = 0
+    print(newLabels)
     for label in newLabels:
-        print(label)
+        print('label', k, label, type(label))
+        k += 1
         if label == 'detrimental variables':
             colors.append('r')
         elif 'variables' in label or 'and' in label:
