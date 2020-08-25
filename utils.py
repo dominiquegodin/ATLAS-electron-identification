@@ -1111,7 +1111,7 @@ def plot_correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mod
         plt.savefig(path)
 
 def create_path(output_dir):
-    for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):                                # Create the output directory if it doesn't exist.
+    for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):                                # Create the output directory if it doesn't exist.
         try: os.mkdir(path)
         except OSError: continue
         except FileExistsError: pass
