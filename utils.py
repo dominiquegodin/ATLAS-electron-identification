@@ -947,6 +947,7 @@ def plot_importances(results, path, title):
     widths = data
     colors = []
     for label in newLabels:
+        print(label)
         if label == 'detrimental variables':
             colors.append('r')
         elif 'variables' in label or 'and' in label:
