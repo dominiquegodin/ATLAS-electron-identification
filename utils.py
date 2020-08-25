@@ -951,7 +951,7 @@ def plot_importances(results, path, title):
             colors.append('r')
         elif 'variables' in label or 'and' in label:
             colors.append('gold')
-        elif label.startswith('em_') or label.startwith('lar_') or labels.startwith('tile_'):
+        elif label.startswith('em_') or label.startswith('lar_') or labels.startswith('tile_'):
             colors.append('m')
         elif label == 'tracks_image':
             colors.append('g')
