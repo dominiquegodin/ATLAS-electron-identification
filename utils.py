@@ -868,7 +868,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     of features to a dictionary in a pickle file.
     '''
     name = [feats[0],'group_{}'.format(g)][g>=0]
-    output_dir += '/' + region + '/permutation_importance'
+    output_dir += '/permutation_importance' + '/' + region
     fname = output_dir + '/importance'
     for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):            # Creating the output folder if it doesn't exist
         try: os.mkdir(path)
@@ -887,7 +887,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
             shuffling_sample(shuffled_sample, feats, k)
             bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-        imp_tup = name, np.mean(importance), np.std(importance)
+        imp_tup = name, np.mean(importance), np.std(importance), bkg_rej
         with open(fname + '.pkl','ab') as afp:                                                   # Saving the results in a pickle
             pickle.dump(imp_tup, afp)
         print_importances(fname)
@@ -906,7 +906,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
         imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
         for i in range(n_classes):
-            imp_tup = name, imp_mean[i], imp_std[i]
+            imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
             file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
             with open(file_name,'ab') as afp:                                                           # Saving the results in a pickle
                 pickle.dump(imp_tup, afp)

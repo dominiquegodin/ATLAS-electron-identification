@@ -15,8 +15,8 @@ rdm = np.random
 
 # PROGRAM ARGUMENTS
 parser = ArgumentParser()
-parser.add_argument( '--n_train'     , default =  1e6,  type = float )
-parser.add_argument( '--n_valid'     , default =  1e6,  type = float )
+parser.add_argument( '--n_train'     , default =  10e6,  type = float)
+parser.add_argument( '--n_valid'     , default =  10e6,  type = float)
 parser.add_argument( '--batch_size'  , default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'    , default =  100,  type = int   )
 parser.add_argument( '--n_classes'   , default =    2,  type = int   )
@@ -55,7 +55,7 @@ parser.add_argument( '--feat'        , default = -1, type = int      )
 parser.add_argument( '--impPlot'     , default = 'perm_imp.pdf'      )
 parser.add_argument( '--impOut'      , default = 'importances'       )
 parser.add_argument( '--correlation' , default = 'OFF'               )
-parser.add_argument( '--tracks'      , default = 'OFF'               )
+parser.add_argument( '--tracks_means', default = 'OFF'               )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -120,10 +120,10 @@ tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0' 
                 'p_mean_sigmad0']
 
 # ADDING TRACKS SCALARS FOR CORRELATIONS
-if args.tracks == 'ON':
+if args.tracks_means == 'ON':
     scalars += tracks_means
     fmode = '_with_tracks'
-elif args.tracks == 'ONLY':
+elif args.tracks_means == 'ONLY':
     scalars = tracks_means
     fmode = '_tracks_only'
 else :
@@ -350,5 +350,6 @@ if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
     feats += groups
+    output_dir = arg.output_dir + '/{}c_{}m/{}'.format(args.n_classes, args.n_train//1e6, args.weight_type)  # Saves the output according to the number of classes, the stats used and the reweighthing
     feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
-                        training, args.n_classes, args.n_reps, args.output_dir, region)
+                        training, args.n_classes, args.n_reps, output_dir, region)
