@@ -133,13 +133,16 @@ groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel
              'em_endcap_Lr3', 'lar_endcap_Lr0', 'p_nTracks', 'tile_gap_Lr1', 'p_EptRatio', 'lar_endcap_Lr1',
              'p_dPOverP', 'p_numberOfSCTHits', 'lar_endcap_Lr3', 'p_Rphi' , 'p_f3', 'p_ndof', 'p_Eratio']]
 
+ args.output_dir = arg.output_dir + '/{}c_{}m/{}/{}'.format(args.n_classes, args.n_train//1e6,                      # Saves the output according to the number of classes, the stats used,
+                                                            args.weight_type, region)                               # the reweighthing and the region
+
 # FEATURE REMOVAL
 if args.removal == 'ON':
     feat = feature_removal(args.feat, images, scalars, groups, args.images, args.scalars)
-    args.output_dir = args.output_dir + '/' + region + '/' + feat                                                   # The output directory will be different for each region and each feature.
-create_path(args.output_dir)
-                                                                                                                    # That way the model.h5 and their corresponding plots aren't mixed with
+    args.output_dir = args.output_dir + '/removal_importance/' + feat                                               # The output directory will be different for each feature.
+create_path(args.output_dir)                                                                                        # That way the model.h5 and their corresponding plots aren't mixed with
                                                                                                                     # the other trainings.
+
 # TRAINING VARIABLES
 train_var = {'images' :images  if args.images  == 'ON' else [], 'tracks':[],
              'scalars':scalars if args.scalars == 'ON' else []}
@@ -296,6 +299,5 @@ if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
     g = args.feat-len(feats)
     feats += groups
-    output_dir = arg.output_dir + '/{}c_{}m/{}'.format(args.n_classes, args.n_train//1e6, args.weight_type)  # Saves the output according to the number of classes, the stats used and the reweighthing
     feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
-                        training, args.n_classes, args.n_reps, output_dir, region)
+                        training, args.n_classes, args.n_reps, args.output_dir)
