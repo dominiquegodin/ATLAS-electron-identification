@@ -945,7 +945,7 @@ def plot_importances(results, path, title):
     fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
     widths = data
-    color = []
+    colors = []
     for label in newLabels:
         if label == 'detrimental variables':
             colors.append('r')
