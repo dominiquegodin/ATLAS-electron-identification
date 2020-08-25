@@ -881,13 +881,13 @@ def bkg_rej_70(model, sample, labels):
     return bkg_rej
 
 def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
-                       output_dir):
+                       output_dir, region):
     '''
     Takes a pretrained model and saves the permutation importance of a feature or a group
     of features to a dictionary in a pickle file.
     '''
     name = [feats[0],'group_{}'.format(g)][g>=0]
-    output_dir += '/permutation_importance'
+    output_dir += '/permutation_importance' + '/' + region
     fname = output_dir + '/importance'
     create_path(output_dir)
     if type(feats) == str :
@@ -904,7 +904,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
             shuffling_sample(shuffled_sample, feats, k)
             bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-        imp_tup = name, np.mean(importance), np.std(importance)
+        imp_tup = name, np.mean(importance), np.std(importance), bkg_rej
         with open(fname + '.pkl','ab') as afp:                                                   # Saving the results in a pickle
             pickle.dump(imp_tup, afp)
         print_importances(fname)
@@ -923,11 +923,11 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
         imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
         for i in range(n_classes):
-            imp_tup = name, imp_mean[i], imp_mean[i]
-            fname += '_{}.pkl'.format(i if i else 'bkg')
-            with open(fname,'ab') as afp:                                                           # Saving the results in a pickle
+            imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
+            file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
+            with open(file_name,'ab') as afp:                                                           # Saving the results in a pickle
                 pickle.dump(imp_tup, afp)
-            print_importances(fname)
+            print_importances(file_name)
 
 def print_importances(file):
     '''
@@ -962,19 +962,19 @@ def plot_importances(results, path, title):
     fig, ax = plt.subplots(figsize=(18.4, 10))
     ax.invert_yaxis()
     widths = data
-    color = []
+    colors = []
     for label in newLabels:
         if label == 'detrimental variables':
             colors.append('r')
         elif 'variables' in label or 'and' in label:
-            colors.append('gold')
-        elif label.startswith('em_') or label.startwith('lar_') or labels.startwith('tile_'):
+            colors.append('tab:orange')
+        elif label.startswith('em_') or label.startswith('lar_') or label.startswith('tile_'):
             colors.append('m')
         elif label == 'tracks_image':
             colors.append('g')
         else :
             colors.append('tab:blue')
-    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=color)
+    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=colors)
     xcenters = widths / 2
 
     text_color = 'white'
