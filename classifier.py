@@ -215,25 +215,10 @@ if args.model_in != '':
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
 
 
-# ADDING TRACKS SCALARS FOR CORRELATIONS
-tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
-                'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
-                'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
-                'p_mean_sigmad0']
-
-if args.tracks_means == 'ON':
-    scalars += tracks_means
-    fmode = '_with_tracks'
-elif args.tracks_means == 'ONLY':
-    scalars = tracks_means
-    fmode = '_tracks_only'
-else :
-    fmode = ''
-
 # EVALUATING CORRELATIONS
 if args.correlation in ['ON','SCATTER']:
     correlations(images, scalars, valid_sample, valid_labels, region, args.output_dir + '/correlations/' + region + '/',
-                 args.scaling, args.scaler_out, args.images, args.correlation)
+                 args.scaling, args.scaler_out, args.images, args.correlation, args.tracks_means)
 
 
 # TRAINING LOOP

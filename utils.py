@@ -1029,7 +1029,21 @@ def removal_bkg_rej(model,valid_probs,labels,feat,file):
     with open(fname + '.pkl','wb') as wfp:                                                  # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, wfp)
 
-def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr):
+def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
+    tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
+                    'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
+                    'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
+                    'p_mean_sigmad0']
+
+    if arg_tracks_means == 'ON':                                                           # Adding tracks_means to the scalars for correlation
+        scalars += tracks_means
+        fmode = '_with_tracks'
+    elif arg_tracks_means == 'ONLY':
+        scalars = tracks_means
+        fmode = '_tracks_only'
+    else :
+        fmode = ''
+
     create_path(output_dir)
     if scaling:
         scaler_out = output_dir + scaler_out
@@ -1048,7 +1062,6 @@ def correlations(images, scalars, sample, labels, region, output_dir, scaling, s
             sample[image + '_mean'] = np.mean(sample[image], axis = (1,2))
             scalars += [image + '_mean']
         fmode = '_with_im_means'
-    else : fmode = ''
             #print(image)
             #print(np.all(np.isfinite(sample[image])))
             #print('min :', np.amin(sample[image]), 'max :', np.amax(sample[image]))
