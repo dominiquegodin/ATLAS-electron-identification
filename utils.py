@@ -862,13 +862,13 @@ def bkg_rej_70(model, sample, labels):
     return bkg_rej
 
 def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
-                       output_dir):
+                       output_dir,region):
     '''
     Takes a pretrained model and saves the permutation importance of a feature or a group
     of features to a dictionary in a pickle file.
     '''
     name = [feats[0],'group_{}'.format(g)][g>=0]
-    output_dir += '/permutation_importance'
+    output_dir += '/' + region + '/permutation_importance'
     fname = output_dir + '/importance'
     for path in list(accumulate([folder+'/' for folder in output_dir.split('/')])):            # Creating the output folder if it doesn't exist
         try: os.mkdir(path)
