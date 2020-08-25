@@ -351,4 +351,4 @@ if args.permutation == 'ON':
     g = args.feat-len(feats)
     feats += groups
     feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
-                        training, args.n_classes, args.n_reps, args.output_dir)
+                        training, args.n_classes, args.n_reps, args.output_dir + '/' + region )
