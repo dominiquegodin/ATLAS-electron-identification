@@ -233,7 +233,7 @@ else :
 # EVALUATING CORRELATIONS
 if args.correlation in ['ON','SCATTER']:
     correlations(images, scalars, valid_sample, valid_labels, region, args.output_dir + '/correlations/' + region + '/',
-                 args.scaling, args.scaler_out, args.images, arg.correlation)
+                 args.scaling, args.scaler_out, args.images, args.correlation)
 
 
 # TRAINING LOOP
