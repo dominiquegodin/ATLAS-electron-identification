@@ -57,6 +57,7 @@ parser.add_argument( '--impPlot'     , default = 'perm_imp.pdf'      )
 parser.add_argument( '--impOut'      , default = 'importances'       )
 parser.add_argument( '--correlation' , default = 'OFF'               )
 parser.add_argument( '--tracks_means', default = 'OFF'               )
+parser.add_argument( '--auto_output_dir', default = 'OFF'               )
 args = parser.parse_args()
 #from plots_DG import combine_ROC_curves
 #combine_ROC_curves(args.output_dir, CNN)
@@ -133,7 +134,8 @@ groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel
              'em_endcap_Lr3', 'lar_endcap_Lr0', 'p_nTracks', 'tile_gap_Lr1', 'p_EptRatio', 'lar_endcap_Lr1',
              'p_dPOverP', 'p_numberOfSCTHits', 'lar_endcap_Lr3', 'p_Rphi' , 'p_f3', 'p_ndof', 'p_Eratio']]
 
- args.output_dir = arg.output_dir + '/{}c_{}m/{}/{}'.format(args.n_classes, args.n_train//1e6,                      # Saves the output according to the number of classes, the stats used,
+if args.auto_output_dir == 'ON':
+    args.output_dir = arg.output_dir + '/{}c_{}m/{}/{}'.format(args.n_classes, args.n_train//1e6,                      # Saves the output according to the number of classes, the stats used,
                                                             args.weight_type, region)                               # the reweighthing and the region
 
 # FEATURE REMOVAL
@@ -230,7 +232,6 @@ else :
 
 # EVALUATING CORRELATIONS
 if args.correlation in ['ON','SCATTER']:
-    output_dir =
     correlations(images, scalars, valid_sample, valid_labels, region, args.output_dir + '/correlations/' + region + '/',
                  args.scaling, args.scaler_out, args.images, arg.correlation)
 
