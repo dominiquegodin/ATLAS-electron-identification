@@ -277,8 +277,7 @@ if args.results_out != '':
 # FEATURE REMOVAL IMPORTANCE
 if args.removal == 'ON' :
     fname = args.output_dir + '/' + args.impOut
-    fname = removal_bkg_rej(model,valid_probs,valid_labels,feat,fname)
-    print_importances(fname)
+    removal_bkg_rej(model,valid_probs,valid_labels,feat,fname)
 
 #if args.plotting in ['rm', 'removal']:
 #    plot_removal()

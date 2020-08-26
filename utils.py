@@ -927,7 +927,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
             imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
             file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
             with open(file_name,'ab') as afp:                                                      # Saving the results in a pickle
-                print('Saving results to {}'.format(afp))
+                print('Saving results to {}'.format(file_name))
                 pickle.dump(imp_tup, afp)
             print_importances(file_name)
 
@@ -1028,9 +1028,12 @@ def removal_bkg_rej(model,valid_probs,labels,feat,fname):
     '''
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
-    with open(fname + '.pkl','wb') as wfp:                                                  # Saving the results in a pickle
+    fname += '.pkl'
+    with open(fname,'wb') as wfp:                                                  # Saving the results in a pickle
+        print('Saving results to {}'.format(fname))
         pickle.dump(bkg_rej_tup, wfp)
-        return wfp
+        print_importances(fname)
+
 
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
     tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
