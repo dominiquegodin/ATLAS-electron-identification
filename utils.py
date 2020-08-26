@@ -1032,7 +1032,7 @@ def removal_bkg_rej(model,valid_probs,labels,feat,fname):
     with open(fname,'wb') as wfp:                                                  # Saving the results in a pickle
         print('Saving results to {}'.format(fname))
         pickle.dump(bkg_rej_tup, wfp)
-        print_importances(fname)
+    print_importances(fname)
 
 
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
