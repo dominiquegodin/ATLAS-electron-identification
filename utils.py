@@ -301,7 +301,7 @@ def class_weights(labels, bkg_ratio):
     return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
-def validation(output_dir, results_in, plotting, n_valid, data_file, variables, diff_plots, valid_cuts=''):
+def validation(output_dir, results_in, plotting, n_valid, data_file, variables, diff_plots, n_classes, valid_cuts=''):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
@@ -329,7 +329,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
         cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
     def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
     print(text_line(len(labels)) if len(labels) < n_e else '', '\n')
-    valid_results(sample, labels, probs, [], None, output_dir, plotting, diff_plots)
+    valid_results(sample, labels, probs, [], None, output_dir, plotting, diff_plots, n_classes)
 
 
 def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', p='p_', process=False):
@@ -581,10 +581,11 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
     return_dict[bkg] = print_dict
 
 
-def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, diff_plots):
+def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, diff_plots, n_classes):
     global print_dict; print_dict = {n:'' for n in np.arange(1,4)}
     compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] + [1, 2, 3, 4, 5]           # Comment the second list for 2 classes trainings
+    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg']
+    if n_classes == 6: bkg_list += [1, 2, 3, 4, 5]
     arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
@@ -905,7 +906,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
             bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
         imp_tup = name, np.mean(importance), np.std(importance), bkg_rej
-        with open(fname + '.pkl','ab') as afp:                                                   # Saving the results in a pickle
+        with open(fname + '.pkl','ab') as afp:                                                  # Saving the results in a pickle
             pickle.dump(imp_tup, afp)
         print_importances(fname)
 
@@ -919,13 +920,14 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
             shuffling_sample(shuffled_sample,feats, k)
             probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
             bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
-                                train_labels, training, output_dir, 'OFF', False)               # Background rejection with one feature shuffled
+                                train_labels, training, output_dir, 'OFF', False, n_classes)    # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
         imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
         for i in range(n_classes):
             imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
             file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
-            with open(file_name,'ab') as afp:                                                           # Saving the results in a pickle
+            with open(file_name,'ab') as afp:                                                      # Saving the results in a pickle
+                print('Saving results to {}'.format(afp))
                 pickle.dump(imp_tup, afp)
             print_importances(file_name)
 

@@ -8,7 +8,7 @@ from   utils      import validation, make_sample, sample_composition, apply_scal
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
 from   utils      import feature_permutation, feature_removal, print_importances, plot_importances
-from   utils      import removal_bkg_rej, correlations, create_path
+from   utils      import removal_bkg_rej, correlations, create_path, #plot_removal, plot_permutation
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
@@ -164,7 +164,7 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     variables = {'others':others, 'scalars':scalars, 'images':[]}
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
-               args.data_file, variables, args.runDiffPlots)
+               args.data_file, variables, args.n_classes, args.runDiffPlots)
 elif args.results_in !='':
     print("\noption [--results_in] was given but no matching file found in the right path, aborting..")
     print("results_in file =", args.output_dir+'/'+args.results_in, '\n')
@@ -267,7 +267,7 @@ else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
 bkg_rej_full = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
-              args.output_dir, args.plotting, args.runDiffPlots)
+              args.output_dir, args.plotting, args.runDiffPlots, args.n_classes)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
@@ -280,6 +280,9 @@ if args.removal == 'ON' :
     removal_bkg_rej(model,valid_probs,valid_labels,feat,fname)
     print_importances(fname)
 
+#if args.plotting in ['rm', 'removal']:
+#    plot_removal()
+
 # FEATURE PERMUTATION IMPORTANCE
 if args.permutation == 'ON':
     feats = [[var] for var in images + scalars]
@@ -287,3 +290,6 @@ if args.permutation == 'ON':
     feats += groups
     feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
                         training, args.n_classes, args.n_reps, args.output_dir)
+
+#if args.plotting in ['prm', 'permutation']:
+#    plot_permutation()
