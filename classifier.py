@@ -74,28 +74,28 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 # DATAFILE
 create_path(args.output_dir)
 #if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
-if args.data_file in ['','barrel']:
-    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
-    region = 'barrel'
-if args.data_file == 'transition':
-     args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
-     region = 'transition'
-if args.data_file == 'endcap':
-    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
-    region = 'endcap'
-if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
-for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
-
-#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
-#if args.data_file == ''          :
-#    args.data_file = '/scratch/odenis/el_data/0.0_1.3/el_data.h5'
+#if args.data_file in ['','barrel']:
+#    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
 #    region = 'barrel'
 #if args.data_file == 'transition':
-#    args.data_file = '/scratch/odenis/el_data/1.3_1.6/el_data.h5'
-#    region = 'transition'
-#if args.data_file == 'endcap'    :
-#    args.data_file = '/scratch/odenis/el_data/1.6_2.5/el_data.h5'
+#     args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
+#     region = 'transition'
+#if args.data_file == 'endcap':
+#    args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
 #    region = 'endcap'
+#if args.data_file == '': args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
+#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
+
+#if args.data_file == '': args.data_file = '/opt/tmp/godin/el_data/2020-05-28/el_data.h5'
+if args.data_file == ''          :
+    args.data_file = '/scratch/odenis/el_data/0.0_1.3/el_data.h5'
+    region = 'barrel'
+if args.data_file == 'transition':
+    args.data_file = '/scratch/odenis/el_data/1.3_1.6/el_data.h5'
+    region = 'transition'
+if args.data_file == 'endcap'    :
+    args.data_file = '/scratch/odenis/el_data/1.6_2.5/el_data.h5'
+    region = 'endcap'
 for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
 
 # CNN PARAMETERS

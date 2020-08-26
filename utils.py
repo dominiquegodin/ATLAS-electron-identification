@@ -881,56 +881,6 @@ def bkg_rej_70(model, sample, labels):
     bkg_rej = 1/fpr[np.argwhere(tpr>=0.7)[0]][0]
     return bkg_rej
 
-def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
-                       output_dir):
-    '''
-    Takes a pretrained model and saves the permutation importance of a feature or a group
-    of features to a dictionary in a pickle file.
-    '''
-    name = [feats[0],'group_{}'.format(g)][g>=0]
-    output_dir += '/permutation_importance'
-    fname = output_dir + '/importance'
-    create_path(output_dir)
-    if type(feats) == str :
-        feats = [feats]
-
-    if n_classes == 2 :
-        bkg_rej = np.empty(n_reps)
-        features = ' + '.join(feats)
-        print('\nPERMUTATION OF : ' + features)
-        bkg_rej_full = bkg_rej_70(model, sample, labels)
-        print('Background rejection =', bkg_rej_full)
-        shuffled_sample = create_shuffle_sample(sample,feats)
-        for k in range(n_reps):                                                                  # Reshuffling loop
-            shuffling_sample(shuffled_sample, feats, k)
-            bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
-        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-        imp_tup = name, np.mean(importance), np.std(importance), bkg_rej
-        fname += '.pkl'
-        with open(fname,'ab') as afp:                                                  # Saving the results in a pickle
-            pickle.dump(imp_tup, afp)
-        print_importances(fname)
-
-    elif n_classes == 6 :
-        bkg_rej = np.empty((n_classes, n_reps))
-        features = ' + '.join(feats)
-        print('\nPERMUTATION OF : ' + features)
-        bkg_rej_full = np.reshape(bkg_rej_full,(n_classes,1))
-        shuffled_sample = create_shuffle_sample(sample, feats)
-        for k in range(n_reps) :
-            shuffling_sample(shuffled_sample,feats, k)
-            probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
-            bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
-                                train_labels, training, output_dir, 'OFF', False, n_classes)    # Background rejection with one feature shuffled
-        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
-        imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
-        for i in range(n_classes):
-            imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
-            file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
-            with open(file_name,'ab') as afp:                                                      # Saving the results in a pickle
-                print('Saving results to {}'.format(file_name))
-                pickle.dump(imp_tup, afp)
-            print_importances(file_name)
 
 def print_importances(file):
     '''
@@ -991,6 +941,75 @@ def plot_importances(results, path, title):
     plt.savefig(path)
     return fig, ax
 
+def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
+                       output_dir):
+    '''
+    Takes a pretrained model and saves the permutation importance of a feature or a group
+    of features to a dictionary in a pickle file.
+    '''
+    name = [feats[0],'group_{}'.format(g)][g>=0]
+    output_dir += '/permutation_importance'
+    fname = output_dir + '/importance'
+    create_path(output_dir)
+    if type(feats) == str :
+        feats = [feats]
+
+    if n_classes == 2 :
+        bkg_rej = np.empty(n_reps)
+        features = ' + '.join(feats)
+        print('\nPERMUTATION OF : ' + features)
+        bkg_rej_full = bkg_rej_70(model, sample, labels)
+        print('Background rejection =', bkg_rej_full)
+        shuffled_sample = create_shuffle_sample(sample,feats)
+        for k in range(n_reps):                                                                  # Reshuffling loop
+            shuffling_sample(shuffled_sample, feats, k)
+            bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
+        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+        imp_tup = name, np.mean(importance), np.std(importance), bkg_rej
+        fname += '.pkl'
+        with open(fname,'ab') as afp:                                                  # Saving the results in a pickle
+            pickle.dump(imp_tup, afp)
+        print_importances(fname)
+
+    elif n_classes == 6 :
+        bkg_rej = np.empty((n_classes, n_reps))
+        features = ' + '.join(feats)
+        print('\nPERMUTATION OF : ' + features)
+        bkg_rej_full = np.reshape(bkg_rej_full,(n_classes,1))
+        shuffled_sample = create_shuffle_sample(sample, feats)
+        for k in range(n_reps) :
+            shuffling_sample(shuffled_sample,feats, k)
+            probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
+            bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
+                                train_labels, training, output_dir, 'OFF', False, n_classes)    # Background rejection with one feature shuffled
+        importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+        imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
+        for i in range(n_classes):
+            imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
+            file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
+            with open(file_name,'ab') as afp:                                                      # Saving the results in a pickle
+                print('Saving results to {}'.format(file_name))
+                pickle.dump(imp_tup, afp)
+            print_importances(file_name)
+
+
+def plot_permutation(output_dir):
+    bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
+                r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
+
+    file = args.importances_in
+    path = args.importances_out
+    n_reps = args.n_reps
+
+    for i in range(6):
+        if i :
+            suf = '_' + str(i)
+        else :
+            suf = '_bkg'
+        title = 'Permutation importance against {} background.\n(averaged over {} repetitions)'.format(bkg_list[i], n_reps)
+        results = print_importances(file + suf + '.pkl')
+        plot_importances(results, path + suf + '.pdf', title)
+
 def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     '''
     Removes the specified features from the input variables.
@@ -1037,6 +1056,36 @@ def removal_bkg_rej(model,valid_probs,labels,feat,fname):
         print('Saving results to {}'.format(fname))
         pickle.dump(bkg_rej_tup, wfp)
     print_importances(fname)
+
+def plot_removal(feats, output_dir, region, arg_im):
+    feats = 'full' + feats
+    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
+    if arg_im == 'OFF':
+        arg_im = 'ImagesOFF/'
+    else:
+        arg_im = ''
+
+    bkg_rej = {}
+    absent = []
+    for folder in feats:
+        pth = output_dir + '/removal_importance/' + arg_im + region + '/' + folder + '/importance.pkl'
+        print('Opening:',pth)
+        try:
+            with open(pth, 'rb') as rfp:
+                bkg_tup = pickle.load(rfp)
+                key = bkg_tup[0].replace(' ', '_')
+                bkg_rej[key] = bkg_tup[1]
+        except:
+            print(folder + ' not in directory')
+            absent.append(folder)
+            continue
+    print('\n', bkg_rej)
+    imp = {}
+    for feat in [f for f in feats if f not in absent + ['full']]:
+        imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
+    path = output_dir + '/removal_importance/{}/rm_imp.pdf'.format(arg_im + region)
+    title = r'Feature removal importance without reweighting ({})'.format(eta[region])
+    plot_importances(imp, path, title)
 
 
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):

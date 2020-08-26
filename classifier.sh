@@ -1,6 +1,6 @@
 #  6C PERMUTATION IMPORTANCE
-python classifier.py  --n_train=10e6  --n_valid=15e6  --batch_size=5e3  --n_epochs=0  --n_classes=6           \
-                      --n_tracks=5    --feat=$VAR --permutation=ON --model_in=model.h5                        \
+python classifier.py  --n_train=10e6  --n_valid=15e6  --batch_size=5e3  --n_epochs=100  --n_classes=6         \
+                      --n_tracks=5                            \
                       --auto_output_dir=ON
 
 exit
