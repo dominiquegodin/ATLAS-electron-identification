@@ -140,7 +140,7 @@ if args.auto_output_dir == 'ON':
 
 # FEATURE REMOVAL
 if args.removal == 'ON':
-    feat = feature_removal(args.feat, images, scalars, groups, args.images, args.scalars)
+    images, scalars, feat = feature_removal(args.feat, images, scalars, groups, args.images, args.scalars)
     args.output_dir = args.output_dir + '/removal_importance/' + feat                                               # The output directory will be different for each feature.
 create_path(args.output_dir)                                                                                        # That way the model.h5 and their corresponding plots aren't mixed with
                                                                                                                     # the other trainings.

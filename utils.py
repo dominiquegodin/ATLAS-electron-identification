@@ -1020,7 +1020,7 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
         scalars = [key for key in scalars if key not in groups[g]]
         feat = 'group_{}'.format(g)
     else : feat = 'full'
-    return feat
+    return images, scalars, feat
 
 def removal_bkg_rej(model,valid_probs,labels,feat,fname):
     '''
