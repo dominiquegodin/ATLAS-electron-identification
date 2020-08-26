@@ -180,7 +180,7 @@ with strategy.scope():
     if tf.__version__ >= '2.1.0' and len(variables['images']) >= 1:
         tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
     sample, _ = make_sample(args.data_file, variables, [0,1], args.n_tracks, args.n_classes)
-    CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
+    if 'tracks_image' in np.sum(list(variables.values())): CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
     func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
     model     = multi_CNN(*func_args, **train_var); print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
