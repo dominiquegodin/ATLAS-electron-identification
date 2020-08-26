@@ -1013,7 +1013,10 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
             sys.exit()
         scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
     elif g >= 0 :
-        if  groups[g][0] not in images + scalars:
+        condition1 = groups[g][0] not in images + scalars
+        condition2 = groups[g][0] in images and arg_im == 'OFF'
+        condition3 = groups[g][0] in scalars and arg_sc == 'OFF'
+        if condition1 or condition2 or condition3 :
             print("Cannot remove features not in the sample, aborting...")
             sys.exit()
         images  = [key for key in images  if key not in groups[g]]
