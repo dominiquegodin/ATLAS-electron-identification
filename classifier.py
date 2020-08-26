@@ -135,7 +135,7 @@ groups  =  [['em_barrel_Lr1', 'em_barrel_Lr1_fine'], ['em_barrel_Lr0','em_barrel
              'p_dPOverP', 'p_numberOfSCTHits', 'lar_endcap_Lr3', 'p_Rphi' , 'p_f3', 'p_ndof', 'p_Eratio']]
 
 if args.auto_output_dir == 'ON':
-    args.output_dir = arg.output_dir + '/{}c_{}m/{}/{}'.format(args.n_classes, args.n_train//1e6,                      # Saves the output according to the number of classes, the stats used,
+    args.output_dir = args.output_dir + '/{}c_{}m/{}/{}'.format(args.n_classes, args.n_train//1e6,                      # Saves the output according to the number of classes, the stats used,
                                                             args.weight_type, region)                               # the reweighthing and the region
 
 # FEATURE REMOVAL
