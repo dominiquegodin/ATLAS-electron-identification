@@ -1030,6 +1030,7 @@ def removal_bkg_rej(model,valid_probs,labels,feat,fname):
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
     with open(fname + '.pkl','wb') as wfp:                                                  # Saving the results in a pickle
         pickle.dump(bkg_rej_tup, wfp)
+        return wfp
 
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
     tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
