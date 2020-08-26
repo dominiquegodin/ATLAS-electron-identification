@@ -1022,7 +1022,7 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     else : feat = 'full'
     return feat
 
-def removal_bkg_rej(model,valid_probs,labels,feat,file):
+def removal_bkg_rej(model,valid_probs,labels,feat,fname):
     '''
     Computes and saves background rejection of the given model to a pickle file.
     '''
