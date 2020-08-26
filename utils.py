@@ -895,13 +895,13 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         feats = [feats]
 
     if n_classes == 2 :
-        bkg_rej = np.empty(n_rep)
+        bkg_rej = np.empty(n_reps)
         features = ' + '.join(feats)
         print('\nPERMUTATION OF : ' + features)
         bkg_rej_full = bkg_rej_70(model, sample, labels)
         print('Background rejection =', bkg_rej_full)
         shuffled_sample = create_shuffle_sample(sample,feats)
-        for k in range(n_rep):                                                                  # Reshuffling loop
+        for k in range(n_reps):                                                                  # Reshuffling loop
             shuffling_sample(shuffled_sample, feats, k)
             bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
