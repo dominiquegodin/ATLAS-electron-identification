@@ -941,6 +941,13 @@ def plot_importances(results, path, title):
     plt.savefig(path)
     return fig, ax
 
+def saving_results(var, fname):
+    fname += '.pkl'
+    print('Saving results to {}'.format(fname))
+    with open(fname,'wb') as wfp:                                                  # Saving the results in a pickle
+        pickle.dump(var, wfp)
+    print_importances(fname)
+
 def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
                        output_dir):
     '''
@@ -949,7 +956,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     '''
     name = [feats[0],'group_{}'.format(g)][g>=0]
     output_dir += '/permutation_importance'
-    fname = output_dir + '/importance'
+    fname = output_dir + '/' + name + '/importance'
     create_path(output_dir)
     if type(feats) == str :
         feats = [feats]
@@ -966,10 +973,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
             bkg_rej[k] = bkg_rej_70(model, shuffled_sample, labels)                             # Background rejection with one feature shuffled
         importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
         imp_tup = name, np.mean(importance), np.std(importance), bkg_rej
-        fname += '.pkl'
-        with open(fname,'ab') as afp:                                                  # Saving the results in a pickle
-            pickle.dump(imp_tup, afp)
-        print_importances(fname)
+        saving_results(imp_tup, fname)
 
     elif n_classes == 6 :
         bkg_rej = np.empty((n_classes, n_reps))
@@ -986,11 +990,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
         for i in range(n_classes):
             imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
-            file_name = fname + '_{}.pkl'.format(i if i else 'bkg')
-            with open(file_name,'ab') as afp:                                                      # Saving the results in a pickle
-                print('Saving results to {}'.format(file_name))
-                pickle.dump(imp_tup, afp)
-            print_importances(file_name)
+            saving_results(imp_tup, fname + '_{}'.format(i if i else 'bkg'))
 
 
 def plot_permutation(output_dir):
@@ -1051,11 +1051,7 @@ def removal_bkg_rej(model,valid_probs,labels,feat,fname):
     '''
     fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
     bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
-    fname += '.pkl'
-    with open(fname,'wb') as wfp:                                                  # Saving the results in a pickle
-        print('Saving results to {}'.format(fname))
-        pickle.dump(bkg_rej_tup, wfp)
-    print_importances(fname)
+    saving_results(bkg_rej_tup, fname)
 
 def plot_removal(feats, output_dir, region, arg_im):
     feats = 'full' + feats

@@ -268,6 +268,7 @@ else:
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
 bkg_rej_full = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
               args.output_dir, args.plotting, args.runDiffPlots, args.n_classes)
+print('bkg_rej_full',bkg_rej_full, type(bkg_rej_full)) # FOR DEVELOPING PURPOSES
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
