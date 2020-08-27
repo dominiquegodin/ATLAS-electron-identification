@@ -8,7 +8,7 @@ from   utils      import validation, make_sample, sample_composition, apply_scal
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
 from   utils      import feature_permutation, feature_removal, print_importances, plot_importances
-from   utils      import removal_bkg_rej, correlations, create_path#, plot_removal, plot_permutation
+from   utils      import removal_bkg_rej, correlations, create_path, saving_results#, plot_removal, plot_permutation
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
@@ -53,8 +53,6 @@ parser.add_argument( '--removal'     , default = 'OFF'               )
 parser.add_argument( '--permutation' , default = 'OFF'               )
 parser.add_argument( '--n_reps'      , default = 10, type = int      )
 parser.add_argument( '--feat'        , default = -1, type = int      )
-parser.add_argument( '--impPlot'     , default = 'perm_imp.pdf'      )
-parser.add_argument( '--impOut'      , default = 'importances'       )
 parser.add_argument( '--correlation' , default = 'OFF'               )
 parser.add_argument( '--tracks_means', default = 'OFF'               )
 parser.add_argument( '--auto_output_dir', default = 'OFF'               )
@@ -268,7 +266,7 @@ else:
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
 bkg_rej_full = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
               args.output_dir, args.plotting, args.runDiffPlots, args.n_classes)
-print('bkg_rej_full',bkg_rej_full, type(bkg_rej_full)) # FOR DEVELOPING PURPOSES
+print('bkg_rej_full[0]',bkg_rej_full[0], type(bkg_rej_full[0])) # FOR DEVELOPING PURPOSES
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.n_folds > 1 and False: valid_data = (valid_probs,)
@@ -277,8 +275,8 @@ if args.results_out != '':
 
 # FEATURE REMOVAL IMPORTANCE
 if args.removal == 'ON' :
-    fname = args.output_dir + '/' + args.impOut
-    removal_bkg_rej(model,valid_probs,valid_labels,feat,fname)
+    fname = args.output_dir + '/bkg_rej'
+    saving_results(bkg_rej_full, fname)
 
 #if args.plotting in ['rm', 'removal']:
 #    plot_removal()

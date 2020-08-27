@@ -1045,14 +1045,6 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     else : feat = 'full'
     return images, scalars, feat
 
-def removal_bkg_rej(model,valid_probs,labels,feat,fname):
-    '''
-    Computes and saves background rejection of the given model to a pickle file.
-    '''
-    fpr, tpr, _ = metrics.roc_curve(labels, valid_probs[:,0], pos_label=0)
-    bkg_rej_tup = feat, 1/fpr[np.argwhere(tpr>=0.7)[0]][0]                                  # Background rejection with one feature removed
-    saving_results(bkg_rej_tup, fname)
-
 def plot_removal(feats, output_dir, region, arg_im):
     feats = 'full' + feats
     eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
