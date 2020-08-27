@@ -993,9 +993,8 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
                             train_labels, training, output_dir, 'OFF', False, n_classes)    # Background rejection with one feature shuffled
     importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
     imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
-    for i in range(n_classes):
-        imp_tup = name, imp_mean[i], imp_std[i], bkg_rej[i,:]
-        saving_results(imp_tup, fname + '_{}'.format(i if i else 'bkg'))
+    imp_tup = name, imp_mean, imp_std, bkg_rej
+    saving_results(imp_tup, fname + '_{}'.format(i if i else 'bkg'))
 
 def plot_permutation(output_dir, importance_in):
     bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
