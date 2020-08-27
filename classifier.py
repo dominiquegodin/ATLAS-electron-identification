@@ -133,6 +133,13 @@ if args.removal == 'ON':
     args.output_dir = args.output_dir + '/removal_importance/' + feat                                               # The output directory will be different for each feature.
 create_path(args.output_dir)                                                                                        # That way the model.h5 and their corresponding plots aren't mixed with
                                                                                                                     # the other trainings.
+# FEATURE IMPORTANCE PLOTTING
+#if args.plotting in ['rm', 'removal']:
+#    plot_removal()
+#    sys.exit()
+if args.plotting in ['prm', 'permutation']:
+    plot_permutation(args.output_dir, images + scalars, args.n_classes, args.n_reps)
+    sys.exit()
 
 # TRAINING VARIABLES
 train_var = {'images' :images  if args.images  == 'ON' else [], 'tracks':[],
@@ -264,13 +271,11 @@ if args.results_out != '':
     else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
+
 # FEATURE REMOVAL IMPORTANCE
 if args.removal == 'ON' :
     fname = args.output_dir + '/bkg_rej'
     saving_results((feat,bkg_rej_full), fname)
-
-#if args.plotting in ['rm', 'removal']:
-#    plot_removal()
 
 # FEATURE PERMUTATION IMPORTANCE
 if args.permutation == 'ON':
@@ -279,6 +284,3 @@ if args.permutation == 'ON':
     feats += groups
     feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
                         training, args.n_classes, args.n_reps, args.output_dir)
-
-if args.plotting in ['prm', 'permutation']:
-    plot_permutation(args.output_dir, images + scalars, args.n_classes, args.n_reps)
