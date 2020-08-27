@@ -892,11 +892,13 @@ def plot_importances(results, path, title):
     '''
     Plots a horizontal bar plot ranking of the feature importances from a dictionary.
     '''
+    print('results', results)
     # Data parsing section
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True) # Sorts the importances in decreasing order
     labels = [tup[0] for tup in sortedResults]
     newLabels = LaTeXizer(labels)[1]
     data = [tup[1][0] for tup in sortedResults]
+    print('data', data)
     # Permutation importances data contain errors estimation (standard deviation over n repetitons), but removal importance doesn't.
     # I use a try/except block to catch that shape difference between the data:
     try :
@@ -940,8 +942,10 @@ def plot_importances(results, path, title):
         ax.barh(feat, widths, height=0.75, xerr=err, capsize=5, color=color, label=label)
 
     # Numerical values of the importance
+    print('values', values)
     values = np.around(widths,2)
     values = np.reshape(values,(values.size,1))
+    print('values reshape', values)
     valuesTable = plt.table(cellText=values, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
                       loc='center right')
 
