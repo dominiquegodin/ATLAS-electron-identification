@@ -932,6 +932,7 @@ def plot_importances(results, path, title):
     plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
+    print('Saving plot to {}'.format(path))
     plt.savefig(path)
     return fig, ax
 
@@ -1006,7 +1007,6 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
     absent = []
     for feat in feats:
         file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
-        print('Opening:', file)
         try:
             imp, err, _ = print_importances(file)[feat]
         except:
