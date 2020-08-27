@@ -982,9 +982,9 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
         bkg_rej = np.empty((1, n_reps))
     elif n_classes == 6 :
         bkg_rej = np.empty((n_classes, n_reps))
+        bkg_rej_full = np.reshape(bkg_rej_full,(n_classes, 1))
     features = ' + '.join(feats)
     print('\nPERMUTATION OF : ' + features)
-    bkg_rej_full = np.reshape(bkg_rej_full,(n_classes,1))
     shuffled_sample = create_shuffle_sample(sample, feats)
     for k in range(n_reps) :
         shuffling_sample(shuffled_sample,feats, k)
