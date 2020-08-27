@@ -913,25 +913,25 @@ def plot_importances(results, path, title):
     rCount, iCount, sCount, gCount = 0, 0, 0, 0 # Counts the number of time each categorie has been labeled (for the legend)
     for feat, width, err in zip(newLabels, widths, errors):
         if feat == 'detrimental variables':
-            color.append('r')
+            color = 'r'
             if rCount == 0: # If the categorie of variable has already been labelled, we don't label it again
                 label = feat
                 rCount += 1
         elif 'variables' in feat or 'and' in feat:
-            color.append('tab:orange')
+            color = 'tab:orange'
             if gCount == 0:
                 label = 'Groups of features'
                 gCount +=1
         elif feat.startswith('em_') or feat.startswith('lar_') or feat.startswith('tile_'):
-            color.append('indigo')
+            color = 'indigo'
             if iCount == 0:
                 label = 'Images'
                 iCount +=1
         elif feat == 'tracks_image':
-            color.append('lime')
+            color = 'lime'
             label = feat
         else :
-            color.append('tab:blue')
+            color = 'tab:blue'
             if sCount == 0:
                 label = 'Scalars'
                 sCount +=1
