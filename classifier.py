@@ -8,7 +8,7 @@ from   utils      import validation, make_sample, sample_composition, apply_scal
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
 from   utils      import feature_permutation, feature_removal, print_importances, plot_importances
-from   utils      import correlations, create_path, saving_results#, plot_removal, plot_permutation
+from   utils      import correlations, create_path, saving_results, plot_removal, plot_permutation
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
