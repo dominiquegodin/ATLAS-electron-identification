@@ -1,7 +1,7 @@
-#  6C PERMUTATION IMPORTANCE
-python classifier.py  --n_train=10e6  --n_valid=15e6  --batch_size=5e3  --n_epochs=100  --n_classes=6         \
-                      --n_tracks=5    --output_dir='/scratch/odenis'                        \
-                      --auto_output_dir=ON
+# SINGLE TRAINING
+python classifier.py  --n_train=10e6  --n_valid=15e6  --batch_size=5e3  --n_epochs=0  --n_classes=6           \
+                      --n_tracks=5    --output_dir=/scratch/odenis  --feat=$VAR --permutation=ON               \
+                      --model_in=model.h5 --auto_output_dir=ON
 
 exit
 
@@ -69,10 +69,12 @@ python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir=ou
                       --model_in=model.h5 --scaler_in=scaler.pkl --featImp='ON' --feat=${VAR}
 
 # FEATURE PERMUTATION IMPORTANCE PLOTTING
-python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.pkl'                          \
-                        --importances_out='outputs/2c_10m/match2s_2d/perm_imp.png'
+python plot_perm_imp.py --importances_in='outputs/2c_10m/match2s_2d/importances.pkl' --importances_out='outputs/2c_10m/match2s_2d/perm_imp.png'
 
 # FEATURE REMOVAL IMPORTANCE (BELUGA)
-python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2         \
-                      --verbose=2  --output_dir='/scratch/odenis/removal_importance'                          \
-                      --impOut='removal_importance.pkl' --feat=$VAR --data_file='barrel'
+python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
+                      --verbose=2  --output_dir='/scratch/odenis/removal_importance'                            \
+                      --impOut='removal_importance.pkl' --rm_features=${VAR} --data_file='endcap'
+
+# TESTS
+python classifier.py --n_train=10 --n_valid=10 --batch_size=5 --n_epochs=5 --n_classes=2 --output_dir=outputs/tests
