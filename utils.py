@@ -1008,7 +1008,7 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
         file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
         print('Opening:', file)
         try:
-            imps, err, _ = print_importances(file)[feat]
+            imp, err, _ = print_importances(file)[feat]
         except:
             print(folder + ' not in directory')
             absent.append(folder)
