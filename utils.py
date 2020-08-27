@@ -892,13 +892,22 @@ def plot_importances(results, path, title):
     '''
     Plots a horizontal bar plot ranking of the feature importances from a dictionary.
     '''
-    print('results', results)
+    categories = {'Images'   : (['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+                                'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+                                'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1',
+                                'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'], 'indigo'),
+                'Tracks image': (['tracks_image'], 'lime',
+                'Scalars'   : (['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
+                                'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
+                                'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
+                                'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'], 'tab:blue'),
+                'Groups of features': (['group_0', 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7',
+                                'group_8',  'group_9', 'group_10', 'group_11'], 'tab:orange')}
     # Data parsing section
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True) # Sorts the importances in decreasing order
     labels = [tup[0] for tup in sortedResults]
     newLabels = LaTeXizer(labels)[1]
     data = [tup[1][0] for tup in sortedResults]
-    print('data', data)
     # Permutation importances data contain errors estimation (standard deviation over n repetitons), but removal importance doesn't.
     # I use a try/except block to catch that shape difference between the data:
     try :
@@ -914,38 +923,18 @@ def plot_importances(results, path, title):
     widths = data
     # Colors of the bars according to the type of variables (blue for scalars, indigo for images,
     # lime for tracks images, orange for groups and red for the set of detrimental variables)
-    rCount, iCount, sCount, gCount = 0, 0, 0, 0 # Counts the number of time each categorie has been labeled (for the legend)
-    for feat, width, err in zip(newLabels, widths, errors):
-        if feat == 'detrimental variables':
-            color = 'r'
-            if rCount == 0: # If the categorie of variable has already been labelled, we don't label it again
-                label = feat
-                rCount += 1
-        elif 'variables' in feat or 'and' in feat:
-            color = 'tab:orange'
-            if gCount == 0:
-                label = 'Groups of features'
-                gCount +=1
-        elif feat.startswith('em_') or feat.startswith('lar_') or feat.startswith('tile_'):
-            color = 'indigo'
-            if iCount == 0:
-                label = 'Images'
-                iCount +=1
-        elif feat == 'tracks_image':
-            color = 'lime'
-            label = feat
-        else :
-            color = 'tab:blue'
-            if sCount == 0:
-                label = 'Scalars'
-                sCount +=1
-        ax.barh(feat, widths, height=0.75, xerr=err, capsize=5, color=color, label=label)
+    for cat in categories:
+        cat_widths = np.copy(widths)
+        cat_err = np.copy(errors)
+        category, color = categorie[cat]
+        index = np.array([labels.index for feat in labels if label not in category])
+        cat_widths[index] = np.zeros(index.size)
+        cat_err[index] = np.zeros(index.size)
+        ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
 
     # Numerical values of the importance
     values = np.around(widths,2)
-    print('values', values)
     values = np.reshape(values,(values.size,1))
-    print('values reshape', values)
     valuesTable = plt.table(cellText=values, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
                       loc='center right')
 
@@ -1041,7 +1030,6 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
             print(feat + ' not in directory')
             continue
         for i in range(n_bkg):
-            print(results) # For development purposes
             results[i].update({feat:(imp[i], err[i])})
     for i in range(n_bkg):
         if i :
@@ -1049,7 +1037,7 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
         else :
             suf = '_bkg'
         title = 'Permutation importance against {} background.\n(averaged over {} repetitions)'.format(bkg_list[i], n_reps)
-        plot_importances(results[i], plot + suf + '.pdf', title)
+        ortances(results[i], plot + suf + '.pdf', title)
 
 
 # FEATURE REMOVAL FUNCTIONS
@@ -1116,7 +1104,7 @@ def plot_removal(feats, output_dir, region, arg_im):
         imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
     path = output_dir + '/removal_importance/{}/rm_imp.pdf'.format(arg_im + region)
     title = r'Feature removal importance without reweighting ({})'.format(eta[region])
-    plot_importances(imp, path, title)
+    ortances(imp, path, title)
 
 # FEATURE CORRELATIIONS FUNCTIONS
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
