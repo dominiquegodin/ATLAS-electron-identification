@@ -1010,8 +1010,8 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
         try:
             imp, err, _ = print_importances(file)[feat]
         except:
-            print(folder + ' not in directory')
-            absent.append(folder)
+            print(feat + ' not in directory')
+            absent.append(feat)
             continue
         for i in range(n_bkg):
             print(results) # For development purposes
