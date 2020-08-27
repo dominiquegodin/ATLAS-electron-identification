@@ -883,8 +883,10 @@ def print_importances(file):
                 results[imp[0]] = imp[1:]
             except EOFError:
                 break
-    print(results)
-    return results
+    mean = ' '.join(list(imp[1]))
+    std = ' '.join(list(imp[2]))
+    print('{}\nMean importance : {}\nStandard deviation : {}\n'.format(imp[0], mean, std))
+    return imp
 
 def plot_importances(results, path, title):
     '''
@@ -1025,14 +1027,12 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
     else: n_bkg = n_classes
     plot = output_dir + '/permutation_importance/prm_imp'
     results = [{} for i in range(n_bkg)]
-    absent = []
     for feat in feats:
         file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
         try:
-            imp, err, _ = print_importances(file)[feat]
+            name, imp, err, _ = print_importances(file)
         except:
             print(feat + ' not in directory')
-            absent.append(feat)
             continue
         for i in range(n_bkg):
             print(results) # For development purposes

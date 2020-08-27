@@ -74,7 +74,7 @@ python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epoc
                       --impOut='removal_importance.pkl' --rm_features=${VAR} --data_file='endcap'
 
 # FEATURE IMPORTANCE PLOTTING
-python classifier.py  --plotting=prm --n_classes=6 --output_dir=/scratch/odenis/ --auto_output_dir=ON  --n_reps=10
+python classifier.py  --plotting=prm --n_classes=6 --output_dir=/scratch/odenis --auto_output_dir=ON  --n_reps=10
 
 # TESTS
 python classifier.py --n_train=10 --n_valid=10 --batch_size=5 --n_epochs=5 --n_classes=2 --output_dir=outputs/tests
