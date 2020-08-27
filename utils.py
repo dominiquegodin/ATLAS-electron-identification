@@ -994,7 +994,7 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
     imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
     imp_tup = name, imp_mean, imp_std, bkg_rej
-    saving_results(imp_tup, fname + '_{}'.format(i if i else 'bkg'))
+    saving_results(imp_tup, fname)
 
 def plot_permutation(output_dir, importance_in):
     bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
