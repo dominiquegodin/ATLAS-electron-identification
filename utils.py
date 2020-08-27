@@ -1014,8 +1014,8 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
             absent.append(folder)
             continue
         for i in range(n_bkg):
+            print(results) # For development purposes
             results[i].update({feat:(imp, err)})
-    print(results) # For development purposes
     for i in range(n_bkg):
         if i :
             suf = '_' + str(i)
