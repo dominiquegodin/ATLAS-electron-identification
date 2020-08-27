@@ -1002,7 +1002,7 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
     if n_classes == 2: n_bkg = 1
     else: n_bkg = n_classes
-    plot = output_dir + 'prm_imp'
+    plot = output_dir + '/prm_imp'
     results = [{} for i in range(n_bkg)]
     absent = []
     for feat in feats:
