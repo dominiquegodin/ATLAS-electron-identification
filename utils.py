@@ -898,9 +898,9 @@ def plot_importances(results, path, title):
     # Permutation importances data contain errors estimation (standard deviation over n repetitons), but removal importance doesn't.
     # I use a try/except block to catch that shape difference between the data:
     try :
-        error = [tup[1][1] for tup in sortedResults]
+        errors = [tup[1][1] for tup in sortedResults]
     except:
-        error = np.zeros(len(sortedResults))
+        errors = np.zeros(len(sortedResults))
     data = np.array(data)
     errors = np.array(errors)
 
