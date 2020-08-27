@@ -1033,6 +1033,7 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
     results = [{} for i in range(n_bkg)]
     for feat in feats:
         file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
+        print('Opening ', output_dir + '/permutation_importance/')
         try:
             name, imp, err, _ = print_importances(file)
             print('DEBUG', name, ':',imp, err)
