@@ -1002,7 +1002,7 @@ def plot_permutation(output_dir, importance_in):
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
 
     file = output_dir + importance_in
-    path =
+    path = 'stuff'
     n_reps = args.n_reps
 
     for i in range(6):
