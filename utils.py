@@ -592,8 +592,14 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     for job in processes: job.start()
     for job in processes: job.join()
     if plotting=='OFF':
-        for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
-        bkg_rej_list = np.array([int(return_dict[bkg][3].split()[-1]) for bkg in bkg_list])                 # Array of the bkg rej for each class
+        bkg_rej_list = []
+        for bkg in bkg_list:
+            print("".join(list(return_dict[bkg].values())))
+            bkg_rej = return_dict[bkg][3].split()[-1]                                                                   # Extracts the bkg_rej from the return_dict
+            try : bkg_rej = int(bkg_rej)
+            except ValueError : bkg_rej = np.inf
+            bkg_rej_list.append(bkg_rej)
+        bkg_rej_list = np.array(bkg_rej_list)                                                                           # Array of the bkg rej for each class
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
