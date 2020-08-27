@@ -942,8 +942,8 @@ def plot_importances(results, path, title):
         ax.barh(feat, widths, height=0.75, xerr=err, capsize=5, color=color, label=label)
 
     # Numerical values of the importance
-    print('values', values)
     values = np.around(widths,2)
+    print('values', values)
     values = np.reshape(values,(values.size,1))
     print('values reshape', values)
     valuesTable = plt.table(cellText=values, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
@@ -1035,6 +1035,7 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
         file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
         try:
             name, imp, err, _ = print_importances(file)
+            print('DEBUG', name, ':',imp, err)
         except:
             print(feat + ' not in directory')
             continue
