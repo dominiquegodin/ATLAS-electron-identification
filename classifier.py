@@ -280,5 +280,5 @@ if args.permutation == 'ON':
     feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
                         training, args.n_classes, args.n_reps, args.output_dir)
 
-#if args.plotting in ['prm', 'permutation']:
-#    plot_permutation()
+if args.plotting in ['prm', 'permutation']:
+    plot_permutation(args.output_dir, images + scalars, args.n_classes, args.n_reps)

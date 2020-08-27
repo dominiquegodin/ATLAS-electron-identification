@@ -876,15 +876,15 @@ def print_importances(file):
     Reads the given pickle file containing feature importances data, prints it and returns it.
     '''
     with open(file,'rb') as rfp:
-        record = dict()
+        results = dict()
         while True:
             try:
                 imp = pickle.load(rfp)
-                record[imp[0]] = imp[1:]
+                results[imp[0]] = imp[1:]
             except EOFError:
                 break
-    print(record)
-    return record
+    print(results)
+    return results
 
 def plot_importances(results, path, title):
     '''
@@ -996,22 +996,33 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     imp_tup = name, imp_mean, imp_std, bkg_rej
     saving_results(imp_tup, fname)
 
-def plot_permutation(output_dir, importance_in):
+def plot_permutation(output_dir, feats, n_classes, n_reps):
     bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
-
-    file = output_dir + importance_in
-    path = 'stuff'
-    n_reps = args.n_reps
-
-    for i in range(6):
+    if n_classes == 2: n_bkg = 1
+    else: n_bkg = n_classes
+    plot = output_dir + 'prm_imp'
+    results = list(range(n_bkg))
+    absent = []
+    for feat in feats:
+        file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
+        print('Opening:', file)
+        try:
+            imps, err, _ = print_importances(file)[feat]
+        except:
+            print(folder + ' not in directory')
+            absent.append(folder)
+            continue
+        for i in range(n_bkg):
+            results[i].update({feat:(imp, err)})
+    print(results) # For development purposes
+    for i in range(n_bkg):
         if i :
             suf = '_' + str(i)
         else :
             suf = '_bkg'
         title = 'Permutation importance against {} background.\n(averaged over {} repetitions)'.format(bkg_list[i], n_reps)
-        results = print_importances(file + suf + '.pkl')
-        plot_importances(results, path + suf + '.pdf', title)
+        plot_importances(results[i], plot + suf + '.pdf', title)
 
 
 # FEATURE REMOVAL FUNCTIONS
@@ -1061,10 +1072,10 @@ def plot_removal(feats, output_dir, region, arg_im):
     bkg_rej = {}
     absent = []
     for folder in feats:
-        pth = output_dir + '/removal_importance/' + arg_im + region + '/' + folder + '/importance.pkl'
-        print('Opening:',pth)
+        file = output_dir + '/removal_importance/' + arg_im + region + '/' + folder + '/importance.pkl'
+        print('Opening:',file)
         try:
-            with open(pth, 'rb') as rfp:
+            with open(file, 'rb') as rfp:
                 bkg_tup = pickle.load(rfp)
                 key = bkg_tup[0].replace(' ', '_')
                 bkg_rej[key] = bkg_tup[1]
