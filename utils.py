@@ -1031,13 +1031,13 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
     else: n_bkg = n_classes
     plot = output_dir + '/permutation_importance/prm_imp'
     results = [{} for i in range(n_bkg)]
+    print('Opening', output_dir + '/permutation_importance/')
     for feat in feats:
         file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
-        print('Opening ', output_dir + '/permutation_importance/')
         try:
             name, imp, err, _ = print_importances(file)
             print('DEBUG', name, ':',imp, err)
-        except:
+        except OSError:
             print(feat + ' not in directory')
             continue
         for i in range(n_bkg):
