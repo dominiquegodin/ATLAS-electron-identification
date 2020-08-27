@@ -883,8 +883,8 @@ def print_importances(file):
                 results[imp[0]] = imp[1:]
             except EOFError:
                 break
-    mean = ' '.join(list(imp[1]))
-    std = ' '.join(list(imp[2]))
+    mean = ' '.join(list(str(imp[1])))
+    std = ' '.join(list(str(imp[2])))
     print('{}\nMean importance : {}\nStandard deviation : {}\n'.format(imp[0], mean, std))
     return imp
 
