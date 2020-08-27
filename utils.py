@@ -902,33 +902,54 @@ def plot_importances(results, path, title):
     except:
         error = np.zeros(len(sortedResults))
     data = np.array(data)
-    error = np.array(error)
+    errors = np.array(errors)
 
     #Plotting section
-    fig, ax = plt.subplots(figsize=(18.4, 10))
+    fig, ax = plt.subplots(figsize=(18, 20))
     ax.invert_yaxis()
     widths = data
     # Colors of the bars according to the type of variables (blue for scalars, indigo for images,
     # lime for tracks images, orange for groups and red for the set of detrimental variables)
-    colors = []
-    for label in newLabels:
-        if label == 'detrimental variables':
-            colors.append('r')
-        elif 'variables' in label or 'and' in label:
-            colors.append('tab:orange')
-        elif label.startswith('em_') or label.startswith('lar_') or label.startswith('tile_'):
-            colors.append('indigo')
-        elif label == 'tracks_image':
-            colors.append('lime')
+    rCount, iCount, sCount, gCount = 0, 0, 0, 0 # Counts the number of time each categorie has been labeled (for the legend)
+    for feat, width, err in zip(newLabels, widths, errors:
+        if feat == 'detrimental variables':
+            color.append('r')
+            if rCount == 0: # If the categorie of variable has already been labelled, we don't label it again
+                label = feat
+                rCount += 1
+        elif 'variables' in feat or 'and' in feat:
+            color.append('tab:orange')
+            if gCount == 0:
+                label = 'Groups of features'
+                gCount +=1
+        elif feat.startswith('em_') or feat.startswith('lar_') or feat.startswith('tile_'):
+            color.append('indigo')
+            if iCount == 0:
+                label = 'Images'
+                iCount +=1
+        elif feat == 'tracks_image':
+            color.append('lime')
+            label = feat
         else :
-            colors.append('tab:blue')
-    ax.barh(newLabels, widths, height=0.75, xerr=error, capsize=5, color=colors)
-    xup = widths * 1.2      # Position of the numerical value of the importances
-    text_color = 'black'
-    for y, (x, c) in enumerate(zip(xup, widths)):
-            ax.text(x, y, str(round(c,3)), ha='center', va='center', color=text_color)
+            color.append('tab:blue')
+            if sCount == 0:
+                label = 'Scalars'
+                sCount +=1
+        ax.barh(feat, widths, height=0.75, xerr=err, capsize=5, color=color, label=label)
+
+    # Numerical values of the importance
+    values = np.around(widths,2)
+    values = np.reshape(values,(values.size,1))
+    valuesTable = plt.table(cellText=,, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
+                      loc='center right'	)
+
+    # Legend
+    ax.legend(loc='best')
+
     plt.axvline(1, color='r', ls=':')       # Red vertical line to highlight the threshold between good and bad variables:
                                             # Above this line, variables are important; under it, they are detrimental.
+
+    # Labels
     plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
@@ -1030,9 +1051,9 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     '''
     Removes the specified features from the input variables.
     '''
-    i = arg_feat                                                                                            # image indices
-    s = arg_feat - len(images)                                                                              # scalar indices
-    g = arg_feat - len(images + scalars)                                                                    # Feature group indices
+    i = arg_feat                                        # image indices
+    s = arg_feat - len(images)                          # scalar indices
+    g = arg_feat - len(images + scalars)                # group of features indices
     print('i : {}, s : {}, g : {}'.format(i,s,g))
     if g > len(groups) :
         print('Argument out of range, aborting...')
