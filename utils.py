@@ -911,7 +911,7 @@ def plot_importances(results, path, title):
     # Colors of the bars according to the type of variables (blue for scalars, indigo for images,
     # lime for tracks images, orange for groups and red for the set of detrimental variables)
     rCount, iCount, sCount, gCount = 0, 0, 0, 0 # Counts the number of time each categorie has been labeled (for the legend)
-    for feat, width, err in zip(newLabels, widths, errors:
+    for feat, width, err in zip(newLabels, widths, errors):
         if feat == 'detrimental variables':
             color.append('r')
             if rCount == 0: # If the categorie of variable has already been labelled, we don't label it again
