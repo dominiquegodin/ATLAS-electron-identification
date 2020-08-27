@@ -940,7 +940,7 @@ def plot_importances(results, path, title):
     # Numerical values of the importance
     values = np.around(widths,2)
     values = np.reshape(values,(values.size,1))
-    valuesTable = plt.table(cellText=,, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
+    valuesTable = plt.table(cellText=values, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
                       loc='center right'	)
 
     # Legend
