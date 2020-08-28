@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import tensorflow as tf, matplotlib.pyplot as plt
 import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
 import pandas as pd
@@ -885,10 +884,10 @@ def print_importances(file):
             except EOFError:
                 break
     mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[1],3).astype('U5')
-    importance = np.char.add(mean, ' ± '); importance = np.char.add(importance, std)
+    importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
     #print(1,importance, type(importance))
     importance = u' '.join(importance.tolist())
-    print(u'{} : {}\n'.format(imp[0], importance).encode('utf-8'))
+    print('{} : {}\n'.format(imp[0], importance))
     return imp
 
 def plot_importances(results, path, title):
