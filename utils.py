@@ -1051,7 +1051,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
         else :
             suf = '_bkg'
         title = '{} importance against {} background. ({})\n(averaged over {} repetitions)'.format(
-                mode, bkg_list[i], eta[region] n_reps)
+                mode, bkg_list[i], eta[region], n_reps)
         ranking_plot(results[i], plot + suf + '.pdf', title, images, scalars, groups)
 
 
