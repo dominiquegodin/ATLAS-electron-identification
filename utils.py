@@ -889,21 +889,12 @@ def print_importances(file):
     print('{:<28} : {}'.format(imp[0], importance))
     return imp
 
-def plot_importances(results, path, title):
+def ranking_plot(results, path, title, images, scalars, groups):
     '''
     Plots a horizontal bar plot ranking of the feature importances from a dictionary.
     '''
-    categories = {'Images'   : (['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
-                                'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
-                                'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1',
-                                'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'], 'indigo'),
-                'Tracks image': (['tracks_image'], 'lime'),
-                'Scalars'   : (['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
-                                'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
-                                'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
-                                'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits'], 'tab:blue'),
-                'Groups of features': (['group_0', 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7',
-                                'group_8',  'group_9', 'group_10', 'group_11'], 'tab:orange')}
+    categories = {'Images'   : (images[:-1], 'indigo'), 'Tracks image': (['tracks_image'], 'lime'),
+                  'Scalars'  : (scalars, 'tab:blue'), 'Groups of features': (groups, 'tab:orange')}
     # Data parsing section
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True) # Sorts the importances in decreasing order
     labels = [tup[0] for tup in sortedResults]
@@ -962,7 +953,6 @@ def saving_results(var, fname):
     print_importances(fname)
 
 
-# FEATURE PERMUTATION FUNCTIONS
 def create_shuffle_sample(sample,feats):
     '''
     Initialize a copy of the valid sample that is going to be partially shuffled.
@@ -1012,35 +1002,59 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     imp_tup = name, imp_mean, imp_std, bkg_rej
     saving_results(imp_tup, fname)
 
-def plot_permutation(output_dir, feats, n_classes, n_reps, n_groups):
-    groups = ['group_{}'.format(g) for g in range(n_groups)]
-    feats += groups
+def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_classes, arg_im):
     bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
+    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
+    groups = ['group_{}'.format(g) for g in range(n_groups)]
+    feats = images + scalars + groups
     if n_classes == 2: n_bkg = 1
     else: n_bkg = n_classes
-    plot = output_dir + '/permutation_importance/prm_imp'
     results = [{} for i in range(n_bkg)]
-    print('Opening', output_dir + '/permutation_importance/')
-    for feat in feats:
-        file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
-        try:
-            name, imp, err, _ = print_importances(file)
-        except OSError:
-            print(feat + ' not in directory')
-            continue
-        for i in range(n_bkg):
-            results[i].update({feat:(imp[i], err[i])})
+    if mode in ['prm','permutation']:
+        mode = 'Permutation'
+        plot = output_dir + '/permutation_importance/prm_imp'
+        print('Opening', output_dir + '/permutation_importance/')
+        for feat in feats:
+            file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
+            try:
+                name, imp, err, bkgs = print_importances(file)
+                n_reps = bkgs[0,:].size
+            except OSError:
+                print(feat + ' not in directory')
+                continue
+            for i in range(n_bkg):
+                results[i].update({feat:(imp[i], err[i])})
+    elif mode in ['rm', 'removal']:
+        mode = 'Removal'
+        feats = 'full' + feats
+        if arg_im == 'OFF':
+            arg_im = 'ImagesOFF/'
+        else:
+            arg_im = ''
+        plot = output_dir + '/removal_importance/rm_imp'
+        bkg_rej = {}
+        for feat in feats:
+            file = output_dir + '/removal_importance/' + arg_im + '/' + feat + '/importance.pkl'
+            print('Opening:',file)
+            try:
+                feat, bkg_rej[feat] = print_importances(file)
+                imp = bkg_rej['full']/bkg_rej[feat]
+                for i in range(n_bkg):
+                    results[i].update({feat:(imp[i], 0.05)})
+            except OSError:
+                print(feat + ' not in directory')
+                continue
     for i in range(n_bkg):
         if i :
             suf = '_' + str(i)
         else :
             suf = '_bkg'
-        title = 'Permutation importance against {} background.\n(averaged over {} repetitions)'.format(bkg_list[i], n_reps)
-        plot_importances(results[i], plot + suf + '.pdf', title)
+        title = '{} importance against {} background. ({})\n(averaged over {} repetitions)'.format(
+                mode, bkg_list[i], eta[region] n_reps)
+        ranking_plot(results[i], plot + suf + '.pdf', title, images, scalars, groups)
 
 
-# FEATURE REMOVAL FUNCTIONS
 def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     '''
     Removes the specified features from the input variables.
@@ -1076,37 +1090,7 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     else : feat = 'full'
     return images, scalars, feat
 
-def plot_removal(feats, output_dir, region, arg_im):
-    feats = 'full' + feats
-    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
-    if arg_im == 'OFF':
-        arg_im = 'ImagesOFF/'
-    else:
-        arg_im = ''
 
-    bkg_rej = {}
-    absent = []
-    for folder in feats:
-        file = output_dir + '/removal_importance/' + arg_im + region + '/' + folder + '/importance.pkl'
-        print('Opening:',file)
-        try:
-            with open(file, 'rb') as rfp:
-                bkg_tup = pickle.load(rfp)
-                key = bkg_tup[0].replace(' ', '_')
-                bkg_rej[key] = bkg_tup[1]
-        except:
-            print(folder + ' not in directory')
-            absent.append(folder)
-            continue
-    print('\n', bkg_rej)
-    imp = {}
-    for feat in [f for f in feats if f not in absent + ['full']]:
-        imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
-    path = output_dir + '/removal_importance/{}/rm_imp.pdf'.format(arg_im + region)
-    title = r'Feature removal importance without reweighting ({})'.format(eta[region])
-    plot_importances(imp, path, title)
-
-# FEATURE CORRELATIIONS FUNCTIONS
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
     tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
                     'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,

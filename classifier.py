@@ -137,11 +137,8 @@ if args.removal == 'ON':
 create_path(args.output_dir)                                                                                        # That way the model.h5 and their corresponding plots aren't mixed with
                                                                                                                     # the other trainings.
 # FEATURE IMPORTANCE PLOTTING
-#if args.plotting in ['rm', 'removal']:
-#    plot_removal()
-#    sys.exit()
-if args.plotting in ['prm', 'permutation']:
-    plot_permutation(args.output_dir, images + scalars, args.n_classes, args.n_reps, len(groups))
+if args.plotting in ['prm', 'permutation','rm', 'removal']:
+    plot_importance(args.plotting, args.output_dir, region, images, scalars, len(groups), args.n_classes, args.images)
     sys.exit()
 
 # TRAINING VARIABLES
@@ -275,10 +272,9 @@ if args.results_out != '':
     pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
 
 
-# FEATURE REMOVAL IMPORTANCE
-if args.removal == 'ON' :
-    fname = args.output_dir + '/bkg_rej'
-    saving_results((feat,bkg_rej_full), fname)
+# FEATURE IMPORTANCE
+fname = args.output_dir + '/bkg_rej' # Saves the 70% bkg_rej into a pkl for later use
+saving_results((feat, bkg_rej_full), fname)
 
 # FEATURE PERMUTATION IMPORTANCE
 if args.permutation == 'ON':
