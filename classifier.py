@@ -141,7 +141,7 @@ create_path(args.output_dir)                                                    
 #    plot_removal()
 #    sys.exit()
 if args.plotting in ['prm', 'permutation']:
-    plot_permutation(args.output_dir, images + scalars, args.n_classes, args.n_reps)
+    plot_permutation(args.output_dir, images + scalars + groups, args.n_classes, args.n_reps)
     sys.exit()
 
 # TRAINING VARIABLES
