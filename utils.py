@@ -885,10 +885,10 @@ def print_importances(file):
                 break
     mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[1],3).astype('U5')
     importance = np.char.add(mean, ' ± '); importance = np.char.add(importance, std)
-    print(1,importance)
-    importance = ' '.join(importance.tolist())
+    print(1,importance, type(importance))
+    importance = ' '.join(importance.tolist()).encode('utf-8')
     print(importance)
-    print('{} : {}\n'.format(imp[0], importance))
+    print('{} : {}\n'.format(imp[0], importance.decode('utf-8')))
     return imp
 
 def plot_importances(results, path, title):
