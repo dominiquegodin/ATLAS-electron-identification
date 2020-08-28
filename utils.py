@@ -907,6 +907,7 @@ def plot_importances(results, path, title):
     # Data parsing section
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True) # Sorts the importances in decreasing order
     labels = [tup[0] for tup in sortedResults]
+    print(labels)
     newLabels = LaTeXizer(labels)[1]
     data = [tup[1][0] for tup in sortedResults]
     # Permutation importances data contain errors estimation (standard deviation over n repetitons), but removal importance doesn't.
@@ -919,7 +920,7 @@ def plot_importances(results, path, title):
     errors = np.array(errors)
 
     #Plotting section
-    fig, ax = plt.subplots(figsize=(18, 20))
+    fig, ax = plt.subplots(figsize=(18, 16))
     ax.invert_yaxis()
     widths = data
     # Colors of the bars according to the type of variables (blue for scalars, indigo for images,
@@ -936,8 +937,7 @@ def plot_importances(results, path, title):
     # Numerical values of the importance
     values = np.around(widths,2)
     values = np.reshape(values,(values.size,1))
-    valuesTable = plt.table(cellText=values, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
-                      loc='right')
+    valuesTable = plt.table(cellText=values, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$', loc='right')
 
     # Legend
     ax.legend(loc='best')
@@ -949,6 +949,8 @@ def plot_importances(results, path, title):
     plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
+    plt.subplots_adjust(right=0.2)
+    plt.tight_layout()
     print('Saving plot to {}'.format(path))
     plt.savefig(path)
     return fig, ax
