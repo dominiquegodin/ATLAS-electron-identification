@@ -886,7 +886,7 @@ def print_importances(file):
     mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[2], 2).astype('U5')
     importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
     importance = u' | '.join(importance.tolist())
-    print('{:<20} : {}\n'.format(imp[0], importance))
+    print('{:<20} : {}'.format(imp[0], importance))
     return imp
 
 def plot_importances(results, path, title):
@@ -929,7 +929,6 @@ def plot_importances(results, path, title):
         cat_err = np.copy(errors)
         category, color = categories[cat]
         indices = np.array([labels.index(feat) for feat in labels if feat not in category])
-        print(cat, indices, type(indices[0]))
         cat_widths[indices] = np.zeros(indices.size)
         cat_err[indices] = np.zeros(indices.size)
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
@@ -938,7 +937,7 @@ def plot_importances(results, path, title):
     values = np.around(widths,2)
     values = np.reshape(values,(values.size,1))
     valuesTable = plt.table(cellText=values, colLabels=r'$\frac{bkg\_rej\_full}{bkg\_rej}$',
-                      loc='center right')
+                      loc='right')
 
     # Legend
     ax.legend(loc='best')
