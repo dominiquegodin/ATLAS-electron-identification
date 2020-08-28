@@ -107,6 +107,9 @@ scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_
 others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
             'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo',
             'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'        ]
+
+###### Don't forget to update LaTeXizer in utils if you make changes to the intput variables. ######
+
 with h5py.File(args.data_file, 'r') as data:
     images  = [key for key in images  if key in data or key=='tracks_image']
     scalars = [key for key in scalars if key in data]
