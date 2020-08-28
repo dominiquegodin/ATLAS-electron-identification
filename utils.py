@@ -937,7 +937,7 @@ def plot_importances(results, path, title):
     for width, (index, value)  in zip(np.around(widths,3), enumerate(widths + errors + 0.005*widths[0])):
         plt.text(value, index, str(width))
     # Legend
-    ax.legend(loc='bottom left')
+    ax.legend(loc='lower left')
 
     plt.axvline(1, color='r', ls=':')       # Red vertical line to highlight the threshold between good and bad variables:
                                             # Above this line, variables are important; under it, they are detrimental.
