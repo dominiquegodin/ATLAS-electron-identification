@@ -1013,6 +1013,8 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     saving_results(imp_tup, fname)
 
 def plot_permutation(output_dir, feats, n_classes, n_reps):
+    groups = ['group_{}'.format(g) for g in range(12)]
+    feats += groups
     bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
     if n_classes == 2: n_bkg = 1
