@@ -888,7 +888,7 @@ def print_importances(file):
     importance = np.char.add(mean, ' ± '); importance = np.char.add(importance, std)
     #print(1,importance, type(importance))
     importance = u' '.join(importance.tolist())
-    print u'{} : {}\n'.format(imp[0], importance).encode('utf-8')
+    print(u'{} : {}\n'.format(imp[0], importance).encode('utf-8'))
     return imp
 
 def plot_importances(results, path, title):
