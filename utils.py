@@ -886,7 +886,7 @@ def print_importances(file):
     mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[2], 2).astype('U5')
     importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
     importance = u' | '.join(importance.tolist())
-    print('{:<30} : {}'.format(imp[0], importance))
+    print('{:<28} : {}'.format(imp[0], importance))
     return imp
 
 def plot_importances(results, path, title):
@@ -937,7 +937,7 @@ def plot_importances(results, path, title):
     for width, (index, value)  in zip(np.around(widths,3), enumerate(widths + errors + 0.005*widths[0])):
         plt.text(value, index, str(width))
     # Legend
-    ax.legend(loc='best')
+    ax.legend(loc='bottom left')
 
     plt.axvline(1, color='r', ls=':')       # Red vertical line to highlight the threshold between good and bad variables:
                                             # Above this line, variables are important; under it, they are detrimental.
