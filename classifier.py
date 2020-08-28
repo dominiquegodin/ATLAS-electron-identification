@@ -7,8 +7,8 @@ from   itertools  import accumulate
 from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
 from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
 from   utils      import sample_weights, downsampling, balance_sample, match_distributions
-from   utils      import feature_permutation, feature_removal, print_importances, plot_importances
-from   utils      import correlations, create_path, saving_results, plot_importance
+from   utils      import feature_permutation, feature_removal, print_importances, plot_importance
+from   utils      import correlations, create_path, saving_results
 from   plots_DG   import var_histogram
 from   models     import multi_CNN
 rdm = np.random
