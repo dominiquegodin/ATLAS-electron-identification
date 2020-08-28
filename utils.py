@@ -929,7 +929,7 @@ def plot_importances(results, path, title):
         cat_widths = np.copy(widths)
         cat_err = np.copy(errors)
         category, color = categories[cat]
-        index = np.array([labels.index for feat in labels if feat not in category]).astype(int)
+        index = np.array([int(labels.index) for feat in labels if feat not in category])
         print(cat, index, type(index[0]))
         cat_widths[index] = np.zeros(index.size)
         cat_err[index] = np.zeros(index.size)
