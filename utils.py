@@ -886,7 +886,7 @@ def print_importances(file):
     mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[2], 2).astype('U5')
     importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
     importance = u' | '.join(importance.tolist())
-    print('{:<20} : {}'.format(imp[0], importance))
+    print('{:<30} : {}'.format(imp[0], importance))
     return imp
 
 def plot_importances(results, path, title):
@@ -919,7 +919,7 @@ def plot_importances(results, path, title):
     errors = np.array(errors)
 
     #Plotting section
-    fig, ax = plt.subplots(figsize=(18, 16))
+    fig, ax = plt.subplots(figsize=(18, 15))
     ax.invert_yaxis()
     widths = data
     # Colors of the bars according to the type of variables (blue for scalars, indigo for images,
@@ -934,7 +934,7 @@ def plot_importances(results, path, title):
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
 
     # Numerical values of the importance
-    for width, (index, value)  in zip(np.around(widths), enumerate(widths + errors + 0.005*widths[0])):
+    for width, (index, value)  in zip(np.around(widths,3), enumerate(widths + errors + 0.005*widths[0])):
         plt.text(value, index, str(width))
     # Legend
     ax.legend(loc='best')
