@@ -887,7 +887,6 @@ def print_importances(file):
     importance = np.char.add(mean, ' ± '); importance = np.char.add(importance, std)
     #print(1,importance, type(importance))
     importance = u' '.join(importance.tolist())
-    print(importance)
     print(u'{} : {}\n'.format(imp[0], importance))
     return imp
 
