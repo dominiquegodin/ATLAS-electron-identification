@@ -1,6 +1,6 @@
 # SINGLE TRAINING
 python classifier.py  --n_train=10e6  --n_valid=15e6  --batch_size=5e3  --n_epochs=0  --n_classes=6           \
-                      --n_tracks=5    --output_dir=/scratch/odenis  --feat=$VAR --permutation=ON               \
+                      --n_tracks=5    --output_dir=/scratch/odenis             \
                       --model_in=model.h5 --auto_output_dir=ON
 
 exit

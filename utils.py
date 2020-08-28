@@ -927,12 +927,9 @@ def ranking_plot(results, path, title, images, scalars, groups):
     # Numerical values of the importance
     for width, (index, value)  in zip(np.around(widths,3), enumerate(widths + errors + 0.005*widths[0])):
         plt.text(value, index, str(width))
-    # Legend
-    ax.legend(loc='lower right')
-
+    ax.legend(loc='lower right', prop={'size': 14})
     plt.axvline(1, color='r', ls=':')       # Red vertical line to highlight the threshold between good and bad variables:
                                             # Above this line, variables are important; under it, they are detrimental.
-
     # Labels
     plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
@@ -1025,6 +1022,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
                 continue
             for i in range(n_bkg):
                 results[i].update({feat:(imp[i], err[i])})
+        full_bkg_rej = print_importances(output_dir + '/bkg_rej.pkl')
     elif mode in ['rm', 'removal']:
         mode = 'Removal'
         feats = 'full' + feats
@@ -1045,13 +1043,14 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             except OSError:
                 print(feat + ' not in directory')
                 continue
+        full_bkg_rej = bkg_rej['full']
     for i in range(n_bkg):
         if i :
             suf = '_' + str(i)
         else :
             suf = '_bkg'
-        title = '{} importance against {} background. ({})\n(averaged over {} repetitions)'.format(
-                mode, bkg_list[i], eta[region], n_reps)
+        title = '{} importance against {} background.\n(averaged over {} repetitions; {}; full background rejection : {})'
+        title = title.format(mode, bkg_list[i], n_reps, eta[region], full_bkg_rej)
         ranking_plot(results[i], plot + suf + '.pdf', title, images, scalars, groups)
 
 
