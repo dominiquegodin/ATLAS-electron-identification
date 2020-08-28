@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import tensorflow as tf, matplotlib.pyplot as plt
 import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle, time
 import pandas as pd
