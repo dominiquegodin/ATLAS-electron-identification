@@ -929,7 +929,7 @@ def plot_importances(results, path, title):
         cat_err = np.copy(errors)
         category, color = categories[cat]
         index = np.array([labels.index for feat in labels if feat not in category]).astype(int)
-        print(cat, index, type(index[0)])
+        print(cat, index, type(index[0]))
         cat_widths[index] = np.zeros(index.size)
         cat_err[index] = np.zeros(index.size)
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
