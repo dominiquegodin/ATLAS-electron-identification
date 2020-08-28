@@ -884,7 +884,7 @@ def print_importances(file):
             except EOFError:
                 break
     mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[1],3).astype('U5')
-    importance = np.char.add(mean, ' ± '); importance = np.char.add(importance, std)
+    importance = np.char.add(mean, ' ± '.decode('utf-8')); importance = np.char.add(importance, std)
     importance = ' '.join(importance.tolist())
     print('{} : {}\n'.format(imp[0], importance))
     return imp
