@@ -1025,7 +1025,6 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
         file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
         try:
             name, imp, err, _ = print_importances(file)
-            print('DEBUG', name, ':',imp, err)
         except OSError:
             print(feat + ' not in directory')
             continue
@@ -1037,7 +1036,7 @@ def plot_permutation(output_dir, feats, n_classes, n_reps):
         else :
             suf = '_bkg'
         title = 'Permutation importance against {} background.\n(averaged over {} repetitions)'.format(bkg_list[i], n_reps)
-        ortances(results[i], plot + suf + '.pdf', title)
+        plot_importances(results[i], plot + suf + '.pdf', title)
 
 
 # FEATURE REMOVAL FUNCTIONS
@@ -1104,7 +1103,7 @@ def plot_removal(feats, output_dir, region, arg_im):
         imp[feat] = bkg_rej['full']/bkg_rej[feat], 0.05
     path = output_dir + '/removal_importance/{}/rm_imp.pdf'.format(arg_im + region)
     title = r'Feature removal importance without reweighting ({})'.format(eta[region])
-    ortances(imp, path, title)
+    plot_importances(imp, path, title)
 
 # FEATURE CORRELATIIONS FUNCTIONS
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
