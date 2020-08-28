@@ -273,8 +273,9 @@ if args.results_out != '':
 
 
 # FEATURE IMPORTANCE
+if args.removal == 'ON': bkg_rej_full = (feat, bkg_rej_full)
 fname = args.output_dir + '/bkg_rej' # Saves the 70% bkg_rej into a pkl for later use
-saving_results((feat, bkg_rej_full), fname)
+saving_results(bkg_rej_full, fname)
 
 # FEATURE PERMUTATION IMPORTANCE
 if args.permutation == 'ON':
