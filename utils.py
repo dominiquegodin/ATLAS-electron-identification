@@ -883,9 +883,10 @@ def print_importances(file):
                 results[imp[0]] = imp[1:]
             except EOFError:
                 break
-    mean = ' '.join(np.around(imp[1],3).astype(str).tolist())
-    std  = ' '.join(np.around(imp[2],3).astype(str).tolist())
-    print('{}\nMean importance : {}\nStandard deviation : {}\n'.format(imp[0], mean, std))
+    mean, std = np.around(imp[1],3).astype(str) , np.around(imp[1],3).astype(str)
+    importance = np.char.add(mean, ' ± '); importance = np.char.add(importance, std)
+    importance = ' '.join(importance.tolist())
+    print('{} : {}\n'.format(imp[0], importance))
     return imp
 
 def plot_importances(results, path, title):
@@ -927,7 +928,8 @@ def plot_importances(results, path, title):
         cat_widths = np.copy(widths)
         cat_err = np.copy(errors)
         category, color = categories[cat]
-        index = np.array([labels.index for feat in labels if feat not in category])
+        index = np.array([labels.index for feat in labels if feat not in category]).astype(int)
+        print(cat, index, type(index[0)])
         cat_widths[index] = np.zeros(index.size)
         cat_err[index] = np.zeros(index.size)
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
