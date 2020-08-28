@@ -934,8 +934,8 @@ def plot_importances(results, path, title):
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
 
     # Numerical values of the importance
-    for index, value in enumerate(widths + errors + 0.05*widths[0]):
-        plt.text(value, index, str(value))
+    for width, (index, value)  in zip(np.around(widths), enumerate(widths + errors + 0.005*widths[0])):
+        plt.text(value, index, str(width))
     # Legend
     ax.legend(loc='best')
 
@@ -1012,8 +1012,8 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     imp_tup = name, imp_mean, imp_std, bkg_rej
     saving_results(imp_tup, fname)
 
-def plot_permutation(output_dir, feats, n_classes, n_reps):
-    groups = ['group_{}'.format(g) for g in range(12)]
+def plot_permutation(output_dir, feats, n_classes, n_reps, n_groups):
+    groups = ['group_{}'.format(g) for g in range(n_groups)]
     feats += groups
     bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
