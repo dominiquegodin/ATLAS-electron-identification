@@ -1047,6 +1047,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             except OSError:
                 print(feat + ' not in directory')
                 continue
+        print(bkg_rej.keys())
         full_bkg_rej = bkg_rej['full']
     for i in range(n_bkg):
         if i :
