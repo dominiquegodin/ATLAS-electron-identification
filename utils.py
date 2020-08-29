@@ -1056,8 +1056,8 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             suf = '_' + str(i)
         else :
             suf = '_bkg'
-        title = '{} importance against {} background.\n(averaged over {} repetitions; {}; full background rejection : {})'
-        title = title.format(mode, bkg_list[i], n_reps, eta[region], full_bkg_rej)
+        title = '{} importance against {} background.\n(averaged over {} repetitions, region : {} , full background rejection : {})'
+        title = title.format(mode, bkg_list[i], n_reps, eta[region], full_bkg_rej[i])
         ranking_plot(results[i], plot + suf + '.pdf', title, images, scalars, groups)
 
 
