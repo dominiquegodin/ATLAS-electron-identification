@@ -1030,7 +1030,6 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
     elif mode in ['rm', 'removal']:
         mode = 'Removal'
         feats = ['full'] + feats
-        print(feats)
         if arg_im == 'OFF':
             arg_im = 'ImagesOFF/'
         else:
@@ -1038,10 +1037,9 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
         plot = output_dir + '/removal_importance/rm_imp'
         bkg_rej = {}
         for feat in feats:
-            file = output_dir + '/removal_importance/' + arg_im + '/' + feat + '/importance.pkl'
+            file = output_dir + '/removal_importance/' + arg_im + feat + '/removal_importance.pkl' # NEEDS TO BE PUT BACK TO '/importance.pkl'
             print('Opening:',file)
             try:
-                print(feat)
                 feat, bkg_rej[feat] = print_importances(file)
                 imp = bkg_rej['full']/bkg_rej[feat]
                 for i in range(n_bkg):
@@ -1049,7 +1047,6 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             except OSError:
                 print(feat + ' not in directory')
                 continue
-        print(bkg_rej.keys())
         full_bkg_rej = bkg_rej['full']
     for i in range(n_bkg):
         if i :
