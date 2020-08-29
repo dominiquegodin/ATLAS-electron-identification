@@ -883,10 +883,12 @@ def print_importances(file):
                 results[imp[0]] = imp[1:]
             except EOFError:
                 break
-    mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[2], 2).astype('U5')
-    importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
-    importance = u' | '.join(importance.tolist())
-    print('{:<28} : {}'.format(imp[0], importance))
+    try :
+        mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[2], 2).astype('U5')
+        importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
+        importance = u' | '.join(importance.tolist())
+        print('{:<28} : {}'.format(imp[0], importance))
+    except : pass
     return imp
 
 def ranking_plot(results, path, title, images, scalars, groups):
