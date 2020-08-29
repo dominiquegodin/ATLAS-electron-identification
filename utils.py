@@ -1000,12 +1000,16 @@ def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_lab
     saving_results(imp_tup, fname)
 
 def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_classes, arg_im):
-    bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
+    '''
+    Opens the importance data files, parses them and then plots a ranking of the features.
+    This function works for both permutation and removal importances.
+    '''
+    bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',                   # Lists of the types of background in 6 classes
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
-    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
+    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'} # Dictionary containing the 3 eta regions in LaTeX format
     groups = ['group_{}'.format(g) for g in range(n_groups)]
     feats = images + scalars + groups
-    if n_classes == 2: n_bkg = 1
+    if n_classes == 2: n_bkg = 1 # Determine the number of bkgs against which the importance is to be computed
     else: n_bkg = n_classes
     results = [{} for i in range(n_bkg)]
     if mode in ['prm','permutation']:
@@ -1025,7 +1029,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
         full_bkg_rej = print_importances(output_dir + '/bkg_rej.pkl')
     elif mode in ['rm', 'removal']:
         mode = 'Removal'
-        feats = 'full' + feats
+        feats = ['full'] + feats
         if arg_im == 'OFF':
             arg_im = 'ImagesOFF/'
         else:
