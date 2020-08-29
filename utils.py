@@ -922,6 +922,7 @@ def ranking_plot(results, path, title, images, scalars, groups):
         cat_err = np.copy(errors)
         category, color = categories[cat]
         indices = np.array([labels.index(feat) for feat in labels if feat not in category])
+        print('indices' ,indices)
         cat_widths[indices] = np.zeros(indices.size)
         cat_err[indices] = np.zeros(indices.size)
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
@@ -1039,7 +1040,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
         plot = output_dir + '/removal_importance/rm_imp'
         bkg_rej = {}
         for feat in feats:
-            file = output_dir + '/removal_importance/' + arg_im + feat + '/removal_importance.pkl' # NEEDS TO BE PUT BACK TO '/importance.pkl'
+            file = output_dir + '/removal_importance/' + arg_im + feat + '/importance.pkl'
             print('Opening:',file)
             try:
                 feat, bkg_rej[feat] = print_importances(file)
