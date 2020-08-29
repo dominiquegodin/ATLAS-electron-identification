@@ -922,9 +922,9 @@ def ranking_plot(results, path, title, images, scalars, groups):
         cat_err = np.copy(errors)
         category, color = categories[cat]
         indices = np.array([labels.index(feat) for feat in labels if feat not in category])
-        print('indices' ,indices)
-        cat_widths[indices] = np.zeros(indices.size)
-        cat_err[indices] = np.zeros(indices.size)
+        if indices.size != 0 :
+            cat_widths[indices] = np.zeros(indices.size)
+            cat_err[indices] = np.zeros(indices.size)
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
 
     # Numerical values of the importance
