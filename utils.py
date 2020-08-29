@@ -1030,6 +1030,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
     elif mode in ['rm', 'removal']:
         mode = 'Removal'
         feats = ['full'] + feats
+        print(feats)
         if arg_im == 'OFF':
             arg_im = 'ImagesOFF/'
         else:
@@ -1040,6 +1041,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             file = output_dir + '/removal_importance/' + arg_im + '/' + feat + '/importance.pkl'
             print('Opening:',file)
             try:
+                print(feat)
                 feat, bkg_rej[feat] = print_importances(file)
                 imp = bkg_rej['full']/bkg_rej[feat]
                 for i in range(n_bkg):
