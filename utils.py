@@ -898,9 +898,10 @@ def print_importances(file):
         importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
         importance = ' | '.join(importance.tolist())
         print('{:<28} : {}'.format(imp[0], importance))
+        output = imp
     # Printing the raw variable in the other case
-    except : print(varList)
-    return varList
+    except : print(varList);output = varList
+    return output
 
 def ranking_plot(results, path, title, images, scalars, groups):
     '''
