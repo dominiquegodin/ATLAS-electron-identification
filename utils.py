@@ -1032,7 +1032,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
         full_bkg_rej = print_importances(output_dir + '/bkg_rej.pkl')
     elif mode in ['rm', 'removal']:
         mode = 'Removal'
-        nreps = ''
+        n_reps = ''
         feats = ['full'] + feats
         if arg_im == 'OFF':
             arg_im = 'ImagesOFF/'
