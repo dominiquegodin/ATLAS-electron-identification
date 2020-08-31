@@ -13,7 +13,7 @@ scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_
             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits']
 
 feats = images + scalars + ['group_{}'.format(g) for g in range(12)]
-output_dir = '2c_10m/none/barrel'
+output_dir = '/scratch/odenis/2c_10m/none/barrel'
 
 for feat in feats:
     #try:
