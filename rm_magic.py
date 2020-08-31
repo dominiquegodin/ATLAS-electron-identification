@@ -20,6 +20,6 @@ for feat in feats:
         file = output_dir + '/removal_importance/' + feat
         print('Opening:',file)
         f, bkg_rej = print_importances(file + '/removal_importance.pkl')
-        pickle.dump((f,np.array([bkg_rej])), file  + '/importance.pkl')
+        pickle.dump((f,np.array([bkg_rej])), open(file  + '/importance.pkl', 'wb'))
     except OSError:
         print('Could not convert {}'.format(feat))
