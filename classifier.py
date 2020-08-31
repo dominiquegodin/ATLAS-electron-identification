@@ -138,7 +138,7 @@ create_path(args.output_dir)                                                    
                                                                                                                     # the other trainings.
 # FEATURE IMPORTANCE PLOTTING
 if args.plotting in ['prm', 'permutation','rm', 'removal']:
-    plot_importance(args.plotting, args.output_dir, region, images, scalars, len(groups), args.n_classes, args.images)
+    plot_importance(args.plotting, args.output_dir, region, images, scalars, len(groups), args.n_classes)
     sys.exit()
 
 # TRAINING VARIABLES

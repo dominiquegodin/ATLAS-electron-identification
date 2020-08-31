@@ -835,32 +835,40 @@ def LaTeXizer(names=[]):
     and an empty list.
     the converted list of variables names.
     '''
+    n_groups = 12
+    # Images
     vars  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
              'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
              'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
              'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+    # Scalars
     vars += ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'  ,
              'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2',
              'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
              'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits', 'p_EoverP' ]
-    vars += ['group_0', 'group_1', 'group_2', 'group_3', 'group_4', 'group_5', 'group_6', 'group_7',
-             'group_8',  'group_9', 'group_10', 'group_11']
+    # Groups of variables
+    vars += ['group_{}'.format(g) for g in range(n_groups)]
 
+    # LaTeX images
     Lvars =  ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
               'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
               'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
               'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+    # LaTeX scalars
     Lvars += [r'$E_{ratio}$', r'$R_{\eta}$', r'$R_{had}$', r'$R_{\phi}$' , r'TRTPID' ,   r'Nb of SCT hits',
               'ndof', r'$\Delta p/p$', r'$\Delta \eta_1$', r'$f_1$'    ,  r'$f_3$' , r'$\Delta \phi _{res}$',
               r'$w_{\eta 2}$',  r'$d_0$', r'$d_0/{\sigma(d_0)}$' , r'qd0Sig'   , r'$n_{Tracks}$',
               r'sct wt charge',r'$\eta$'      , r'$p_t$', r'$E/p_T$'    , r'$w_{stot}$', r'$n_{Blayer}$',r'$E/p$']
+    # LaTeX groups of variables
     Lvars += ['em_barrel_Lr1 variables', 'em_barrel variables', 'em_endcap variables', 'em_endcap_Lr1 variables',
               'lar_endcap variables', 'tile variables', r'$d_0$ variables 1', r'$d_0$ variables 2', r'$f_1$ and $f_3$',
               r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'detrimental variables']
 
-    converter = {var : Lvar for var, Lvar in zip(vars, Lvars)}  # This is the mapping dictionary
-    Lnames = [converter[name] if name in vars else name for name in names]  # This is the resulting list of the variable's names converted to be compatible with LaTeX
-    return converter,Lnames                                                 # Names that are not in the list "vars" won't be converted
+    # Create a mapping dictionary from the list of variables names to their LaTeX equivalent
+    converter = {var : Lvar for var, Lvar in zip(vars, Lvars)}
+    # Create a list of the converted variables' names (note that the variables that are not in the LaTeXizer won't be converted)
+    Lnames = [converter[name] if name in vars else name for name in names]
+    return converter, Lnames
 
 def create_path(dir):
     '''
@@ -873,56 +881,52 @@ def create_path(dir):
 
 def print_importances(file):
     '''
-    Reads the given pickle file containing feature importances data, prints it and returns it.
+    Reads the given pickle file, prints its content and returns it.
     '''
+    # Reading the file
     with open(file,'rb') as rfp:
-        results = dict()
+        varList = []
         while True:
             try:
-                imp = pickle.load(rfp)
-                results[imp[0]] = imp[1:]
+                varList.append(pickle.load(rfp))
             except EOFError:
                 break
+    # Printing the content of the file if it's feature importance data
     try :
+        imp = varList[-1]
         mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[2], 2).astype('U5')
         importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
-        importance = u' | '.join(importance.tolist())
+        importance = ' | '.join(importance.tolist())
         print('{:<28} : {}'.format(imp[0], importance))
-    except : pass
-    return imp
+    # Printing the raw variable in the other case
+    except : print(varList)
+    return varList
 
 def ranking_plot(results, path, title, images, scalars, groups):
     '''
     Plots a horizontal bar plot ranking of the feature importances from a dictionary.
     '''
+    # Maps of the categories for legend purposes
     categories = {'Images'   : (images[:-1], 'indigo'), 'Tracks image': (['tracks_image'], 'lime'),
                   'Scalars'  : (scalars, 'tab:blue'), 'Groups of features': (groups, 'tab:orange')}
     # Data parsing section
     sortedResults = sorted(results.items(), key = lambda lst: lst[1][0], reverse=True) # Sorts the importances in decreasing order
-    labels = [tup[0] for tup in sortedResults]
-    newLabels = LaTeXizer(labels)[1]
-    data = [tup[1][0] for tup in sortedResults]
-    # Permutation importances data contain errors estimation (standard deviation over n repetitons), but removal importance doesn't.
-    # I use a try/except block to catch that shape difference between the data:
-    try :
-        errors = [tup[1][1] for tup in sortedResults]
-    except:
-        errors = np.zeros(len(sortedResults))
-    data = np.array(data)
-    errors = np.array(errors)
+    labels = [tup[0] for tup in sortedResults] # Names of the variables
+    newLabels = LaTeXizer(labels)[1] # Converted names
+    data = np.array([tup[1][0] for tup in sortedResults])   # Feature importance
+    errors = np.array([tup[1][1] for tup in sortedResults]) # Incertitude
 
     #Plotting section
     fig, ax = plt.subplots(figsize=(18, 15))
     ax.invert_yaxis()
     widths = data
-    # Colors of the bars according to the type of variables (blue for scalars, indigo for images,
-    # lime for tracks images, orange for groups and red for the set of detrimental variables)
     for cat in categories:
         cat_widths = np.copy(widths)
         cat_err = np.copy(errors)
         category, color = categories[cat]
         indices = np.array([labels.index(feat) for feat in labels if feat not in category])
         if indices.size != 0 :
+        # Set the values of the variables that are not in that category to zero (so they won't appear multiple times in the plot)
             cat_widths[indices] = np.zeros(indices.size)
             cat_err[indices] = np.zeros(indices.size)
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
@@ -931,16 +935,18 @@ def ranking_plot(results, path, title, images, scalars, groups):
     # Above this line, variables are important; under it, they are detrimental.
     plt.axvline(1, color='r', ls=':')
 
-    # Numerical values of the importance
+    # Numerical values of the importance (printed above the bars)
     for width, (index, value)  in zip(np.around(widths,3), enumerate(widths + errors + 0.005*widths[0])):
         plt.text(value, index, str(width), va='center')
 
-    # Finition
+    # Plot's finish
     ax.legend(loc='lower right', prop={'size': 14})
     plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
     plt.tight_layout()
+
+    # Saving section
     print('Saving plot to {}'.format(path))
     plt.savefig(path)
     return fig, ax
@@ -956,9 +962,9 @@ def saving_results(var, fname):
     print_importances(fname)
 
 
-def create_shuffle_sample(sample,feats):
+def copy_sample(sample,feats):
     '''
-    Initialize a copy of the valid sample that is going to be partially shuffled.
+    Initialize a copy of a valid sample that is going to be partially altered.
     '''
     shuffled_sample = {key:value for (key,value) in sample.items() if key not in feats}
     for feat in feats:
@@ -973,89 +979,121 @@ def shuffling_sample(sample, feats, k=0):
     for feat in feats:
         rdm.shuffle(sample[feat])  # Shuffling of one feature
 
+def pseudo_removal(sample, feats, k=0):
+    '''
+    Replace the specified features in the given sample by zeros.
+    '''
+    print('PSEUDO REMOVAL #' + str(k+1))
+    for feat in feats:
+        sample[feat] = np.zeros_like(sample[feat])  # Pseudo-removal of one feature
+
 def feature_permutation(feats, g, sample, labels, model, bkg_rej_full, train_labels, training, n_classes, n_reps,
                        output_dir):
     '''
     Takes a pretrained model and saves the permutation importance of a feature or a group
     of features to a dictionary in a pickle file.
     '''
-    # All the results will be saved in the permutation_importance subdirectory.
+    # All the results will be saved in the permutation_importance subdirectory:
     output_dir += '/permutation_importance'
-    # The importance of each variable will be saved in a different file.
+    # The importance of each variable will be saved in a different file:
     name = [feats[0],'group_{}'.format(g)][g>=0]
     fname = output_dir + '/' + name + '_importance'
     create_path(output_dir)
+    # Converts the feature into a list to homogenize the format (groups are already given as a list)
     if type(feats) == str :
         feats = [feats]
+    # Initialize bkg_rej
     if n_classes == 2 :
         bkg_rej = np.empty((1, n_reps))
     elif n_classes == 6 :
         bkg_rej = np.empty((n_classes, n_reps))
         bkg_rej_full = np.reshape(bkg_rej_full,(n_classes, 1))
+    # Permutation of the given features k times
     features = ' + '.join(feats)
     print('\nPERMUTATION OF : ' + features)
-    shuffled_sample = create_shuffle_sample(sample, feats)
+    shuffled_sample = copy_sample(sample, feats)
     for k in range(n_reps) :
         shuffling_sample(shuffled_sample,feats, k)
         probs = model.predict(shuffled_sample, batch_size=20000, verbose=2)
+        # Background rejection with one feature shuffled
         bkg_rej[:, k] = valid_results(shuffled_sample, labels, probs,
-                            train_labels, training, output_dir, 'OFF', False, n_classes)    # Background rejection with one feature shuffled
-    importance = bkg_rej_full / bkg_rej                                                     # Comparison with the unshuffled sample
+                            train_labels, training, output_dir, 'OFF', False, n_classes)
+    # Computation of the importance of the features
+    importance = bkg_rej_full / bkg_rej
     imp_mean, imp_std = np.mean(importance, axis=1), np.std(importance, axis=1)
     imp_tup = name, imp_mean, imp_std, bkg_rej
     saving_results(imp_tup, fname)
 
-def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_classes, arg_im):
+def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_classes):
     '''
     Opens the importance data files, parses them and then plots a ranking of the features.
     This function works for both permutation and removal importances.
     '''
-    bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',                   # Lists of the types of background in 6 classes
+    # Lists of the types of background in 6 classes
+    bkg_list = ['global', 'Charge flip', 'Photon conversion', 'b/c hadron decay',
                 r'Light flavor (bkg $\gamma$+e)', 'Ligth flavor (hadron)']
-    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'} # Dictionary containing the 3 eta regions in LaTeX format
+    # Dictionary containing the 3 eta regions in LaTeX format
+    eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
     groups = ['group_{}'.format(g) for g in range(n_groups)]
     feats = images + scalars + groups
-    if n_classes == 2: n_bkg = 1 # Determine the number of bkgs against which the importance is to be computed
+    # Determine the number of bkgs against which the importance is to be computed
+    if n_classes == 2: n_bkg = 1
     else: n_bkg = n_classes
     results = [{} for i in range(n_bkg)]
+
+    # Prepare the permutation importance data for plotting
     if mode in ['prm','permutation']:
         mode = 'Permutation'
+        # Name of the plot file
         plot = output_dir + '/permutation_importance/prm_imp'
+        # Reading the pickle files:
         print('Opening', output_dir + '/permutation_importance/')
         for feat in feats:
             file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
             try:
+                # Extracts the data from the pickle file
                 name, imp, err, bkgs = print_importances(file)
                 n_reps = 'averaged over {} repetitions, '.format(bkgs[0,:].size)
             except OSError:
+                # Notify the user which features couldn't be included in the plot
                 print(feat + ' not in directory')
                 continue
+            # Saves each background results separately
             for i in range(n_bkg):
                 results[i].update({feat:(imp[i], err[i])})
+        # Extracts the background rejection of the untouched training to give an idea of the scale
         full_bkg_rej = print_importances(output_dir + '/bkg_rej.pkl')
+
+    # Prepare the removal importance data for plotting
     elif mode in ['rm', 'removal']:
         mode = 'Removal'
-        n_reps = ''
+        imp_dir = '/removal_importance/'
+        n_reps = '' # THIS WILL NEED TO BE ADJUSTED IF REMOVAL IMPORTANCE WITH MULTIPLE TRAININGS IS IMPLEMENTED
         feats = ['full'] + feats
-        if arg_im == 'OFF':
-            arg_im = 'ImagesOFF/'
-        else:
-            arg_im = ''
-        plot = output_dir + '/removal_importance/rm_imp'
+        # Name of the plot file
+        plot = output_dir + imp_dir + 'rm_imp'
+
+        # Reading the pickle files:
         bkg_rej = {}
-        print('Opening:', output_dir + '/removal_importance/' + arg_im)
+        print('Opening:', output_dir + imp_dir)
         for feat in feats:
-            file = output_dir + '/removal_importance/' + arg_im + feat + '/importance.pkl'
+            file = output_dir + imp_dir + feat + '/importance.pkl'
             try:
+                # Extracts the background rejection of the removed features
                 feat, bkg_rej[feat] = print_importances(file)
+                # Computing the importance of the feature:
                 imp = bkg_rej['full']/bkg_rej[feat]
+                # Saves each background results separately (except for the full bkg_rej which is saved later)
                 for i in range(n_bkg):
                     if feat != 'full': results[i].update({feat:(imp[i], 0.05)})
-                print('{} successfully plotted'.format(feat))
             except OSError:
+                # Notify the user which features couldn't be included in the plot
                 print(feat + ' not in directory')
                 continue
+        # Saves full background rejection to give an idea of the scale
         full_bkg_rej = bkg_rej['full']
+
+    # Plotting
     for i in range(n_bkg):
         if i :
             suf = '_' + str(i)
@@ -1070,10 +1108,12 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     '''
     Removes the specified features from the input variables.
     '''
-    i = arg_feat                                        # image indices
-    s = arg_feat - len(images)                          # scalar indices
-    g = arg_feat - len(images + scalars)                # group of features indices
-    print('i : {}, s : {}, g : {}'.format(i,s,g))
+    i = arg_feat                                        # Image indices
+    s = arg_feat - len(images)                          # Scalar indices
+    g = arg_feat - len(images + scalars)                # Group of features indices
+    print('i : {}, s : {}, g : {}'.format(i,s,g))       # For debugging purposes
+
+    # Fail-safes
     if g > len(groups) :
         print('Argument out of range, aborting...')
         sys.exit()
@@ -1082,12 +1122,16 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
         if arg_im == 'OFF':
             print('Cannot remove image if images are OFF, aborting...')
             sys.exit()
-        images, feat = images[:i]+images[i+1:], images[i]                              # Removes the specified image
+        # Removal of the specified image
+        images, feat = images[:i]+images[i+1:], images[i]
+
     elif s >= 0 and s < len(scalars) :
         if arg_sc == 'OFF':
             print('Cannot remove scalar if scalars are OFF, aborting...')
             sys.exit()
-        scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]                          # Removes the specified scalar
+        # Removal of the specified scalar
+        scalars, feat = scalars[:s]+scalars[s+1:], scalars[s]
+
     elif g >= 0 :
         condition1 = groups[g][0] not in images + scalars
         condition2 = groups[g][0] in images and arg_im == 'OFF'
@@ -1095,20 +1139,28 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
         if condition1 or condition2 or condition3 :
             print("Cannot remove features not in the sample, aborting...")
             sys.exit()
+        # Removal of the features in the group
         images  = [key for key in images  if key not in groups[g]]
         scalars = [key for key in scalars if key not in groups[g]]
+        # Group automatic name:
         feat = 'group_{}'.format(g)
+
     else : feat = 'full'
     return images, scalars, feat
 
 
 def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
+    '''
+    Separates and prepares the sample for the correlations plots and runs the correlations plots
+    '''
+    # Scalars obtained from the tracks images
     tracks_means = ['p_mean_efrac', 'p_mean_deta'   , 'p_mean_dphi'   , 'p_mean_d0'     ,
                     'p_mean_z0'   , 'p_mean_charge' , 'p_mean_vertex' , 'p_mean_chi2'   ,
                     'p_mean_ndof' , 'p_mean_pixhits', 'p_mean_scthits', 'p_mean_trthits',
                     'p_mean_sigmad0']
 
-    if arg_tracks_means == 'ON':                                                           # Adding tracks_means to the scalars for correlation
+    # Adding tracks_means to the scalars for correlation
+    if arg_tracks_means == 'ON':
         scalars += tracks_means
         fmode = '_with_tracks'
     elif arg_tracks_means == 'ONLY':
@@ -1118,6 +1170,7 @@ def correlations(images, scalars, sample, labels, region, output_dir, scaling, s
         fmode = ''
 
     create_path(output_dir)
+    # Applying quantile transform
     if scaling:
         scaler_out = output_dir + scaler_out
         train_sample, sample = apply_scaler(sample, sample, scalars, scaler_out)
@@ -1126,7 +1179,8 @@ def correlations(images, scalars, sample, labels, region, output_dir, scaling, s
     else :
         trans = ''
         mode = ''
-    print('CLASSIFIER : evaluating variables correlations')
+
+    # Adding images means to the scalars
     if arg_im == 'ON':
         for image in images:
             if np.amin(sample[image]) == np.amax(sample[image]) :
@@ -1135,17 +1189,18 @@ def correlations(images, scalars, sample, labels, region, output_dir, scaling, s
             sample[image + '_mean'] = np.mean(sample[image], axis = (1,2))
             scalars += [image + '_mean']
         fmode = '_with_im_means'
-            #print(image)
-            #print(np.all(np.isfinite(sample[image])))
-            #print('min :', np.amin(sample[image]), 'max :', np.amax(sample[image]))
+
+    # Separating the sample into signal sample and background sample
     sig_sample = {key : sample[key][np.where(labels == 0)[0]] for key in scalars}
     bkg_sample = {key : sample[key][np.where(labels == 1)[0]] for key in scalars}
 
+    # Evaluating and plotting correlations
+    print('CLASSIFIER : evaluating variables correlations')
     plot_correlations(bkg_sample, output_dir, scatter=arg_corr, mode = '\n(Background' + mode + ')',
                  fmode = '_bkg_' + trans + fmode, region=region)
     plot_correlations(sig_sample, output_dir, scatter=arg_corr, mode = '\n(Signal' + mode + ')',
                  fmode = '_sig_' + trans + fmode, region=region)
-    sys.exit() # No need for training or validation
+    sys.exit() # End the program when correlations are completed
 
 def plot_correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mode='', fmode='',region='barrel'):
     '''
@@ -1157,14 +1212,18 @@ def plot_correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mod
     If scatter=True, plots scatter plots between the given variables and their distrubution
     into a matrix.
     '''
+    # Mapping of the three eta region for title purposes
     eta = {'barrel': r'$0<\eta<1.3$', 'transition': r'$1.3<\eta<1.6$', 'endcap': r'$1.6<\eta<2.5$'}
     data = pd.DataFrame(sample)
+
+    # Converts the variables' names to be compatible with LaTeX display
     if LaTeX:
         print("LaTeX : ", "ON" if LaTeX else 'OFF')
         data = data.rename(columns = LaTeXizer()[0])
     names = data.columns
+
+    # Computing correlations
     correlations = data.corr()
-    #print(correlations)
 
     # plot scatter plot matrix
     if scatter == 'SCATTER':
@@ -1185,18 +1244,15 @@ def plot_correlations(sample, dir, scatter=False, LaTeX=True, frmt = '.pdf', mod
         for (i, j), z in np.ndenumerate(correlations):
             ax.text(j, i, '{:0.1f}'.format(z) if abs(z) > 0.15 and z != 1.0 else '', ha='center', va='center', fontsize=8)
         ticks = np.arange(0,len(names),1)
-        ax.set_xticks(ticks)
+        ax.set_xticks(ticks, rotation=90)
         ax.set_yticks(ticks)
         ax.set_xticklabels(names, fontsize = 14)
         ax.set_yticklabels(names, fontsize = 14)
-        plt.xticks(rotation=90)
         plt.title(r'Correlation matrix for {}'.format(eta[region]) + mode, fontsize = 20)
         plt.tight_layout()
         path = dir + 'corr_matrix' + fmode + frmt
         print('Saving matrix to '+ path)
         plt.savefig(path)
-
-
 
         #################################################################################
         #####  UNDER DEVELOPMENT   ######################################################
