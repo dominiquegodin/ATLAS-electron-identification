@@ -885,22 +885,21 @@ def print_importances(file):
     '''
     # Reading the file
     with open(file,'rb') as rfp:
-        varList = []
         while True:
             try:
-                varList.append(pickle.load(rfp))
+                var = pickle.load(rfp)
             except EOFError:
                 break
     # Printing the content of the file if it's feature importance data
     try :
-        imp = varList[-1]
+        imp = var
         mean, std = np.around(imp[1],3).astype('U5') , np.around(imp[2], 2).astype('U5')
         importance = np.char.add(mean, ' +/- '); importance = np.char.add(importance, std)
         importance = ' | '.join(importance.tolist())
         print('{:<28} : {}'.format(imp[0], importance))
         output = imp
     # Printing the raw variable in the other case
-    except : print(varList);output = varList
+    except : print(var);output = var
     return output
 
 def ranking_plot(results, path, title, images, scalars, groups):
