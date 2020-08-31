@@ -13,7 +13,7 @@ scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_
             'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge',
             'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_wtots1', 'p_numberOfInnermostPixelHits']
 
-feats = images + scalars + ['group_{}'.format(g) for g in range(12)]
+feats = 'full' + images + scalars + ['group_{}'.format(g) for g in range(12)]
 output_dir = '/scratch/odenis/2c_10m/none/barrel'
 
 for feat in feats:
