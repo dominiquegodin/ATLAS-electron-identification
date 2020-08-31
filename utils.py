@@ -927,13 +927,16 @@ def ranking_plot(results, path, title, images, scalars, groups):
             cat_err[indices] = np.zeros(indices.size)
         ax.barh(newLabels, cat_widths, height=0.75, xerr=cat_err, capsize=5, color=color, label=cat)
 
+    # Red vertical line to highlight the threshold between good and bad variables:
+    # Above this line, variables are important; under it, they are detrimental.
+    plt.axvline(1, color='r', ls=':')
+
     # Numerical values of the importance
     for width, (index, value)  in zip(np.around(widths,3), enumerate(widths + errors + 0.005*widths[0])):
-        plt.text(value, index, str(width))
+        plt.text(value, index, str(width), va='center')
+
+    # Finition
     ax.legend(loc='lower right', prop={'size': 14})
-    plt.axvline(1, color='r', ls=':')       # Red vertical line to highlight the threshold between good and bad variables:
-                                            # Above this line, variables are important; under it, they are detrimental.
-    # Labels
     plt.title(title, fontsize=20)
     ax.set_xlabel(r'$\frac{bkg\_rej\_full}{bkg\_rej}$', fontsize=18)
     ax.set_ylabel('Features', fontsize=18)
@@ -1057,8 +1060,8 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             suf = '_' + str(i)
         else :
             suf = '_bkg'
-        title = '{} importance against {} background.\n({}region : {} , full background rejection : {})'
-        title = title.format(mode, bkg_list[i], n_reps, eta[region], full_bkg_rej[i])
+        title = '{} importance against {} background.\n({} classes, {}region : {} , full background rejection : {})'
+        title = title.format(mode, bkg_list[i], n_classes, n_reps, eta[region], np.around(full_bkg_rej[i]))
         ranking_plot(results[i], plot + suf + '.pdf', title, images, scalars, groups)
 
 
