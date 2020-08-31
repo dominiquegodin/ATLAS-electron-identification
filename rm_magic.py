@@ -17,10 +17,10 @@ feats = images + scalars + ['group_{}'.format(g) for g in range(12)]
 output_dir = '/scratch/odenis/2c_10m/none/barrel'
 
 for feat in feats:
-    #try:
-    file = output_dir + '/removal_importance/' + feat
-    print('Opening:',file)
-    f, bkg_rej = print_importances(file + '/removal_importance.pkl')
-    pickle.dump((f,np.array([bkg_rej])), open(file  + '/importance.pkl', 'wb'))
-#    except OSError:
-##        print('Could not convert {}'.format(feat))
+    try:
+        file = output_dir + '/removal_importance/' + feat
+        print('Opening:',file)
+        f, bkg_rej = print_importances(file + '/removal_importance.pkl')
+        pickle.dump((f,np.array([bkg_rej])), open(file  + '/importance.pkl', 'wb'))
+    except OSError:
+        print(OSError)
