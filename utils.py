@@ -1043,14 +1043,15 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             arg_im = ''
         plot = output_dir + '/removal_importance/rm_imp'
         bkg_rej = {}
+        print('Opening:', output_dir + '/removal_importance/' + arg_im)
         for feat in feats:
             file = output_dir + '/removal_importance/' + arg_im + feat + '/importance.pkl'
-            print('Opening:',file)
             try:
                 feat, bkg_rej[feat] = print_importances(file)
                 imp = bkg_rej['full']/bkg_rej[feat]
                 for i in range(n_bkg):
                     if feat != 'full': results[i].update({feat:(imp[i], 0.05)})
+                print('{} successfully plotted'.format(feat))
             except OSError:
                 print(feat + ' not in directory')
                 continue
@@ -1061,7 +1062,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
         else :
             suf = '_bkg'
         title = '{} importance against {} background.\n({} classes, {}region : {} , full background rejection : {})'
-        title = title.format(mode, bkg_list[i], n_classes, n_reps, eta[region], np.around(full_bkg_rej[i]))
+        title = title.format(mode, bkg_list[i], n_classes, n_reps, eta[region], full_bkg_rej[i].astype(int))
         ranking_plot(results[i], plot + suf + '.pdf', title, images, scalars, groups)
 
 
