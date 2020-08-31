@@ -858,9 +858,9 @@ def LaTeXizer(names=[]):
               'lar_endcap variables', 'tile variables', r'$d_0$ variables 1', r'$d_0$ variables 2', r'$f_1$ and $f_3$',
               r'$n_{Tracks}$ and sct wt charge',  r'$n_{Tracks}$ and $p_t$', 'detrimental variables']
 
-    converter = {var:Lvar for var,Lvar in zip(vars,Lvars)}  # This is the mapping dictionary
-    Lnames = [converter[name] for name in names]            # This is the resulting list of var names converted to be compatible with LaTeX
-    return converter,Lnames
+    converter = {var : Lvar for var, Lvar in zip(vars, Lvars)}  # This is the mapping dictionary
+    Lnames = [converter[name] if name in vars else name for name in names]  # This is the resulting list of the variable's names converted to be compatible with LaTeX
+    return converter,Lnames                                                 # Names that are not in the list "vars" won't be converted
 
 def create_path(dir):
     '''
@@ -1047,7 +1047,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
                 feat, bkg_rej[feat] = print_importances(file)
                 imp = bkg_rej['full']/bkg_rej[feat]
                 for i in range(n_bkg):
-                    results[i].update({feat:(imp[i], 0.05)})
+                    if feat != 'full': results[i].update({feat:(imp[i], 0.05)})
             except OSError:
                 print(feat + ' not in directory')
                 continue
