@@ -1023,7 +1023,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             file = output_dir + '/permutation_importance/' + feat + '_importance.pkl'
             try:
                 name, imp, err, bkgs = print_importances(file)
-                n_reps = bkgs[0,:].size
+                n_reps = 'averaged over {} repetitions, '.format(bkgs[0,:].size)
             except OSError:
                 print(feat + ' not in directory')
                 continue
@@ -1032,6 +1032,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
         full_bkg_rej = print_importances(output_dir + '/bkg_rej.pkl')
     elif mode in ['rm', 'removal']:
         mode = 'Removal'
+        nreps = ''
         feats = ['full'] + feats
         if arg_im == 'OFF':
             arg_im = 'ImagesOFF/'
@@ -1056,7 +1057,7 @@ def plot_importance(mode, output_dir, region, images, scalars, n_groups, n_class
             suf = '_' + str(i)
         else :
             suf = '_bkg'
-        title = '{} importance against {} background.\n(averaged over {} repetitions, region : {} , full background rejection : {})'
+        title = '{} importance against {} background.\n({}region : {} , full background rejection : {})'
         title = title.format(mode, bkg_list[i], n_reps, eta[region], full_bkg_rej[i])
         ranking_plot(results[i], plot + suf + '.pdf', title, images, scalars, groups)
 
