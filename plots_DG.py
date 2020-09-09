@@ -1,4 +1,5 @@
-import numpy as np, h5py, sys, time
+import numpy as np
+import h5py, sys, time
 from   sklearn           import metrics
 from   scipy.spatial     import distance
 from   matplotlib        import pylab
@@ -40,7 +41,7 @@ def plot_history(history, output_dir, key='accuracy'):
     plt.ylabel(key.title()+' (%)',fontsize=25)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
     file_name = output_dir+'/history.png'
-    print('Saving training accuracy history to:', file_name, '\n'); plt.savefig(file_name)
+    print('Saving training accuracy history to:', file_name); plt.savefig(file_name)
 
 
 def var_histogram(sample, labels, weights, output_dir, prefix, var):
@@ -68,7 +69,8 @@ def var_histogram(sample, labels, weights, output_dir, prefix, var):
     pylab.ylim(0, y_max); plt.yticks(np.arange(0, y_max+1, step))
     plt.ylabel('Distribution (% per bin)', fontsize=25)
     plt.legend(loc='upper right', fontsize=16); file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
-    print('Saving', prefix, 'sample distributions to:', file_name); plt.savefig(file_name)
+    print('Saving', prefix, 'sample', format(var,'3s'), 'distributions to:', file_name)
+    plt.savefig(file_name)
 
 
 def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, bkg='bkg'):
@@ -209,9 +211,6 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
                 p2 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], 1-LLH[1],
                                  s=40, marker='o', c=val_2[0].get_color())
             l1 = plt.legend([p1, p2], ['LLH '+sig_eff, 'LLH $1\!-\!$'+bkg_eff], loc='lower left', fontsize=13)
-            #std_accuracy = valid_accuracy(y_true, y_prob)
-            #plt.scatter( 0.5, std_accuracy, s=30, marker='D', c=val_3[0].get_color(),
-            #             label="{0:<10s} {1:>5.2f}%".format('Standard Accuracy:', std_accuracy), zorder=10 )
             plt.scatter( best_threshold, max(accuracy), s=40, marker='o', c=val_3[0].get_color(),
                          label='{0:<10s} {1:>5.2f}%'.format('Best Accuracy:',100*max(accuracy)), zorder=10 )
             plt.legend(loc=location, fontsize=15, numpoints=3); plt.gca().add_artist(l1)
@@ -247,7 +246,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
                      label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
-    print('Saving test sample ROC'+str(ROC_type)+' curve to:   ', file_name); plt.savefig(file_name)
+    print('Saving test sample ROC'+str(ROC_type)+' curve    to:', file_name); plt.savefig(file_name)
 
 
 def combine_ROC_curves(output_dir, cuts=''):

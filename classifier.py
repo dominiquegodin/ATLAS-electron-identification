@@ -1,14 +1,14 @@
 # IMPORT PACKAGES AND FUNCTIONS
-import tensorflow as tf, tensorflow.keras.callbacks as cb
-import numpy      as np, multiprocessing as mp, os, sys, h5py, pickle
-from   argparse   import ArgumentParser
-from   tabulate   import tabulate
-from   itertools  import accumulate
-from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
-from   utils      import compo_matrix, class_weights, cross_valid, valid_results, sample_analysis
-from   utils      import sample_weights, downsampling, balance_sample, match_distributions
-from   plots_DG   import var_histogram
-from   models     import multi_CNN
+import tensorflow      as tf
+import numpy           as np
+import os, sys, h5py, pickle
+from   argparse  import ArgumentParser
+from   tabulate  import tabulate
+from   itertools import accumulate
+from   utils     import validation, make_sample, sample_composition, apply_scaler, load_scaler
+from   utils     import compo_matrix, sample_weights, class_weights, balance_sample, split_samples
+from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms
+from   models    import multi_CNN, callback, create_model
 
 
 # PROGRAM ARGUMENTS
@@ -25,9 +25,9 @@ parser.add_argument( '--n_gpus'      , default =    4,  type = int   )
 parser.add_argument( '--verbose'     , default =    1,  type = int   )
 parser.add_argument( '--patience'    , default =   10,  type = int   )
 parser.add_argument( '--sbatch_var'  , default =    0,  type = int   )
-parser.add_argument( '--l2'          , default = 1e-8,  type = float )
+parser.add_argument( '--l2'          , default = 1e-7,  type = float )
 parser.add_argument( '--dropout'     , default =  0.1,  type = float )
-parser.add_argument( '--FCN_neurons' , default = [200, 200], type = int, nargs='+')
+parser.add_argument( '--FCN_neurons' , default = [200,200], type = int, nargs='+')
 parser.add_argument( '--weight_type' , default = 'none'              )
 parser.add_argument( '--train_cuts'  , default = ''                  )
 parser.add_argument( '--valid_cuts'  , default = ''                  )
@@ -47,8 +47,6 @@ parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
 parser.add_argument( '--runDiffPlots', default = 0, type = int       )
 args = parser.parse_args()
-#from plots_DG import combine_ROC_curves
-#combine_ROC_curves(args.output_dir, CNN)
 
 
 # VERIFYING ARGUMENTS
@@ -73,31 +71,33 @@ args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
 
 
 # CNN PARAMETERS
-CNN = {(56,11):{'maps':[200,200], 'kernels':[ (3,3) , (3,3) ], 'pools':[ (2,2) , (2,2) ]},
-        (7,11):{'maps':[200,200], 'kernels':[ (2,3) , (2,3) ], 'pools':[ (1,1) , (1,1) ]},
-        #(7,11):{'maps':[200,200], 'kernels':[(2,3,7),(2,3,1)], 'pools':[(1,1,1),(1,1,1)]},
+CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (4,1) , (2,1) ]},
+        (7,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (1,1) , (1,1) ]},
+        #(7,11):{'maps':[200,200], 'kernels':[(3,5,7),(3,5,1)], 'pools':[(1,1,1),(1,1,1)]},
       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # TRAINING VARIABLES
-images   = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
-            'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
-            'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
-            'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
-scalars  = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'           ,
-            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2'         ,
-            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge'         ,
-            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfInnermostPixelHits']
-others   = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
-            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
-            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'         ]
+scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'           ,
+           'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2'         ,
+           'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge'         ,
+           'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfInnermostPixelHits']
+images  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' , 'em_barrel_Lr1_fine',
+           'em_endcap_Lr0'  , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' , 'em_endcap_Lr1_fine',
+           'lar_endcap_Lr0' , 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3', 'tile_gap_Lr1'      ,
+           'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'                        ]
+others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
+           'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
+           'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'         ]
 with h5py.File(args.data_file, 'r') as data:
     images  = [key for key in images  if key in data or key=='tracks_image']
     scalars = [key for key in scalars if key in data]
     others  = [key for key in others  if key in data]
-train_var = {'images' :images  if args.images =='ON' else [], 'tracks':[],
-             'scalars':scalars if args.scalars=='ON' else []}
-variables = {**train_var, 'others':others}; scalars = train_var['scalars']
+if args.scalars != 'ON': scalars=[]
+if args.images  != 'ON': images =[]
+if images == []: args.NN_type = 'FCN'
+train_var = {'scalars':scalars, 'images':images}
+variables = {**train_var, 'others':others}
 
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
@@ -111,7 +111,7 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
-    variables = {'others':others, 'scalars':scalars, 'images':[]}
+    variables = {'scalars':scalars, 'images':[], 'others':others}
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
                args.data_file, variables, args.runDiffPlots)
 elif args.results_in !='':
@@ -120,26 +120,17 @@ elif args.results_in !='':
 if args.results_in != '': sys.exit()
 
 
-# MULTI-GPU DISTRIBUTION
-n_gpus  = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
-devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
-tf.debugging.set_log_device_placement(False)
-strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
-with strategy.scope():
-    if tf.__version__ >= '2.1.0' and len(variables['images']) >= 1:
-        tf.keras.mixed_precision.experimental.set_policy('mixed_float16')
-    sample, _ = make_sample(args.data_file, variables, [0,1], args.n_tracks, args.n_classes)
-    CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
-    func_args = (args.n_classes, args.NN_type, sample, args.l2, args.dropout, CNN, args.FCN_neurons)
-    model     = multi_CNN(*func_args, **train_var); print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+# MODEL CREATION AND MULTI-GPU DISTRIBUTION
+n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
+sample = make_sample(args.data_file, variables, [0,1], args.n_tracks, args.n_classes)[0]
+model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CNN,
+                      args.l2, args.dropout, train_var, n_gpus)
 
 
 # ARGUMENTS AND VARIABLES TABLES
 args.scaler_in  = args.scaler_in  if '.pkl' in args.scaler_in  else ''
 args.model_in   = args.model_in   if '.h5'  in args.model_in   else ''
 args.results_in = args.results_in if '.h5'  in args.results_in else ''
-args.NN_type    = 'FCN' if train_var['images'] == [] else args.NN_type
 args.scaling    = (args.scaling == 'ON' and scalars != [])
 if args.NN_type == 'CNN':
     print('\nCNN ARCHITECTURES:')
@@ -166,38 +157,29 @@ if args.model_in != '':
 
 # TRAINING LOOP
 if args.n_epochs > 0:
-    print(  'CLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
+    print('\nCLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
     print(  'CLASSIFIER: valid sample:'   , format(args.n_valid[1] -args.n_valid[0], '8.0f'), 'e')
     print('\nCLASSIFIER: using TensorFlow', tf.__version__ )
     print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
-    print('\nCLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
-    print([group for group in train_var if train_var[group] != [ ]])
+    print(  'CLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
+    print([key for key in train_var if train_var[key] != []])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
     func_args = (args.data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
-    if False: #generate a different validation sample from training sample with downsampling
-        valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
-        train_sample  = {key:np.concatenate([train_sample[key], extra_sample[key]]) for key in train_sample}
-        train_labels  = np.concatenate([train_labels, extra_labels])
-        sample_weight = match_distributions(train_sample, train_labels, valid_sample, valid_labels)
-    sample_weight = balance_sample(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2d')[-1]
     #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
-    for var in ['pt','eta']:
-        var_histogram(valid_sample, valid_labels,     None     , args.output_dir, 'valid', var)
-        var_histogram(train_sample, train_labels, sample_weight, args.output_dir, 'train', var)
+    sample_weight = balance_sample(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2d')[-1]
+    sample_histograms(valid_sample, valid_labels, train_sample, train_labels, sample_weight, args.output_dir)
     if args.scaling:
         if args.model_in == '':
-            scaler_out = args.output_dir+'/'+args.scaler_out
+            scaler_out = args.output_dir+'/'+args.scaler_out; print()
             train_sample, valid_sample = apply_scaler(train_sample, valid_sample, scalars, scaler_out)
-        else: train_sample = load_scaler(train_sample, scalars, args.output_dir+'/'+args.scaler_in)
-    compo_matrix(valid_labels, train_labels=train_labels); print()
-    model_out   = args.output_dir+'/'+args.model_out
-    check_point = cb.ModelCheckpoint(model_out, save_best_only =True, monitor=args.metrics, verbose=1)
-    early_stop  = cb.EarlyStopping(patience=args.patience, restore_best_weights=True, monitor=args.metrics)
-    training    = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
-                             callbacks=[check_point,early_stop], epochs=args.n_epochs, verbose=args.verbose,
-                             #class_weight=class_weights(train_labels, bkg_ratio=args.bkg_ratio),
-                             sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size) )
+        else: print(); train_sample = load_scaler(train_sample, scalars, args.output_dir+'/'+args.scaler_in)
+    print(); compo_matrix(valid_labels, train_labels=train_labels); print()
+    model_out = args.output_dir+'/'+args.model_out
+    training  = model.fit( train_sample, train_labels, validation_data=(valid_sample,valid_labels),
+                           callbacks=callback(model_out, args.patience, args.metrics),
+                           sample_weight=sample_weight, batch_size=max(1,n_gpus)*int(args.batch_size),
+                           epochs=args.n_epochs, verbose=args.verbose )
     model.load_weights(model_out)
 else: train_labels = []; training = None
 
