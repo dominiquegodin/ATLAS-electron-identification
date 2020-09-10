@@ -53,16 +53,19 @@ def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, trai
             mixed_precision.experimental.set_policy('mixed_float16')
         if 'tracks_image' in train_var['images']: CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
         model = multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, **train_var)
-        print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
-        optimizers.Adadelta(learning_rate=1e-3, rho=0.95, epsilon=1e-07, name='Adadelta')
-        optimizers.Adagrad (learning_rate=1e-3, initial_accumulator_value=0.1, epsilon=1e-07, name='Adagrad')
-        optimizers.Adam    (learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-07, amsgrad=False, name='Adam')
-        optimizers.Adamax  (learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-07, name='Adamax')
-        optimizers.Nadam   (learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-07, name='Nadam')
-        optimizers.RMSprop (learning_rate=1e-3, rho=0.9, momentum=0.0, epsilon=1e-07, centered=False, name='RMSprop')
-        optimizers.SGD     (learning_rate=1e-2, momentum=0.0, nesterov=False, name='SGD')
+        print('\nNEURAL NETWORK ARCHITECTURE'); descent_optimizers(); model.summary()
         model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
+
+
+def descent_optimizers():
+    optimizers.Adadelta(learning_rate=1e-3, rho=0.95, epsilon=1e-07, name='Adadelta')
+    optimizers.Adagrad (learning_rate=1e-3, initial_accumulator_value=0.1, epsilon=1e-07, name='Adagrad')
+    optimizers.Adam    (learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-07, amsgrad=False, name='Adam')
+    optimizers.Adamax  (learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-07, name='Adamax')
+    optimizers.Nadam   (learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-07, name='Nadam')
+    optimizers.RMSprop (learning_rate=1e-3, rho=0.9, momentum=0.0, epsilon=1e-07, centered=False, name='RMSprop')
+    optimizers.SGD     (learning_rate=1e-2, momentum=0.0, nesterov=False, name='SGD')
 
 
 def callback(model_out, patience, metrics):
@@ -70,3 +73,7 @@ def callback(model_out, patience, metrics):
     calls += [callbacks.EarlyStopping(patience=patience, restore_best_weights=True, monitor=metrics, verbose=1)]
     calls += [callbacks.ReduceLROnPlateau(patience=3, factor=0.5, min_delta=1e-6  , monitor=metrics, verbose=1)]
     return calls + [callbacks.TerminateOnNaN()]
+
+
+#def custom_metric(y_true, y_pred):
+#    return tf.keras.metrics.sparse_categorical_accuracy(y_true, y_pred)

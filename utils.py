@@ -317,7 +317,7 @@ def class_weights(labels, bkg_ratio):
     return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
 
 
-def validation(output_dir, results_in, plotting, n_valid, data_file, variables, diff_plots, valid_cuts=''):
+def validation(output_dir, results_in, plotting, n_valid, data_file, input_var, diff_plots, valid_cuts=''):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
@@ -325,7 +325,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
     if False or len(valid_data) == 1: #add variables to the results
         print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
-        sample, labels = make_sample(data_file, variables, n_valid, n_tracks=5, n_classes=probs.shape[1])
+        sample, labels = make_sample(data_file, input_var, n_valid, n_tracks=5, n_classes=probs.shape[1])
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
     if False: #save the added variables to the results file
@@ -348,36 +348,8 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, variables, 
     valid_results(sample, labels, probs, [], None, output_dir, plotting, diff_plots)
 
 
-def make_sample(data_file, variables, idx, n_tracks, n_classes, cuts='', prefix='p_', upsize=False):
-    scalars, images, others = variables.values(); start_time = time.time()
-    with h5py.File(data_file, 'r') as data:
-        sample = {key:data[key][idx[0]:idx[1]] for key in scalars+others}
-        sample.update({'eta':sample['p_eta'], 'pt':sample['p_et_calo']})
-        for key in set(images)-set('tracks_image'):
-            try: sample[key] = data[key][idx[0]:idx[1]]
-            except KeyError:
-                if 'fine' in key: sample[key] = np.zeros((idx[1]-idx[0],)+(56,11))
-                else            : sample[key] = np.zeros((idx[1]-idx[0],)+( 7,11))
-        if 'tracks_image' in images:
-            n_tracks    = min(n_tracks, data[prefix+'tracks'].shape[1])
-            tracks_data = data[prefix+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
-            #tracks_data = np.concatenate((abs(tracks_data[...,0:5]), tracks_data[...,5:13]), axis=2)
-            sample['tracks_image'] = tracks_data
-    if tf.__version__ < '2.1.0' or len(images) == 0:
-        for key in set(sample)-set(others): sample[key] = np.float32(sample[key])
-    if upsize == True:
-        for key in images: sample[key] = resize_images(np.float32(sample[key]),target_shape=(56,11))
-    labels = make_labels(sample, n_classes)
-    if idx[1]-idx[0] > 1:
-        print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-        sample, labels = sample_cuts(sample, labels, cuts)
-        if False: sample = process_images(sample, images)
-    return sample, labels
-
-
-def sample_generator(data_file, variables, idx, n_tracks, n_classes, batch_size=None, cuts='', prefix='p_'):
-    scalars, images, others = variables.values(); start_time = time.time()
-    if batch_size != None: idx = idx*batch_size, (idx+1)*batch_size
+def make_sample(data_file, input_var, idx, n_tracks, n_classes, cuts='', prefix='p_', upsize=False):
+    scalars, images, others = input_var.values(); start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in scalars+others}
         sample.update({'eta':sample['p_eta'], 'pt':sample['p_et_calo']})
@@ -393,7 +365,7 @@ def sample_generator(data_file, variables, idx, n_tracks, n_classes, batch_size=
             sample['tracks_image'] = tracks_data
     if tf.__version__ < '2.1.0' or len(images) == 0:
         for key in set(sample)-set(others): sample[key] = np.float32(sample[key])
-    if False:
+    if upsize == True:
         for key in images: sample[key] = resize_images(np.float32(sample[key]),target_shape=(56,11))
     labels = make_labels(sample, n_classes)
     if idx[1]-idx[0] > 1:
@@ -404,15 +376,17 @@ def sample_generator(data_file, variables, idx, n_tracks, n_classes, batch_size=
 
 
 class Batch_Generator(tf.keras.utils.Sequence):
-    def __init__(self, data_file, variables, sample_size, n_tracks, n_classes, batch_size, cuts):
-        self.data_file = data_file; self.variables = variables; self.sample_size = sample_size
-        self.n_tracks  = n_tracks ; self.n_classes = n_classes; self.batch_size  = batch_size
+    def __init__(self, data_file, input_var, indexes, n_tracks, n_classes, batch_size, cuts):
+        self.data_file = data_file; self.input_var = input_var; self.indexes    = indexes
+        self.n_tracks  = n_tracks ; self.n_classes = n_classes; self.batch_size = batch_size
         self.cuts      = cuts
     def __len__(self):
-        return int(self.sample_size/self.batch_size) #number of batches per epoch
-    def __getitem__(self, idx):
-        return sample_generator(self.data_file, self.variables, idx, self.n_tracks, self.n_classes,
-                                self.batch_size, self.cuts)
+        "number of batches per epoch"
+        return int(np.ceil(np.diff(self.indexes)/self.batch_size))
+    def __getitem__(self, gen_index):
+        idx = self.indexes[0] + gen_index*self.batch_size
+        idx = [idx, min(idx + self.batch_size, self.indexes[1])]
+        return make_sample(self.data_file, self.input_var, idx, self.n_tracks, self.n_classes, self.cuts)
 
 
 def make_labels(sample, n_classes):
@@ -450,7 +424,6 @@ def sample_cuts(sample, labels, cuts):
         #print('CLASSIFIER: applying properties cuts -->', format(len(labels),'8d') ,'e conserved', end='')
         #print(' (' + format(100*len(labels)/length, '.2f') + ' %)')
         #print('CLASSIFIER: applied cuts:', cuts)
-    #print();
     return sample, labels
 
 
@@ -646,15 +619,17 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
 def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, diff_plots):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}
     compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list  = ['bkg'] #+ [1, 2, 3, 4, 5]
+    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list = ['bkg'] + [1, 2, 3, 4, 5]
     arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
     for job in processes: job.start()
     for job in processes: job.join()
     if plotting=='OFF':
-        #print( [int(return_dict[n][3].split()[-1]) for n in ['bkg', 1, 2, 3, 4, 5]] )
         for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
+        if False:
+            if probs.shape[1] == 2: bkg_list = ['bkg']
+            return np.nan_to_num([return_dict[n][3].split()[-1] for n in bkg_list])
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
@@ -798,7 +773,6 @@ def presample(h5_file, output_path, batch_size, sum_e, images, tracks, scalars, 
                    'p_mean_z0'     :4 , 'p_mean_charge' :5 , 'p_mean_vertex' :6 , 'p_mean_chi2'        :7 ,
                    'p_mean_ndof'   :8 , 'p_mean_pixhits':9 , 'p_mean_scthits':10, 'p_mean_trthits'     :11,
                    'p_mean_sigmad0':12, 'p_qd0Sig'      :13, 'p_nTracks'     :14, 'p_sct_weight_charge':15}
-    #sample.update({key:tracks_list[:,tracks_dict[key]] for key in tracks_dict})
     for key in tracks_dict:
         if np.any(tracks_list[:,tracks_dict[key]]!=0): sample[key] = tracks_list[:,tracks_dict[key]]
     for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
@@ -878,26 +852,3 @@ def merge_presamples(n_e, n_tasks, output_path, output_file):
         data.close(); os.remove(output_path+'/'+h5_file)
         print('.', end='', flush=True)
     print(' (', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
-
-
-
-'''
-#################################################################################
-#####  UNDER DEVELOPMENT   ######################################################
-#################################################################################
-
-
-class Batch_Generator(tf.keras.utils.Sequence):
-    def __init__(self, file_name, n_classes, train_features, all_features, indices, batch_size):
-        self.file_name  = file_name ; self.train_features = train_features
-        self.indices    = indices   ; self.all_features   = all_features
-        self.batch_size = batch_size; self.n_classes      = n_classes
-    def __len__(self):
-        "number of batches per epoch"
-        return int(self.indices.size/self.batch_size)
-    def __getitem__(self, index):
-        data   = generator_sample(self.file_name, self.all_features, self.indices, self.batch_size, index)
-        labels = make_labels(data, self.n_classes)
-        data   = [np.float32(data[key]) for key in np.sum(list(self.train_features.values()))]
-        return data, labels
-'''
