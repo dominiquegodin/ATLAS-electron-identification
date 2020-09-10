@@ -1,8 +1,7 @@
 # SINGLE TRAINING
-python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --n_tracks=5    --l2=1e-8      --dropout=0.05    --verbose=2     --NN_type=CNN           \
-		      --plotting=ON   --weight_type=None --bkg_ratio=2 --output_dir=outputs
-
+python classifier.py  --n_train=10e6  --n_valid=15e6  --batch_size=5e3  --n_epochs=0  --n_classes=6           \
+                      --n_tracks=5    --output_dir='/scratch/$USER'             \
+                      --model_in=model.h5 --auto_output_dir=ON
 
 exit
 
@@ -15,7 +14,8 @@ exit
 # SINGLE TRAINING
 python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
                       --n_tracks=5    --l2=1e-8      --dropout=0.05    --verbose=2     --NN_type=CNN           \
-		      --plotting=ON   --weight_type=None --bkg_ratio=2 --output_dir=outputs
+		                  --plotting=ON   --weight_type=None --output_dir=outputs
+
 
 
 # MULTIPLE TRAININGS (array jobs)
@@ -62,4 +62,16 @@ python classifier.py  --n_train=0           --n_valid=$n_e        --n_epochs=0  
 
 
 # USING VALIDATION RESULTS FOR PLOTTING
-python classifier.py  --n_train=0  --n_valid=15e6  --output_dir=outputs  --results_in=valid_probs.pkl  --plotting=OFF
+python classifier.py  --n_valid=15e6  --output_dir=outputs  --results_in=valid_probs.pkl  --plotting=ON
+
+# FEATURE PERMUTATION IMPORTANCE (ARRAY JOB)
+python classifier.py  --n_train=10e6 --n_valid=15e6 --n_epochs=0 --output_dir='/scratch/$USER'     \
+                      --model_in=model.h5 --permutation='ON' --feat=$VAR --auto_output_dir=ON
+
+# FEATURE REMOVAL IMPORTANCE (ARRAY JOB) 
+python classifier.py  --n_train=10e6  --n_valid=10e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
+                      --verbose=2  --output_dir='/scratch/$USER' --feat=$VAR --data_file='barrel'               \
+                      --auto_output_dir=ON
+
+# FEATURE IMPORTANCE PLOTTING (Change --plotting and --n_classes accordingly)
+python classifier.py  --plotting=prm --n_classes=6 --output_dir=/scratch/odenis --auto_output_dir=ON
