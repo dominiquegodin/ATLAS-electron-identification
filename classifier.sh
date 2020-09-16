@@ -1,6 +1,6 @@
 # SINGLE TRAINING
 python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --n_tracks=5    --l2=1e-8      --dropout=0.05    --verbose=2     --NN_type=CNN           \
+                      --n_tracks=5    --l2=1e-7      --dropout=0.1     --verbose=2     --NN_type=CNN           \
 		      --plotting=ON   --weight_type=None --bkg_ratio=2 --output_dir=outputs
 
 
@@ -14,7 +14,7 @@ exit
 
 # SINGLE TRAINING
 python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --n_tracks=5    --l2=1e-8      --dropout=0.05    --verbose=2     --NN_type=CNN           \
+                      --n_tracks=5    --l2=1e-7      --dropout=0.1     --verbose=2     --NN_type=CNN           \
 		      --plotting=ON   --weight_type=None --bkg_ratio=2 --output_dir=outputs
 
 
@@ -22,8 +22,8 @@ python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epoch
 python classifier.py  --n_train=10e6      --n_valid=15e6      --batch_size=5e3   --n_epochs=100  --n_classes=2 \
                       --n_tracks=5        --l2=1e-8           --dropout=0.05     --verbose=2     --NN_type=CNN \
                       --plotting=OFF      --weight_type=None  --scalars=ON       --FCN_neurons 200 200         \
-                      --output_dir=outputs --sbatch_var=${VAR}  --model_out=model_${VAR}-tracks.h5             \
-                      --scaler_out=scaler_${VAR}-tracks.pkl   --results_out=results_${VAR}-tracks.pkl
+                      --output_dir=outputs --sbatch_var=${SBATCH_VAR}  --model_out=model_${SBATCH_VAR}.h5      \
+                      --scaler_out=scaler_${SBATCH_VAR}.pkl   --results_out=results_${SBATCH_VAR}.pkl
 
 
 # CROSS-VALIDATION TRAINING (array jobs)

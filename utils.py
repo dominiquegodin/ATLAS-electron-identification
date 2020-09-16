@@ -9,6 +9,11 @@ from   skimage  import transform
 from   plots_DG import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves, var_histogram
 from   plots_KM import plot_distributions_KM, differential_plots
 
+#import pandas as pd
+#from   pandas.plotting import scatter_matrix
+#from   copy       import deepcopy
+#from   itertools  import accumulate
+
 
 def find_bin(array,binning):
 
@@ -315,6 +320,7 @@ def class_weights(labels, bkg_ratio):
     if bkg_ratio == 0 and n_classes != 2: bkg_ratio = 1
     ratios = {**{0:1}, **{n:bkg_ratio for n in np.arange(1, n_classes)}}
     return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
+
 
 
 def validation(output_dir, results_in, plotting, n_valid, data_file, input_var, diff_plots, valid_cuts=''):
@@ -627,9 +633,7 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     for job in processes: job.join()
     if plotting=='OFF':
         for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
-        if False:
-            if probs.shape[1] == 2: bkg_list = ['bkg']
-            return np.nan_to_num([return_dict[n][3].split()[-1] for n in bkg_list])
+        return np.nan_to_num([int(return_dict[n][3].split()[-1]) for n in bkg_list]) # bkg_rej extraction
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
@@ -737,6 +741,31 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
+
+def feature_removal(scalars, images, groups, index):
+    if   index <= 0: removed_feature = 'all'
+    elif index  > len(scalars+images+groups): sys.exit()
+    elif index <= len(scalars+images):
+        removed_feature = (scalars+images)[index-1]
+        scalars = list(set(scalars) - set([removed_feature]))
+        images  = list(set(images ) - set([removed_feature]))
+    elif index  > len(scalars+images):
+        removed_feature = groups[index-1-len(scalars+images)]
+        scalars = list(set(scalars) - set(removed_feature))
+        images  = list(set(images ) - set(removed_feature))
+    return scalars, images, removed_feature
+
+
+def feature_ranking(output_dir, results_out, scalars, images, groups):
+    data_dict = {}
+    with open(output_dir+'/'+results_out,'rb') as file_data:
+        try:
+            while True: data_dict.update(pickle.load(file_data))
+        except EOFError: pass
+    pickle.dump(data_dict, open(output_dir+'/'+results_out,'wb'))
+    from importance import ranking_plot
+    #ranking_plot(data_dict, output_dir, 'put title here', images, scalars, groups)
+    print(data_dict)
 
 
 

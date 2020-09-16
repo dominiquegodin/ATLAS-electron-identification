@@ -10,8 +10,13 @@ from   utils     import compo_matrix, sample_weights, class_weights, balance_sam
 from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms
 from   models    import multi_CNN, callback, create_model
 
+from   importance import feature_importance, feature_permutation, correlations, saving_results
+#from   importance import feature_removal, print_importances, plot_importance
+#from   importance import correlations, saving_results
+#create_path, feature_importance
 
-# PROGRAM ARGUMENTS
+
+# MAIN PROGRAM ARGUMENTS
 parser = ArgumentParser()
 parser.add_argument( '--n_train'     , default =  1e6,  type = float )
 parser.add_argument( '--n_valid'     , default =  1e6,  type = float )
@@ -37,7 +42,7 @@ parser.add_argument( '--scalars'     , default = 'ON'                )
 parser.add_argument( '--scaling'     , default = 'ON'                )
 parser.add_argument( '--plotting'    , default = 'OFF'               )
 parser.add_argument( '--metrics'     , default = 'val_accuracy'      )
-parser.add_argument( '--data_file'   , default = ''                  )
+parser.add_argument( '--eta_region'  , default = 'barrel'            )
 parser.add_argument( '--output_dir'  , default = 'outputs'           )
 parser.add_argument( '--model_in'    , default = ''                  )
 parser.add_argument( '--model_out'   , default = 'model.h5'          )
@@ -45,7 +50,17 @@ parser.add_argument( '--scaler_in'   , default = 'scaler.pkl'        )
 parser.add_argument( '--scaler_out'  , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'  , default = ''                  )
 parser.add_argument( '--results_out' , default = ''                  )
-parser.add_argument( '--runDiffPlots', default = 0, type = int       )
+parser.add_argument( '--runDiffPlots', default =    0, type = int    )
+# FEATURE IMPORTANCE ARGUMENTS
+parser.add_argument( '--correlation'     , default = 'OFF'               )
+parser.add_argument( '--permutation'     , default = 'OFF'               )
+parser.add_argument( '--removal'         , default = 'OFF'               )
+parser.add_argument( '--feature_removal' , default = 'OFF'               )
+parser.add_argument( '--feature_ranking' , default = 'OFF'               )
+parser.add_argument( '--n_reps'          , default =   10, type = int    )
+parser.add_argument( '--feat'            , default =   -1, type = int    )
+parser.add_argument( '--tracks_means'    , default = 'OFF'               )
+# PARSING PROGRAM ARGUMENTS
 args = parser.parse_args()
 
 
@@ -58,16 +73,13 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weight file required with n_epochs < 1 -> exiting program\n'); sys.exit()
 
 
-# DATAFILE
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    try: os.mkdir(path)
-    except FileExistsError: pass
-args.data_file = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
-#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
-#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
-#args.data_file = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
-#args.data_file = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
-#for key, val in h5py.File(args.data_file, 'r').items(): print(key, val.shape)
+# DATASET
+#if args.eta_region == 'barrel': dataset = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
+if args.eta_region == 'barrel': dataset = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
+#if args.eta_region == 'barrel': dataset = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
+if args.eta_region == 'gap'   : dataset = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
+if args.eta_region == 'endcap': dataset = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
+#for key, val in h5py.File(dataset, 'r').items(): print(key, val.shape)
 
 
 # CNN PARAMETERS
@@ -89,19 +101,37 @@ images  = ['em_barrel_Lr0'  , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_L
 others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'         ]
-with h5py.File(args.data_file, 'r') as data:
+with h5py.File(dataset, 'r') as data:
     images  = [key for key in images  if key in data or key=='tracks_image']
     scalars = [key for key in scalars if key in data]
     others  = [key for key in others  if key in data]
+
+
+# FEATURE IMPORTANCE ANALYSIS
+from utils import feature_removal, feature_ranking
+#groups = [('em_barrel_Lr1', 'em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3')]
+if   args.feature_removal == 'ON':
+    scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
+    print(removed_feature); print(scalars); print(images); sys.exit()
+elif args.feature_ranking == 'ON':
+    feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[]); sys.exit()
+#func_args = (args.output_dir, args.n_classes, args.weight_type, args.eta_region, args.n_train,
+'''
+#             args.feat, images, scalars, args.removal, args.plotting)
+#scalars, images, feat, groups = feature_importance(*func_args)
+'''
+
+
+# TRAINING DICTIONARY
 if args.scalars != 'ON': scalars=[]
 if args.images  != 'ON': images =[]
 if images == []: args.NN_type = 'FCN'
-train_var = {'scalars':scalars, 'images':images}
-variables = {**train_var, 'others':others}
+train_data = {'scalars':scalars, 'images':images}
+input_data = {**train_data, 'others':others}
 
 
 # SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
-sample_size  = len(h5py.File(args.data_file, 'r')['mcChannelNumber'])
+sample_size  = len(h5py.File(dataset, 'r')['eventNumber'])
 args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
 if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
@@ -111,23 +141,24 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
-    variables = {'scalars':scalars, 'images':[], 'others':others}
+    input_data = {'scalars':scalars, 'images':[], 'others':others}
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
-               args.data_file, variables, args.runDiffPlots)
-elif args.results_in !='':
-    print("\noption [--results_in] was given but no matching file found in the right path, aborting..")
-    print("results_in file =", args.output_dir+'/'+args.results_in, '\n')
-if args.results_in != '': sys.exit()
+               dataset, input_data, args.runDiffPlots)
+elif args.results_in != '': print('\noption [--results_in] not matching any file --> aborting ...')
+if   args.results_in != '': sys.exit()
 
 
 # MODEL CREATION AND MULTI-GPU DISTRIBUTION
 n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
-sample = make_sample(args.data_file, variables, [0,1], args.n_tracks, args.n_classes)[0]
+sample = make_sample(dataset, input_data, [0,1], args.n_tracks, args.n_classes)[0]
 model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CNN,
-                      args.l2, args.dropout, train_var, n_gpus)
+                      args.l2, args.dropout, train_data, n_gpus)
 
 
 # ARGUMENTS AND VARIABLES TABLES
+for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+    try: os.mkdir(path)
+    except (FileExistsError, IOError): pass
 args.scaler_in  = args.scaler_in  if '.pkl' in args.scaler_in  else ''
 args.model_in   = args.model_in   if '.h5'  in args.model_in   else ''
 args.results_in = args.results_in if '.h5'  in args.results_in else ''
@@ -137,8 +168,8 @@ if args.NN_type == 'CNN':
     for shape in CNN: print(format(str(shape),'>8s')+':', str(CNN[shape]))
 print('\nPROGRAM ARGUMENTS:'); print(tabulate(vars(args).items(), tablefmt='psql'))
 print('\nTRAINING VARIABLES:')
-headers = [          key  for key in train_var if train_var[key]!=[]]
-table   = [train_var[key] for key in train_var if train_var[key]!=[]]
+headers = [           key  for key in train_data if train_data[key]!=[]]
+table   = [train_data[key] for key in train_data if train_data[key]!=[]]
 length  = max([len(n) for n in table])
 table   = list(map(list, zip(*[n+(length-len(n))*[''] for n in table])))
 print(tabulate(table, headers=headers, tablefmt='psql')); print()
@@ -146,13 +177,20 @@ print(tabulate(table, headers=headers, tablefmt='psql')); print()
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
 print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
-func_args = (args.data_file, variables, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
+func_args = (dataset, input_data, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
 valid_sample, valid_labels = make_sample(*func_args)
 #sample_analysis(valid_sample, valid_labels, scalars, args.scaler_in, args.output_dir); sys.exit()
 if args.model_in != '':
     print('CLASSIFIER: loading pre-trained weights from', args.output_dir+'/'+args.model_in, '\n')
     model.load_weights(args.output_dir+'/'+args.model_in)
     if args.scaling: valid_sample = load_scaler(valid_sample, scalars, args.output_dir+'/'+args.scaler_in)
+
+
+'''
+# EVALUATING FEATUREs CORRELATIONS
+correlations(images, scalars, valid_sample, valid_labels, args.eta_region, args.output_dir,
+             args.scaling, args.scaler_out, args.images, args.correlation, args.tracks_means)
+'''
 
 
 # TRAINING LOOP
@@ -162,9 +200,9 @@ if args.n_epochs > 0:
     print('\nCLASSIFIER: using TensorFlow', tf.__version__ )
     print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
     print(  'CLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
-    print([key for key in train_var if train_var[key] != []])
+    print([key for key in train_data if train_data[key] != []])
     print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
-    func_args = (args.data_file, variables, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
+    func_args = (dataset, input_data, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
     #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     sample_weight = balance_sample(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2d')[-1]
@@ -191,10 +229,34 @@ if args.n_folds > 1:
 else:
     print('\nValidation sample', args.n_valid, 'class predictions:')
     valid_probs = model.predict(valid_sample, batch_size=20000, verbose=args.verbose); print()
-valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
-              args.output_dir, args.plotting, args.runDiffPlots)
+bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir,
+                        args.plotting, args.runDiffPlots)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    if args.n_folds > 1 and False: valid_data = (valid_probs,)
-    else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
-    pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
+    if args.removal == 'ON':
+        pickle.dump({removed_feature:bkg_rej}, open(args.output_dir+'/'+args.results_out,'ab'))
+    else:
+        if args.n_folds > 1 and False: valid_data = (valid_probs,)
+        else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
+        pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
+
+
+'''
+if args.removal == 'ON' or args.permutation == 'ON':
+    bkg_rej_full = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
+                                 args.output_dir, args.plotting, args.runDiffPlots, return_bkg_rej=True)
+
+# FEATURE IMPORTANCE
+if args.removal == 'ON':
+    bkg_rej_full = (feat, bkg_rej_full)
+    fname = args.output_dir + '/bkg_rej' # Saves the 70% bkg_rej into a pkl for later use
+    saving_results(bkg_rej_full, fname)
+
+# FEATURE PERMUTATION IMPORTANCE
+if args.permutation == 'ON':
+    feats = [[var] for var in images + scalars]
+    g = args.feat-len(feats)
+    feats += groups
+    feature_permutation(feats[args.feat], g, valid_sample, valid_labels, model, bkg_rej_full, train_labels,
+                        training, args.n_classes, args.n_reps, args.output_dir)
+'''

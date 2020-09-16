@@ -3,7 +3,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 
 # Training at LPS  
-1) login to atlas16 for GPU's avaibility 
+1) login to atlas16 for GPU's avaibility
    ```
    ssh -Y atlas16
    ```
@@ -59,9 +59,14 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
    cd el_classifier
    ```
+6) File sharing is usually not possible on beluga. So you might need to secure copy the data files and singularity image files from lps to your own directories. Here's a nice tutorial on secure copy:
+    ```
+    https://haydenjames.io/linux-securely-copy-files-using-scp/
+    ```
+
 
 # Using Slurm jobs manager (LPS or Beluga)
-1) run classifier.sh script and send jobs to Slurm batch system
+1) run classifier.sh script and send jobs to Slurm batch system (This will run the command in classifier.sh)
    ```
    sbatch sbatch.sh
    ```
@@ -89,55 +94,73 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
    salloc --time=00:30:00 --cpus-per-task=4 --gres=gpu:1 --mem=128G --x11 --account=def-arguinj
    ```
+   Once the ressources are ready to use, activate the virtual environment of TensorFlow2.1.0+Python3.6.8 Singularity image
+   ```
+   module load singularity/3.5
+   singularity shell --bind $YOUR_CODE_PATH $YOUR_SING_IMAGE_PATH/tf-2.1.0-gpu-py3_sing-3.5.sif
+   ```
 
 
 # classifier.py Options
---n_train     : number of training electrons (default=1e5)
+--n_train         : number of training electrons (default=1e5)
 
---n_valid     : number of testing electrons (default=1e5)
+--n_valid         : number of testing electrons (default=1e5)
 
---batch_size  : size of training batches (default=5000)
+--batch_size      : size of training batches (default=5000)
 
---n_epochs    : number of training epochs (default=100)
+--n_epochs        : number of training epochs (default=100)
 
---n_classes   : number of classes (default=2)
+--n_classes       : number of classes (default=2)
 
---n_tracks    : number of tracks (default=10)
+--n_tracks        : number of tracks (default=10)
 
---n_folds     : number of folds for k-fold cross_validation
+--n_folds         : number of folds for k-fold cross_validation
 
---n_gpus      : number of gpus for distributed training (default=4)
+--n_gpus          : number of gpus for distributed training (default=4)
 
---weight_type : name of weighting method, either of 'none' (default),
-	       'match2b', 'match2s', 'flattening' should be given 
+--weight_type     : name of weighting method, either of 'none' (default),
+	       'match2b', 'match2s', 'flattening' should be given
 
---train_cuts  : applied cuts on training samples 
+--train_cuts      : applied cuts on training samples
 
---valid_cuts  : applied cuts on validation samples 
+--valid_cuts      : applied cuts on validation samples
 
---NN_type     : CNN or FCN specify the type of neural networks (default=CNN) 
+--NN_type         : CNN or FCN specify the type of neural networks (default=CNN)
 
---scaling     : applies quantile transform to scalar variables when ON (fit performed on train sample
+--scaling         : applies quantile transform to scalar variables when ON (fit performed on train sample
 	        and applied to whole sample)  
 
---cross_valid : performs k-fold cross-validation 
+--cross_valid     : performs k-fold cross-validation
 
---plotting    : plots accuracy history when ON, distributions separation and ROC curves 
+--plotting        : plots accuracy history when ON, distributions separation and ROC curves; plots removal ranking plot when set to 'rm' or 'removal' and permutation ranking plot when set to 'prm' or 'permutation'
 
---output_dir  : name of output directory (useful fo running jobs in parallel) 
+--output_dir      : name of output directory (useful for running jobs in parallel)
 
---model_in    : hdf5 model file from a previous training checkpoint (requires .h5 extension)  
+--model_in        : hdf5 model file from a previous training checkpoint (requires .h5 extension)  
 
---model_out   : name of hdf5 checkpoint file used for saving and updating the model best weights 
+--model_out       : name of hdf5 checkpoint file used for saving and updating the model best weights
 
---scaler_in   : name of the pickle file (.pkl) containing scaling transform (quantile) for scalars variables 
+--scaler_in       : name of the pickle file (.pkl) containing scaling transform (quantile) for scalars variables
 
---results_in  : name of the pickle file (.pkl) containing validation results 
+--results_in      : name of the pickle file (.pkl) containing validation results
 
+--removal         : runs removal importance when ON
+
+--permutation     : runs permutation importance when ON
+
+--n_reps          : number of repetition of the permutation algorithm
+
+--feat            : index of the feature to be removed by the removal importance algorithm
+
+--correlation     : plots correlation matrix of the input variable when ON, plots a scatter plot matrix when set to "SCATTER"; set images OFF to remove image means from the correlations
+
+--tracks_means    : adds the tracks means to the correlations plots when ON, plots only the tracks means correlation when set to "ONLY"
+
+--auto_output_dir : automatically set the output directory to output_dir/{n_classes}c_{n_train/1e6}m/{weight_type}/{region} where output_dir is the given output directory, weight_type is the type of reweighthing and region is the eta region where the training is executed (This option is really handy for managing multiple feature importance trainings)
 
 # Explanations
 1) The model and weights are automatically saved to a hdf5 checkpoint for each epoch where the performance
-   (either accuracy or loss function) has improved. 
+   (either accuracy or loss function) has improved.
 2) An early stopping callback allows the training to stop automatically when the validation performance
    has stop improving for a pre-determined number of epochs (default=10).  
 3) Finished or aborted trainings can be resumed from where they were stopped by using previously trained weights
