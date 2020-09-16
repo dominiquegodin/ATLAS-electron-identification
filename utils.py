@@ -743,7 +743,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
 
 
 def feature_removal(scalars, images, groups, index):
-    if   index <= 0: removed_feature = 'all'
+    if   index <= 0: removed_feature = 'none'
     elif index  > len(scalars+images+groups): sys.exit()
     elif index <= len(scalars+images):
         removed_feature = (scalars+images)[index-1]

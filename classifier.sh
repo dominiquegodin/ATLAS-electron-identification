@@ -1,7 +1,7 @@
 # SINGLE TRAINING
-python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --n_tracks=5    --l2=1e-7      --dropout=0.1     --verbose=2     --NN_type=CNN           \
-		      --plotting=ON   --weight_type=None --bkg_ratio=2 --output_dir=outputs
+python classifier.py  --n_train=1e6   --n_valid=1e6  --batch_size=5e3   --n_epochs=100  --n_classes=2           \
+                      --verbose=2     --plotting=OFF --weight_type=none --output_dir=outputs                    \
+                      --feature_removal=ON  --results_out=results.pkl   --sbatch_var=${SBATCH_VAR}
 
 
 exit

@@ -41,7 +41,7 @@ def plot_history(history, output_dir, key='accuracy'):
     plt.ylabel(key.title()+' (%)',fontsize=25)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
     file_name = output_dir+'/history.png'
-    print('Saving training accuracy history to:', file_name); plt.savefig(file_name)
+    print('Saving training accuracy history to:', file_name, '\n'); plt.savefig(file_name)
 
 
 def var_histogram(sample, labels, weights, output_dir, prefix, var):

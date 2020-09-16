@@ -9,11 +9,7 @@ from   utils     import validation, make_sample, sample_composition, apply_scale
 from   utils     import compo_matrix, sample_weights, class_weights, balance_sample, split_samples
 from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms
 from   models    import multi_CNN, callback, create_model
-
 from   importance import feature_importance, feature_permutation, correlations, saving_results
-#from   importance import feature_removal, print_importances, plot_importance
-#from   importance import correlations, saving_results
-#create_path, feature_importance
 
 
 # MAIN PROGRAM ARGUMENTS
@@ -112,15 +108,13 @@ from utils import feature_removal, feature_ranking
 #groups = [('em_barrel_Lr1', 'em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3')]
 if   args.feature_removal == 'ON':
     scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
-    print(removed_feature); print(scalars); print(images); sys.exit()
 elif args.feature_ranking == 'ON':
     feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[]); sys.exit()
-#func_args = (args.output_dir, args.n_classes, args.weight_type, args.eta_region, args.n_train,
 '''
+#func_args = (args.output_dir, args.n_classes, args.weight_type, args.eta_region, args.n_train,
 #             args.feat, images, scalars, args.removal, args.plotting)
 #scalars, images, feat, groups = feature_importance(*func_args)
 '''
-
 
 # TRAINING DICTIONARY
 if args.scalars != 'ON': scalars=[]
@@ -156,9 +150,6 @@ model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CN
 
 
 # ARGUMENTS AND VARIABLES TABLES
-for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
-    try: os.mkdir(path)
-    except (FileExistsError, IOError): pass
 args.scaler_in  = args.scaler_in  if '.pkl' in args.scaler_in  else ''
 args.model_in   = args.model_in   if '.h5'  in args.model_in   else ''
 args.results_in = args.results_in if '.h5'  in args.results_in else ''
@@ -195,6 +186,9 @@ correlations(images, scalars, valid_sample, valid_labels, args.eta_region, args.
 
 # TRAINING LOOP
 if args.n_epochs > 0:
+    for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+        try: os.mkdir(path)
+        except (FileExistsError, IOError): pass
     print('\nCLASSIFIER: train sample:'   , format(args.n_train[1] -args.n_train[0], '8.0f'), 'e')
     print(  'CLASSIFIER: valid sample:'   , format(args.n_valid[1] -args.n_valid[0], '8.0f'), 'e')
     print('\nCLASSIFIER: using TensorFlow', tf.__version__ )
@@ -233,7 +227,7 @@ bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, t
                         args.plotting, args.runDiffPlots)
 if args.results_out != '':
     print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
-    if args.removal == 'ON':
+    if args.feature_removal == 'ON':
         pickle.dump({removed_feature:bkg_rej}, open(args.output_dir+'/'+args.results_out,'ab'))
     else:
         if args.n_folds > 1 and False: valid_data = (valid_probs,)
