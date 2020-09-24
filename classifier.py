@@ -137,7 +137,7 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     input_data = {'scalars':scalars, 'images':[], 'others':others}
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
-               dataset, input_data, args.runDiffPlots)
+               {'scalars':scalars,'images':[],'others':others}, args.runDiffPlots)
 elif args.results_in != '': print('\noption [--results_in] not matching any file --> aborting ...')
 if   args.results_in != '': sys.exit()
 
@@ -167,7 +167,7 @@ print(tabulate(table, headers=headers, tablefmt='psql')); print()
 
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
-print('CLASSIFIER: loading valid sample', args.n_valid, end=' ... ', flush=True)
+print('CLASSIFIER: LOADING VALID SAMPLE')
 func_args = (dataset, input_data, args.n_valid, args.n_tracks, args.n_classes, args.valid_cuts)
 valid_sample, valid_labels = make_sample(*func_args)
 #sample_analysis(valid_sample, valid_labels, scalars, args.scaler_in, args.output_dir); sys.exit()
@@ -195,7 +195,7 @@ if args.n_epochs > 0:
     print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
     print(  'CLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
     print([key for key in train_data if train_data[key] != []])
-    print('\nCLASSIFIER: loading train sample', args.n_train, end=' ... ', flush=True)
+    print('\nCLASSIFIER: LOADING TRAIN SAMPLE')
     func_args = (dataset, input_data, args.n_train, args.n_tracks, args.n_classes, args.train_cuts)
     train_sample, train_labels = make_sample(*func_args); sample_composition(train_sample)
     #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
@@ -226,14 +226,15 @@ else:
 bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training, args.output_dir,
                         args.plotting, args.runDiffPlots)
 if args.results_out != '':
-    print('Saving validation results to:', args.output_dir+'/'+args.results_out, '\n')
     if args.feature_removal == 'ON':
-        pickle.dump({removed_feature:bkg_rej}, open(args.output_dir+'/'+args.results_out,'ab'))
+        args.output_dir = args.output_dir[0:args.output_dir.rfind('/')]
+        try: pickle.dump({removed_feature:bkg_rej}, open(args.output_dir+'/'+args.results_out,'ab'))
+        except (FileExistsError, IOError): print('IO CONFLICT FOR FEAT_'+str(args.sbatch_var), '--> ABORTING')
     else:
         if args.n_folds > 1 and False: valid_data = (valid_probs,)
         else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
         pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
-
+    print('Saved validation results to:', args.output_dir+'/'+args.results_out, '\n')
 
 '''
 if args.removal == 'ON' or args.permutation == 'ON':
