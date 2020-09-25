@@ -801,15 +801,17 @@ def feature_removal(scalars, images, groups, index):
 
 
 def feature_ranking(output_dir, results_out, scalars, images, groups):
-    data_dict = {}; output_dir = output_dir[0:output_dir.rfind('/')]
+    data_dict = {} #; output_dir = output_dir[0:output_dir.rfind('/')]
     with open(output_dir+'/'+results_out,'rb') as file_data:
         try:
             while True: data_dict.update(pickle.load(file_data))
         except EOFError: pass
-    pickle.dump(data_dict, open(output_dir+'/'+results_out,'wb'))
-    from importance import ranking_plot
+    try: pickle.dump(data_dict, open(output_dir+'/'+results_out,'wb'))
+    except IOError: print('FILE ACCESS CONFLICT IN FEATURE RANKING --> SKIPPING ACCESS\n')
+    #from importance import ranking_plot
     #ranking_plot(data_dict, output_dir, 'put title here', images, scalars, groups)
-    print(data_dict)
+    print('BACKGROUND REJECTION DICTIONARY:')
+    for key in data_dict: print(format(key,'30s'), data_dict[key])
 
 
 

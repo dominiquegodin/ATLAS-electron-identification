@@ -2,13 +2,14 @@
 import tensorflow      as tf
 import numpy           as np
 import os, sys, h5py, pickle
-from   argparse  import ArgumentParser
-from   tabulate  import tabulate
-from   itertools import accumulate
-from   utils     import validation, make_sample, sample_composition, apply_scaler, load_scaler
-from   utils     import compo_matrix, sample_weights, class_weights, balance_sample, split_samples
-from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms
-from   models    import multi_CNN, callback, create_model
+from   argparse   import ArgumentParser
+from   tabulate   import tabulate
+from   itertools  import accumulate
+from   utils      import validation, make_sample, sample_composition, apply_scaler, load_scaler
+from   utils      import compo_matrix, sample_weights, class_weights, balance_sample, split_samples
+from   utils      import cross_valid, valid_results, sample_analysis, sample_histograms
+from   utils      import feature_removal, feature_ranking
+from   models     import multi_CNN, callback, create_model
 from   importance import feature_importance, feature_permutation, correlations, saving_results
 
 
@@ -52,7 +53,6 @@ parser.add_argument( '--correlation'     , default = 'OFF'               )
 parser.add_argument( '--permutation'     , default = 'OFF'               )
 parser.add_argument( '--removal'         , default = 'OFF'               )
 parser.add_argument( '--feature_removal' , default = 'OFF'               )
-parser.add_argument( '--feature_ranking' , default = 'OFF'               )
 parser.add_argument( '--n_reps'          , default =   10, type = int    )
 parser.add_argument( '--feat'            , default =   -1, type = int    )
 parser.add_argument( '--tracks_means'    , default = 'OFF'               )
@@ -70,8 +70,8 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 
 
 # DATASET
-#if args.eta_region == 'barrel': dataset = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
-if args.eta_region == 'barrel': dataset = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
+if args.eta_region == 'barrel': dataset = '/project/def-arguinj/dgodin/el_data/2020-05-28/el_data.h5'
+#if args.eta_region == 'barrel': dataset = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3/output/el_data.h5'
 #if args.eta_region == 'barrel': dataset = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3/output/el_data.h5'
 if args.eta_region == 'gap'   : dataset = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6/output/el_data.h5'
 if args.eta_region == 'endcap': dataset = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5/output/el_data.h5'
@@ -103,18 +103,16 @@ with h5py.File(dataset, 'r') as data:
     others  = [key for key in others  if key in data]
 
 
-# FEATURE IMPORTANCE ANALYSIS
-from utils import feature_removal, feature_ranking
+# FEATURE REMOVAL IMPORTANCE RANKING
 #groups = [('em_barrel_Lr1', 'em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2', 'em_barrel_Lr3')]
 if   args.feature_removal == 'ON':
     scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
-elif args.feature_ranking == 'ON':
-    feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[]); sys.exit()
 '''
 #func_args = (args.output_dir, args.n_classes, args.weight_type, args.eta_region, args.n_train,
 #             args.feat, images, scalars, args.removal, args.plotting)
 #scalars, images, feat, groups = feature_importance(*func_args)
 '''
+
 
 # TRAINING DICTIONARY
 if args.scalars != 'ON': scalars=[]
@@ -229,12 +227,13 @@ if args.results_out != '':
     if args.feature_removal == 'ON':
         args.output_dir = args.output_dir[0:args.output_dir.rfind('/')]
         try: pickle.dump({removed_feature:bkg_rej}, open(args.output_dir+'/'+args.results_out,'ab'))
-        except (FileExistsError, IOError): print('IO CONFLICT FOR FEAT_'+str(args.sbatch_var), '--> ABORTING')
+        except IOError: print('FILE ACCESS CONFLICT FOR FEAT_'+str(args.sbatch_var), '--> ABORTING\n')
+        feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[])
     else:
         if args.n_folds > 1 and False: valid_data = (valid_probs,)
         else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
         pickle.dump(valid_data, open(args.output_dir+'/'+args.results_out,'wb'))
-    print('Saved validation results to:', args.output_dir+'/'+args.results_out, '\n')
+    print('\nValidation results saved to:', args.output_dir+'/'+args.results_out, '\n')
 
 '''
 if args.removal == 'ON' or args.permutation == 'ON':
