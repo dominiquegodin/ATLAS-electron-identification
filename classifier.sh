@@ -68,4 +68,4 @@ python classifier.py  --n_train=0  --n_valid=15e6  --output_dir=outputs  --resul
 # FEATURE REMOVAL IMPORTANCE RANKING (array jobs)
 python classifier.py  --n_train=10e6 --n_valid=1e6 --batch_size=5e3 --n_epochs=100 --n_classes=2 --verbose=2   \
                       --weight_type=none --plotting=OFF --feature_removal=ON --sbatch_var=${SBATCH_VAR}        \
-                      --results_out=results.pkl --output_dir=outputs/feat_${SBATCH_VAR}
+                      --results_out=results.pkl --output_dir=outputs/feature_removal/feat_${SBATCH_VAR}
