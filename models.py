@@ -45,11 +45,11 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
 
 
 def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, train_var, n_gpus):
-    devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3']
+    devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3','/gpu:4', '/gpu:5', '/gpu:6', '/gpu:7']
     tf.debugging.set_log_device_placement(False)
     strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
     with strategy.scope():
-        if tf.__version__ >= '2.1.0' and len(train_var['images']) >= 1:
+        if tf.__version__ >= '2.1.0':# and train_var['images'] != ['tracks_image']:
             mixed_precision.experimental.set_policy('mixed_float16')
         if 'tracks_image' in train_var['images']: CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
         model = multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, **train_var)
@@ -69,11 +69,8 @@ def descent_optimizers():
 
 
 def callback(model_out, patience, metrics):
-    calls  = [callbacks.ModelCheckpoint(model_out      , save_best_only=True      , monitor=metrics, verbose=1)]
-    calls += [callbacks.EarlyStopping(patience=patience, restore_best_weights=True, monitor=metrics, verbose=1)]
-    calls += [callbacks.ReduceLROnPlateau(patience=3, factor=0.5, min_delta=1e-6  , monitor=metrics, verbose=1)]
+    calls  = [callbacks.ModelCheckpoint(model_out, save_best_only=True, monitor=metrics, verbose=1)]
+    calls += [callbacks.ReduceLROnPlateau(patience=3, factor=0.5, min_delta=1e-6, monitor=metrics, verbose=1)]
+    calls += [callbacks.EarlyStopping(patience=patience, restore_best_weights=True,
+              min_delta=1e-5, monitor=metrics, verbose=1)]
     return calls + [callbacks.TerminateOnNaN()]
-
-
-#def custom_metric(y_true, y_pred):
-#    return tf.keras.metrics.sparse_categorical_accuracy(y_true, y_pred)

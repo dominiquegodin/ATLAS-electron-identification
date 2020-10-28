@@ -210,6 +210,15 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
+def sample_histograms(valid_sample, valid_labels, train_sample, train_labels, sample_weight, output_dir):
+    arguments  = [(valid_sample, valid_labels,     None     , output_dir, 'valid')]
+    arguments += [(train_sample, train_labels, sample_weight, output_dir, 'train')]
+    processes  = [mp.Process(target=var_histogram, args=arg+(var,)) for arg in arguments for var in ['pt','eta']]
+    for job in processes: job.start()
+    for job in processes: job.join()
+    return sample_weight
+
+
 def split_samples(valid_sample, valid_labels, train_sample, train_labels):
     #generate a different validation sample from training sample with downsampling
     valid_sample, valid_labels, extra_sample, extra_labels = downsampling(valid_sample, valid_labels)
@@ -219,51 +228,71 @@ def split_samples(valid_sample, valid_labels, train_sample, train_labels):
     return valid_sample, valid_labels, train_sample, train_labels, sample_weight
 
 
-def sample_histograms(valid_sample, valid_labels, train_sample, train_labels, sample_weight, output_dir):
-    arguments  = [(valid_sample, valid_labels,      None    , output_dir, 'valid')]
-    arguments += [(train_sample, train_labels, sample_weight, output_dir, 'train')]
-    processes  = [mp.Process(target=var_histogram, args=arg+(var,)) for arg in arguments for var in ['pt','eta']]
-    for job in processes: job.start()
-    for job in processes: job.join()
-    return sample_weight
+def get_class_weight(labels, bkg_ratio):
+    n_e = len(labels); n_classes = max(labels) + 1
+    if bkg_ratio == 0 and n_classes == 2: return None
+    if bkg_ratio == 0 and n_classes != 2: bkg_ratio = 1
+    ratios       = {**{0:1}, **{n:bkg_ratio for n in np.arange(1, n_classes)}}
+    class_weight = {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
+    return class_weight
 
 
-def balance_sample(sample, labels, sampling_type=None, bkg_ratio=None, hist='2d', get_weights=True):
-    if sampling_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max']:
-        return sample, labels, None
-    eta = abs(sample['eta']); eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
+def get_sample_weight(sample, labels, weight_type=None, bkg_ratio=None, hist='2d', density=False):
+    if weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max']: return None
+    n_classes = max(labels)+1
     pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500        ]
-    eta_bins[-1] = max(eta_bins[-1], max(eta)) + 1e-6
-    pt_bins [-1] = max( pt_bins [1], max( pt)) + 1e-6
-    eta_bins = eta_bins[np.where(eta_bins<=min(eta))[0][-1]:np.where(eta_bins>=max(eta))[0][0]+1]
+    eta = abs(sample['eta']); eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
+    pt_bins [-1] = max( pt_bins[-1], max( pt)) + 1e-3
+    eta_bins[-1] = max(eta_bins[-1], max(eta)) + 1e-3
     pt_bins  =  pt_bins[np.where( pt_bins<=min( pt))[0][-1]:np.where( pt_bins>=max( pt))[0][0]+1]
+    eta_bins = eta_bins[np.where(eta_bins<=min(eta))[0][-1]:np.where(eta_bins>=max(eta))[0][0]+1]
     if hist == 'pt' : eta_bins = [eta_bins[0], eta_bins[-1]]
     if hist == 'eta':  pt_bins = [ pt_bins[0],  pt_bins[-1]]
-    eta_ind  = np.digitize(eta, eta_bins, right=False) -1
     pt_ind   = np.digitize( pt,  pt_bins, right=False) -1
-    hist_sig = np.histogram2d(pt[labels==0], eta[labels==0], bins=[pt_bins,eta_bins])[0]
-    hist_bkg = np.histogram2d(pt[labels!=0], eta[labels!=0], bins=[pt_bins,eta_bins])[0]
-    if bkg_ratio == None: bkg_ratio = np.sum(hist_bkg)/np.sum(hist_sig)
-    if   sampling_type == 'bkg_ratio':
-        total_sig = hist_sig * max(1, np.sum(hist_bkg)/np.sum(hist_sig)/bkg_ratio)
-        total_bkg = hist_bkg * max(1, np.sum(hist_sig)/np.sum(hist_bkg)*bkg_ratio)
-    elif sampling_type == 'flattening':
-        total_sig = np.minimum(1, hist_sig) * max(np.max(hist_sig), np.max(hist_bkg)/bkg_ratio)
-        total_bkg = np.minimum(1, hist_bkg) * max(np.max(hist_bkg), np.max(hist_sig)/bkg_ratio)
-    elif sampling_type == 'match2s':
-        total_sig = hist_sig * max(1, np.max(hist_bkg/hist_sig)/bkg_ratio)
-        total_bkg = hist_sig * max(1, np.max(hist_bkg/hist_sig)/bkg_ratio) * bkg_ratio
-    elif sampling_type == 'match2b':
-        total_sig = hist_bkg * max(1, np.max(hist_sig/hist_bkg)*bkg_ratio) / bkg_ratio
-        total_bkg = hist_bkg * max(1, np.max(hist_sig/hist_bkg)*bkg_ratio)
-    elif sampling_type == 'match2max':
-        total_sig = np.maximum(hist_sig, hist_bkg/bkg_ratio)
-        total_bkg = np.maximum(hist_bkg, hist_sig*bkg_ratio)
-    if get_weights or hist != 'pt':
-        weights_sig = total_sig/hist_sig * len(labels)/np.sum(total_sig+total_bkg)
-        weights_bkg = total_bkg/hist_bkg * len(labels)/np.sum(total_sig+total_bkg)
-        return sample, labels, np.where(labels==0, weights_sig[pt_ind,eta_ind], weights_bkg[pt_ind,eta_ind])
-    return upsampling(sample, labels, pt_bins, pt_ind, hist_sig, hist_bkg, total_sig, total_bkg) + (None,)
+    eta_ind  = np.digitize(eta, eta_bins, right=False) -1
+    hist_sig = np.histogram2d(pt[labels==0], eta[labels==0], bins=[pt_bins,eta_bins], density=density)[0]
+    if density: hist_sig *= np.sum(labels==0)
+    total_sig_array = []; total_bkg_array = []; hist_bkg_array = []
+    for n in np.arange(1, n_classes):
+        hist_bkg = np.histogram2d(pt[labels==n], eta[labels==n], bins=[pt_bins,eta_bins], density=density)[0]
+        if density: hist_bkg *= np.sum(labels==n)
+        hist_bkg = np.maximum(hist_bkg, np.min(hist_bkg[hist_bkg!=0]))
+        ratio    = np.sum(hist_bkg)/np.sum(hist_sig) if bkg_ratio == None else bkg_ratio
+        if   weight_type == 'bkg_ratio':
+            total_sig = hist_sig * max(1, np.sum(hist_bkg)/np.sum(hist_sig)/ratio)
+            total_bkg = hist_bkg * max(1, np.sum(hist_sig)/np.sum(hist_bkg)*ratio)
+        elif weight_type == 'flattening':
+            total_sig = np.ones(hist_sig.shape) * max(np.max(hist_sig), np.max(hist_bkg)/ratio)
+            total_bkg = np.ones(hist_bkg.shape) * max(np.max(hist_bkg), np.max(hist_sig)*ratio)
+        elif weight_type == 'match2s':
+            total_sig = hist_sig * max(1, np.max(hist_bkg/hist_sig)/ratio)
+            total_bkg = hist_sig * max(1, np.max(hist_bkg/hist_sig)/ratio) * ratio
+        elif weight_type == 'match2b':
+            total_sig = hist_bkg * max(1, np.max(hist_sig/hist_bkg)*ratio) / ratio
+            total_bkg = hist_bkg * max(1, np.max(hist_sig/hist_bkg)*ratio)
+        elif weight_type == 'match2max':
+            total_sig = np.maximum(hist_sig, hist_bkg/ratio)
+            total_bkg = np.maximum(hist_bkg, hist_sig*ratio)
+        total_sig_array.append(total_sig[np.newaxis,...])
+        total_bkg_array.append(total_bkg[np.newaxis,...])
+        hist_bkg_array.append ( hist_bkg[np.newaxis,...])
+    hist_sig_array  = hist_sig[np.newaxis,...]
+    hist_bkg_array  = np.concatenate( hist_bkg_array, axis=0)
+    total_sig_array = np.concatenate(total_sig_array, axis=0)
+    total_bkg_array = np.concatenate(total_bkg_array, axis=0)
+    total_sig_ratio = total_sig_array / np.max(total_sig_array, axis=0)
+    total_sig_array = np.max(total_sig_array, axis=0)
+    total_bkg_array = total_bkg_array / total_sig_ratio
+    weights_array = np.concatenate([total_sig_array/hist_sig_array, total_bkg_array/hist_bkg_array])
+    sample_weight = np.zeros(len(labels))
+    for n in np.arange(n_classes):
+        sample_weight = np.where(labels==n, weights_array[n,...][pt_ind, eta_ind], sample_weight)
+    return sample_weight*len(labels)/np.sum(sample_weight)
+
+
+def gen_weights(n_train, weight_idx, sample_weight):
+    weights = np.zeros(np.diff(n_train)[0]); np.put(weights, weight_idx, sample_weight)
+    return weights
 
 
 def upsampling(sample, labels, bins, indices, hist_sig, hist_bkg, total_sig, total_bkg):
@@ -314,29 +343,22 @@ def match_distributions(sample, labels, target_sample, target_labels):
     return np.where(labels==0, weights_sig[indices], weights_bkg[indices])
 
 
-def class_weights(labels, bkg_ratio):
-    n_e = len(labels); n_classes = max(labels) + 1
-    if bkg_ratio == 0 and n_classes == 2: return None
-    if bkg_ratio == 0 and n_classes != 2: bkg_ratio = 1
-    ratios = {**{0:1}, **{n:bkg_ratio for n in np.arange(1, n_classes)}}
-    return {n:n_e/np.sum(labels==n)*ratios[n]/sum(ratios.values()) for n in np.arange(n_classes)}
-
-
-def validation(output_dir, results_in, plotting, n_valid, data_file, input_var, diff_plots, valid_cuts=''):
+def validation(output_dir, results_in, plotting, n_valid, data_files, inputs, valid_cuts, sep_bkg, diff_plots):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
     n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
     if False or len(valid_data) == 1: #add variables to the results
-        print('CLASSIFIER: loading valid sample', n_e, end=' ... ', flush=True)
-        sample, labels = make_sample(data_file, input_var, n_valid, n_tracks=5, n_classes=probs.shape[1])
+        print('CLASSIFIER: loading valid sample', n_e, end=' --> ', flush=True)
+        sample, labels = merge_samples(data_files, n_valid, inputs, n_tracks=5, n_classes=probs.shape[1],
+                                       valid_cuts=valid_cuts, s_scaler=None, t_scaler=None)
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
     if False: #save the added variables to the results file
         print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
         pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
-    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' ...', flush=True)
+    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' -->', flush=True)
     #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
     #valid_cuts = '(sample["p_et_calo"]  < 20)'
     #valid_cuts = '(sample["p_et_calo"] >= 20) & (sample["p_et_calo"] <= 80)'
@@ -349,16 +371,19 @@ def validation(output_dir, results_in, plotting, n_valid, data_file, input_var, 
         from plots_DG import cal_images
         cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
     def text_line(n_cut): return ' ('+str(n_cut)+' selected = '+format(100*n_cut/n_e,'0.2f')+'%)'
-    print(text_line(len(labels)) if len(labels) < n_e else '', '\n')
-    valid_results(sample, labels, probs, [], None, output_dir, plotting, diff_plots)
+    print(text_line(len(labels)) if len(labels) < n_e else '')
+    valid_results(sample, labels, probs, [], None, output_dir, plotting, sep_bkg, diff_plots); print()
+    if False: #plot distribution histograms
+        sample_histograms(sample, labels, sample, labels, None, output_dir)
 
 
-def make_sample(data_file, input_data, idx, n_tracks, n_classes, cuts='', scaler_in='', prefix='p_'):
-    if idx[1]-idx[0] > 1:
-        print('loading sample [', format(str(idx[0]),'>7s')+', '+format(str(idx[1]),'>7s'), end='] ')
-        print('from', data_file.split('/')[-3]+'/'+data_file.split('/')[-1], end=' --> ', flush=True)
-        start_time = time.time()
+def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', prefix='p_'):
+    upsize_images = False; preprocess_images = False
     scalars, images, others = input_data.values()
+    if verbose == 'ON':
+        print('loading sample [', format(str(idx[0]),'>7s')+', '+format(str(idx[1]),'>7s'), end='] ')
+        print('from', data_file.split('/')[-2]+'/'+data_file.split('/')[-1], end=' --> ', flush=True)
+        start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in scalars+others}
         sample.update({'eta':sample['p_eta'], 'pt':sample['p_et_calo']})
@@ -372,56 +397,15 @@ def make_sample(data_file, input_data, idx, n_tracks, n_classes, cuts='', scaler
             tracks_data = data[prefix+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
             tracks_data = np.concatenate((abs(tracks_data[...,0:5]), tracks_data[...,5:13]), axis=2)
             sample['tracks_image'] = tracks_data
-    if tf.__version__ < '2.1.0' or len(images) == 0:
+    if tf.__version__ < '2.1.0':
         for key in set(sample)-set(others): sample[key] = np.float32(sample[key])
-    upsize_images = False; preprocess_images = False
-    if upsize_images == True:
+    if images == ['tracks_image']: sample['tracks_image'] = np.float32(sample['tracks_image'])
+    if upsize_images:
         for key in images: sample[key] = resize_images(np.float32(sample[key]),target_shape=(56,11))
     labels = make_labels(sample, n_classes)
-    if idx[1]-idx[0] > 1:
-        print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-        sample, labels = sample_cuts(sample, labels, cuts)
-        if preprocess_images == True: sample = process_images(sample, images)
-        if scaler_in != '': sample = load_scaler(sample, scalars, scaler_in)
+    if preprocess_images: sample = process_images(sample, images)
+    if verbose == 'ON': print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
     return sample, labels
-
-
-def batch_idx(data_files, batch_size, lim):
-    def return_idx(cum_batches, batch_size, index):
-        file_index  = np.searchsorted(cum_batches, index, side='right')
-        batch_index = index - np.append(0, cum_batches)[file_index]
-        idx         = batch_index*batch_size; idx = [idx, min(idx+batch_size, n_e[file_index])]
-        return file_index, idx
-    n_e = [len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files]
-    batches    = np.cumsum(np.int_(np.ceil(np.array(n_e)/batch_size)))
-    indexes    = [return_idx(batches, batch_size, index) for index in np.arange(batches[-1])]
-    cum_n_e    = np.cumsum(np.diff(list(zip(*indexes))[1]))
-    n_e_index  = np.searchsorted(cum_n_e, [lim[0],lim[1]-1], side='right')
-    batch_list = [indexes[n] for n in np.arange(batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
-    cum_n_e    = [cum_n_e[n] for n in np.arange(batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
-    batch_list[ 0][1][0] = batch_list[ 0][1][1] + lim[0] - cum_n_e[ 0]
-    batch_list[-1][1][1] = batch_list[-1][1][1] + lim[1] - cum_n_e[-1]
-    np.random.shuffle(batch_list)
-    batch_dict = {batch_list.index(n):{'file':n[0], 'indices':n[1]} for n in batch_list}
-    #for key in batch_dict: print(key, batch_dict[key])
-    return batch_dict
-
-
-class Batch_Generator(tf.keras.utils.Sequence):
-    def __init__(self, data_files, input_data, indexes, n_tracks, n_classes, batch_size, cuts, scaler_in):
-        self.data_files = data_files; self.input_data = input_data
-        self.indexes    = indexes   ; self.n_tracks   = n_tracks
-        self.n_classes  = n_classes ; self.batch_size = batch_size
-        self.cuts       = cuts      ; self.scaler_in  = scaler_in
-        self.batch_dict = batch_idx(self.data_files, self.batch_size, self.indexes)
-    def __len__(self):
-        return len(self.batch_dict) #number of batches per epoch
-    def __getitem__(self, gen_index):
-        file_index = self.batch_dict[gen_index]['file']
-        idx        = self.batch_dict[gen_index]['indices']
-        data_file  = self.data_files[file_index]
-        args = (data_files, self.input_data, idx, self.n_tracks, self.n_classes, self.cuts, self.scaler_in)
-        return make_sample(*args)
 
 
 def make_labels(sample, n_classes):
@@ -447,19 +431,106 @@ def make_labels(sample, n_classes):
     else: print('\nERROR:', n_classes, 'classes not supported -> exiting program\n'); sys.exit()
 
 
-def sample_cuts(sample, labels, cuts):
+def batch_idx(data_files, batch_size, interval, weights=None, shuffle='OFF'):
+    def return_idx(cum_batches, batch_size, index):
+        file_index  = np.searchsorted(cum_batches, index, side='right')
+        batch_index = index - np.append(0, cum_batches)[file_index]
+        idx         = batch_index*batch_size; idx = [idx, min(idx+batch_size, n_e[file_index])]
+        return file_index, idx
+    n_e = [len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files]
+    cum_batches = np.cumsum(np.int_(np.ceil(np.array(n_e)/batch_size)))
+    indexes = [return_idx(cum_batches, batch_size, index) for index in np.arange(cum_batches[-1])]
+    cum_n_e    = np.cumsum(np.diff(list(zip(*indexes))[1]))
+    n_e_index  = np.searchsorted(cum_n_e, [interval[0],interval[1]-1], side='right')
+    batch_list = [indexes[n] for n in np.arange(cum_batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
+    cum_n_e    = [cum_n_e[n] for n in np.arange(cum_batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
+    batch_list[ 0][1][0] = batch_list[ 0][1][1] + interval[0] - cum_n_e[ 0]
+    batch_list[-1][1][1] = batch_list[-1][1][1] + interval[1] - cum_n_e[-1]
+    if shuffle == 'ON': batch_list = utils.shuffle(batch_list, random_state=0)
+    '''
+    if np.all(weights) != None:
+        weights = np.split(weights, np.cumsum(n_e))
+        print(n_e, sum(n_e)); print()
+        print(np.cumsum(n_e)); print()
+        print(weights); print()
+        print(len(weights)); print()
+        print(batch_list); print()
+        for n in batch_list: print(weights[n[0]][n[1][0]:n[1][1]])
+        sys.exit()
+    '''
+    batch_dict = {batch_list.index(n):{'file':n[0], 'indices':n[1], 'weights':None} for n in batch_list}
+    if np.all(weights) != None:
+        weights = np.split(weights, np.cumsum(n_e))
+        for n in batch_list: batch_dict[batch_list.index(n)]['weights'] = weights[n[0]][n[1][0]:n[1][1]]
+    #for key in batch_dict: print(key, batch_dict[key])
+    return batch_dict
+
+
+def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, s_scaler=None, t_scaler=None):
+    batch_dict = batch_idx(data_files, np.diff(idx)[0], idx)
+    sample, labels = zip(*[make_sample(data_files[batch_dict[key]['file']], batch_dict[key]['indices'],
+                           input_data, n_tracks, n_classes, verbose='ON') for key in batch_dict])
+    sample  = {key:np.concatenate([n[key] for n in sample]) for key in sample[0]}
+    labels  = np.concatenate(labels)
+    indices = np.where( np.logical_and(labels!=-1, eval(cuts) if cuts!='' else True) )[0]
+    sample, labels, _ = sample_cuts(sample, labels, cuts=cuts, verbose='ON')
+    if s_scaler != None: sample = apply_s_scaler(sample, input_data['scalars'], s_scaler, verbose='ON')
+    if t_scaler != None: sample = apply_t_scaler(sample,                        t_scaler, verbose='ON')
+    else: print()
+    return sample, labels, indices
+    #for key in list(batch_dict.keys())[0:1]:
+    #    valid_sample, valid_labels = make_sample(data_files[batch_dict[key]['file']], input_data, batch_dict[key]['indices'],
+    #                                             args.n_tracks, args.n_classes, args.valid_cuts, args.scaler_in)
+    #for key in list(batch_dict.keys())[1:]:
+    #    sample, labels = make_sample(data_files[batch_dict[key]['file']], input_data, batch_dict[key]['indices'],
+    #                                             args.n_tracks, args.n_classes, args.valid_cuts, args.scaler_in)
+    #print(valid_labels.shape, labels.shape)
+    #    valid_sample = {key: np.concatenate([valid_sample[key][:], sample[key][:]]) for key in sample}
+    #    valid_labels = np.concatenate([valid_labels, labels])
+
+
+class Batch_Generator(tf.keras.utils.Sequence):
+    def __init__(self, data_files, indexes, input_data, n_tracks, n_classes,
+                 batch_size, cuts, s_scaler, t_scaler, weights=None, shuffle='OFF'):
+        self.data_files = data_files; self.indexes   = indexes  ; self.input_data = input_data
+        self.n_tracks   = n_tracks  ; self.n_classes = n_classes; self.batch_size = batch_size
+        self.cuts       = cuts      ; self.s_scaler  = s_scaler ; self.t_scaler   = t_scaler
+        self.weights    = weights   ; self.shuffle   = shuffle
+        self.batch_dict = batch_idx(self.data_files, self.batch_size, self.indexes, self.weights, self.shuffle)
+    def __len__(self):
+        return len(self.batch_dict) #number of batches per epoch
+    def __getitem__(self, gen_index):
+        file_index = self.batch_dict[gen_index]['file']
+        file_idx   = self.batch_dict[gen_index]['indices']
+        weights    = self.batch_dict[gen_index]['weights']
+        data_file  = self.data_files[file_index]
+        sample, labels = make_sample(data_file, file_idx, self.input_data, self.n_tracks, self.n_classes)
+        sample, labels, weights = sample_cuts(sample, labels, weights, self.cuts)
+        if len(labels) != 0:
+            if self.s_scaler != None: sample = apply_s_scaler(sample, self.input_data['scalars'], self.s_scaler)
+            if self.t_scaler != None: sample = apply_t_scaler(sample,                             self.t_scaler)
+        return sample, labels, weights
+
+
+def sample_cuts(sample, labels, weights=None, cuts='', verbose='OFF'):
     if np.sum(labels==-1) != 0:
         length = len(labels)
-        sample = {key:sample[key][labels!=-1] for key in sample}; labels = labels[labels!=-1]
-        print('applying IFF labels cuts -->', format(len(labels),'8d'), 'e conserved', end='')
-        print(' (' + format(100*len(labels)/length, '.2f') + ' %)')
+        sample = {key:sample[key][labels!=-1] for key in sample}
+        if np.all(weights) != None: weights = weights[labels!=-1]
+        labels = labels[labels!=-1]
+        if verbose == 'ON':
+            print('applying IFF labels cuts -->', format(len(labels),'8d'), 'e conserved', end='')
+            print(' (' + format(100*len(labels)/length, '.2f') + ' %)')
     if cuts != '':
         length = len(labels)
-        labels = labels[eval(cuts)]; sample = {key:sample[key][eval(cuts)] for key in sample}
-        #print('CLASSIFIER: applying properties cuts -->', format(len(labels),'8d') ,'e conserved', end='')
-        #print(' (' + format(100*len(labels)/length, '.2f') + ' %)')
-        #print('CLASSIFIER: applied cuts:', cuts)
-    return sample, labels
+        labels = labels[eval(cuts)]
+        if np.all(weights) != None: weights = weights[eval(cuts)];
+        sample = {key:sample[key][eval(cuts)] for key in sample}
+        if verbose == 'ON':
+            print('CLASSIFIER: applying features cuts -->', format(len(labels),'8d') ,'e conserved', end='')
+            print(' ('+format(100*len(labels)/length,'.2f')+' %)\nCLASSIFIER: applied cuts:', cuts)
+    if np.any(weights==0): print('EMPTY WEIGHTS'); sys.exit()
+    return sample, labels, weights
 
 
 def process_images(sample, image_list, n_tasks=16):
@@ -474,7 +545,7 @@ def process_images(sample, image_list, n_tasks=16):
     n_samples = len(sample['eventNumber'])
     idx_list  = [task*(n_samples//n_tasks) for task in np.arange(n_tasks)] + [n_samples]
     idx_list  = list( zip(idx_list[:-1], idx_list[1:]) ); start_time = time.time()
-    print('CLASSIFIER: preprocessing images for best axis', end=' ... ', flush=True)
+    print('CLASSIFIER: preprocessing images for best axis', end=' --> ', flush=True)
     for cal_image in [key for key in image_list if 'tracks' not in key]:
         images    = sample[cal_image]; manager = mp.Manager(); return_dict = manager.dict()
         processes = [mp.Process(target=rotation, args=(images, idx, return_dict)) for idx in idx_list]
@@ -482,6 +553,52 @@ def process_images(sample, image_list, n_tasks=16):
         for job in processes: job.join()
         sample[cal_image] = np.concatenate([return_dict[idx] for idx in idx_list])
     print(' ('+format(time.time()-start_time,'.1f'), '\b'+' s)\n')
+    return sample
+
+
+def fit_s_scaler(sample, scalars, scaler_out):
+    print('CLASSIFIER: fitting quantile transform to training scalars', end=' --> ', flush=True)
+    start_time    = time.time()
+    scalars_array = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
+    scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
+    scaler.fit(scalars_array) #scaler.fit_transform(scalars_array)
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
+    print('CLASSIFIER: saving scalars scaler file in', scaler_out, '\n')
+    pickle.dump(scaler, open(scaler_out, 'wb'))
+    return scaler
+
+
+def apply_s_scaler(sample, scalars, scaler, verbose='OFF'):
+    if verbose == 'ON':
+        start_time = time.time()
+        print('CLASSIFIER: applying quantile transform to scalar features', end=' --> ', flush=True)
+    scalars_array = scaler.transform(np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars]))
+    for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_array[:,n]
+    if verbose == 'ON': print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
+    return sample
+
+
+def fit_t_scaler(sample, scaler_out):
+    print('CLASSIFIER: fitting quantile transform to training tracks', end='  --> ', flush=True)
+    start_time    = time.time()
+    tracks = sample['tracks_image']; tracks_shape = tracks.shape
+    scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
+    scaler.fit(np.reshape(tracks, (tracks_shape[0],-1))) #scaler.fit_transform(tracks_array)
+    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
+    print('CLASSIFIER: saving tracks scaler file in', scaler_out, '\n')
+    pickle.dump(scaler, open(scaler_out, 'wb'))
+    return scaler
+
+
+def apply_t_scaler(sample, scaler, verbose='OFF'):
+    if verbose == 'ON':
+        start_time = time.time()
+        print('CLASSIFIER: applying robust transform to tracks features', end=' --> ', flush=True)
+    tracks = sample['tracks_image']; tracks_shape = tracks.shape
+    tracks = np.reshape(tracks, (tracks_shape[0],-1))
+    tracks = scaler.transform(tracks)
+    sample['tracks_image'] = np.reshape(tracks, tracks_shape)
+    if verbose == 'ON': print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
     return sample
 
 
@@ -493,7 +610,7 @@ def sample_composition(sample):
     ratios = np.round(1e4*ratios/len(MC_type))/100
     MC_empty, IFF_empty = np.where(np.sum(ratios, axis=0)==0)[0], np.where(np.sum(ratios, axis=1)==0)[0]
     MC_list,  IFF_list  = list(set(MC_list)-set(MC_empty))      , list(set(IFF_list)-set(IFF_empty))
-    print('\nIFF AND MC TRUTH CLASSIFIERS SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
+    print('IFF AND MC TRUTH CLASSIFIERS TRAINING SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
     dash = (26+7*len(MC_list))*'-'
     print(dash, format('\n| IFF \ MC |','10s'), end='')
     for col in MC_list:
@@ -507,50 +624,6 @@ def sample_composition(sample):
     print(dash + '\n|   Total  |', end='')
     for col in MC_list: print(format(IFF_sum[col], '7.2f'), end='')
     print('   |  100 %  |\n' + dash + '\n')
-
-
-def apply_scaler(train_sample, valid_sample, scalars, scaler_out):
-    print('CLASSIFIER: applying quantile transform to scalar variables', end=' ... ', flush=True)
-    start_time    = time.time()
-    train_scalars = np.hstack([np.expand_dims(train_sample[key], axis=1) for key in scalars])
-    valid_scalars = np.hstack([np.expand_dims(valid_sample[key], axis=1) for key in scalars])
-    scaler        = preprocessing.QuantileTransformer(output_distribution='normal',
-                                                      n_quantiles=10000, random_state=0)
-    train_scalars = scaler.fit_transform(train_scalars)
-    valid_scalars = scaler.transform(valid_scalars)
-    for n in np.arange(len(scalars)):
-        train_sample[scalars[n]] = train_scalars[:,n]
-        valid_sample[scalars[n]] = valid_scalars[:,n]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print('CLASSIFIER: saving transformed scalars in ' + scaler_out)
-    pickle.dump(scaler, open(scaler_out, 'wb'))
-    return train_sample, valid_sample
-
-
-def fit_scaler(sample, scalars, scaler_out):
-    print('CLASSIFIER: applying quantile transform to scalar variables', end=' ... ', flush=True)
-    start_time     = time.time()
-    scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
-    scaler         = preprocessing.QuantileTransformer(output_distribution='normal',
-                                                       n_quantiles=10000, random_state=0)
-    scalars_scaled = scaler.fit_transform(scalars_scaled)
-    for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_scaled[:,n]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print('CLASSIFIER: saving transformed scalars in ' + scaler_out)
-    pickle.dump(scaler, open(scaler_out, 'wb'))
-    return sample
-
-
-def load_scaler(sample, scalars, scaler_file):
-    #print('CLASSIFIER: loading quantile transform from ' + scaler_file)
-    scaler         = pickle.load(open(scaler_file, 'rb'))
-    start_time     = time.time()
-    scalars_scaled = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
-    print('CLASSIFIER: applying quantile transform to scalar variables', end=12*' '+'--> ', flush=True)
-    scalars_scaled = scaler.transform(scalars_scaled)
-    for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_scaled[:,n]
-    print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    return sample
 
 
 def class_ratios(labels):
@@ -591,27 +664,40 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
 
 
-def cross_valid(valid_sample, valid_labels, scalars, model, output_dir, n_folds, verbose=1):
-    print('\n########################################################################'  )
-    print(  '#### STARTING CROSS-VALIDATION #########################################'  )
-    print(  '########################################################################\n')
-    valid_probs  = np.full(valid_labels.shape + (max(valid_labels)+1,), -1.)
+def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_files, n_valid,
+                input_data, n_tracks, valid_cuts, model, generator='OFF', verbose=1):
+    print('########################################################################'  )
+    print('##### STARTING '+str(n_folds)+'-FOLD CROSS-VALIDATION ################################'  )
+    print('########################################################################\n')
+    n_classes    = max(valid_labels)+1
+    valid_probs  = np.full(valid_labels.shape + (n_classes,), -1.)
     event_number = valid_sample['eventNumber']
     for fold_number in np.arange(1, n_folds+1):
-        print('FOLD', fold_number, 'EVALUATION ('+str(n_folds)+'-fold cross-validation)')
+        print('FOLD '+str(fold_number)+'/'+str(n_folds), 'EVALUATION')
         weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
-        scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
+        scaler_file = output_dir+'/s_scaler_'+str(fold_number)+'.pkl'
         print('CLASSIFIER: loading pre-trained weights from', weight_file)
         model.load_weights(weight_file); start_time = time.time()
         indices =               np.where(event_number%n_folds==fold_number-1)[0]
         labels  =           valid_labels[event_number%n_folds==fold_number-1]
         sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
-        if scalars != [] and os.path.isfile(scaler_file): sample = load_scaler(sample, scalars, scaler_file)
-        print('CLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
-        probs = model.predict(sample, batch_size=20000, verbose=verbose)
-        print('FOLD', fold_number, 'ACCURACY:', format(100*valid_accuracy(labels, probs), '.2f'), end='')
+        if scalars != [] and os.path.isfile(scaler_file):
+            print('CLASSIFIER: loading scalars scaler from', scaler_file)
+            scaler = pickle.load(open(scaler_file, 'rb'))
+            sample = apply_s_scaler(sample, scalars, scaler, verbose='ON')
+        print('\033[FCLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
+        if generator == 'ON':
+            valid_cuts = '(sample["eventNumber"]%'+str(n_folds)+'=='+str(fold_number-1)+')'
+            valid_gen  = Batch_Generator(data_files, n_valid, input_data, n_tracks, n_classes,
+                                         batch_size=20000, cuts=valid_cuts, s_scaler=scaler, t_scaler=None)
+            probs = model.predict(valid_gen, workers=4, verbose=verbose)
+        else: probs = model.predict(sample, batch_size=20000, verbose=verbose)
+        print('FOLD '+str(fold_number)+'/'+str(n_folds)+' ACCURACY: ', end='')
+        print(format(100*valid_accuracy(labels, probs), '.2f'), end='')
         print(' % (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
-        for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
+        #for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
+        for n in np.arange(n_classes): np.put(valid_probs[:,n], indices, probs[:,n])
+    print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
     return valid_probs
 
 
@@ -647,7 +733,7 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
         print_dict[3] += format(1/fpr[np.argwhere(tpr>=val/100)[0]][0],'>6.0f')+'\n'
 
 
-def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict, separation=False):
+def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict, separation=True):
     if max(labels) > 1: sample, labels, probs = binarization  (sample, labels, probs, [bkg])
     else              : sample, labels, probs = bkg_separation(sample, labels, probs,  bkg )
     if False: pickle.dump((sample,labels,probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
@@ -665,14 +751,14 @@ def print_results(sample, labels, probs, plotting, output_dir, bkg, return_dict,
     return_dict[bkg] = print_dict
 
 
-def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, diff_plots):
+def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, sep_bkg, diff_plots):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}
-    compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    if training != None: plot_history(training, output_dir)
-    manager   = mp.Manager(); return_dict = manager.dict(); bkg_list = ['bkg'] + [1, 2, 3, 4, 5]
+    print(); compo_matrix(labels, train_labels, probs); print(print_dict[2])
+    manager   = mp.Manager(); return_dict = manager.dict()
+    bkg_list  = ['bkg'] + [1, 2, 3, 4, 5] if sep_bkg =='ON' else ['bkg']
     arguments = [(sample, labels, probs, plotting, output_dir, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
-    #if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
+    if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
     for job in processes: job.start()
     for job in processes: job.join()
     if plotting=='OFF':
@@ -681,7 +767,7 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     # DIFFERENTIAL PLOTS
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
-        pt_boundaries   = [10, 20, 30, 40, 60, 100, 200, 500] #60, 80, 120, 180, 300, 500]
+        pt_boundaries   = [10, 20, 30, 40, 60, 100, 200, 500]
         eta, pt         = sample['eta'], sample['pt']
         eta_bin_indices = get_bin_indices(eta, eta_boundaries)
         pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
@@ -705,7 +791,7 @@ def verify_sample(sample):
         idx1, idx2 = index*batch_size, (index+1)*batch_size
         return_dict[index] = sum([np.sum(np.isfinite(sample[key][idx1:idx2])==False) for key in sample])
     n_e = len(list(sample.values())[0]); start_time = time.time()
-    print('\nSCANNING', n_e, 'ELECTRONS FOR ERRORS ...', end=' ', flush=True)
+    print('\nSCANNING', n_e, 'ELECTRONS FOR ERRORS -->', end=' ', flush=True)
     for n in np.arange(min(12, mp.cpu_count()), 0, -1):
         if n_e % n == 0: n_tasks = n; batch_size = n_e//n_tasks; break
     manager   =  mp.Manager(); return_dict = manager.dict()
@@ -765,14 +851,15 @@ def print_channels(sample, col=0, reverse=False):
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #for key in sample: print(key, sample[key].shape)
     #sys.exit()
-    verify_sample(sample); sys.exit()
+    #verify_sample(sample); sys.exit()
     # CALORIMETER IMAGES
     from plots_DG import cal_images
-    layers = ['em_barrel_Lr0' , 'em_barrel_Lr1'  , 'em_barrel_Lr2'  , 'em_barrel_Lr3' ,
-              'em_endcap_Lr0' , 'em_endcap_Lr1'  , 'em_endcap_Lr2'  , 'em_endcap_Lr3' ,
-              'lar_endcap_Lr0', 'lar_endcap_Lr1' , 'lar_endcap_Lr2' , 'lar_endcap_Lr3',
-              'tile_gap_Lr1'  , 'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
+    layers  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3',
+                                   'tile_gap_Lr1'                                       ,
+                'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3',
+               'lar_endcap_Lr0',  'lar_endcap_Lr1',  'lar_endcap_Lr2',  'lar_endcap_Lr3',
+                                 'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+    cal_images(sample, labels, layers, output_dir, mode='mean', soft=True)
     # TRACKS DISTRIBUTIONS
     #from plots_DG import plot_tracks
     #arguments = [(sample['tracks_image'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
@@ -782,31 +869,33 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     # SCALARS DISTRIBUTIONS
     #from plots_DG import plot_scalars
     #sample_trans = sample.copy()
-    #sample_trans = load_scaler(sample_trans, scalars, scaler_file)#[0]
+    #sample_trans = apply_scaler(sample_trans, scalars, scaler_file)#[0]
     #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
 
 def feature_removal(scalars, images, groups, index):
-    if   index <= 0: removed_feature = 'none'
+    if   index <= 0: return scalars, images, 'none'
     elif index  > len(scalars+images+groups): sys.exit()
     elif index <= len(scalars+images):
         removed_feature = (scalars+images)[index-1]
-        scalars = list(set(scalars) - set([removed_feature]))
-        images  = list(set(images ) - set([removed_feature]))
+        scalars_list = list(set(scalars) - set([removed_feature]))
+        images_list  = list(set(images ) - set([removed_feature]))
     elif index  > len(scalars+images):
         removed_feature = groups[index-1-len(scalars+images)]
-        scalars = list(set(scalars) - set(removed_feature))
-        images  = list(set(images ) - set(removed_feature))
+        scalars_list = list(set(scalars) - set(removed_feature))
+        images_list  = list(set(images ) - set(removed_feature))
+    scalars = [scalar for scalar in scalars if scalar in scalars_list]
+    images  = [ image for  image in  images if  image in  images_list]
     return scalars, images, removed_feature
 
 
 def feature_ranking(output_dir, results_out, scalars, images, groups):
     data_dict = {}
-    with open(output_dir+'/'+results_out,'rb') as file_data:
+    with open(results_out,'rb') as file_data:
         try:
             while True: data_dict.update(pickle.load(file_data))
         except EOFError: pass
-    try: pickle.dump(data_dict, open(output_dir+'/'+results_out,'wb'))
+    try: pickle.dump(data_dict, open(results_out,'wb'))
     except IOError: print('FILE ACCESS CONFLICT IN FEATURE RANKING --> SKIPPING FILE ACCESS\n')
 
     # SECTION TO MODIFY
@@ -859,7 +948,7 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
     for key in tracks + ['p_truth_E', 'p_truth_e']:
         try: sample.pop(key)
         except KeyError: pass
-    with h5py.File(output_dir+'/'+'el_data_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
+    with h5py.File(output_dir+'/'+'e-ID_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
         for key in sample:
             shape = (sum_e+batch_size,) + sample[key].shape[1:]
             if sum_e == 0:
@@ -916,7 +1005,7 @@ def get_truth_m(sample, new=True, m_e=0.511, max_eta=4.9):
 
 
 def merge_presamples(output_dir, output_file):
-    h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'el_data_' in h5_file and '.h5' in h5_file]
+    h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file and '.h5' in h5_file]
     if len(h5_files) == 0: sys.exit()
     np.random.seed(0); np.random.shuffle(h5_files)
     idx = np.cumsum([len(h5py.File(output_dir+'/'+h5_file, 'r')['eventNumber']) for h5_file in h5_files])

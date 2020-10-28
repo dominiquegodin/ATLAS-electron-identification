@@ -365,7 +365,8 @@ def feature_removal(arg_feat, images, scalars, groups, arg_im, arg_sc):
     return images, scalars, feat
 
 
-def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im, arg_corr, arg_tracks_means):
+def correlations(images, scalars, sample, labels, region, output_dir, scaling, scaler_out, arg_im,
+                 arg_corr='ON', arg_tracks_means='OFF'):
     '''
     Separates and prepares the sample for the correlations plots and runs the correlations plots
     '''

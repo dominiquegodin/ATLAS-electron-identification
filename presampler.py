@@ -12,7 +12,7 @@ parser = ArgumentParser()
 parser.add_argument( '--n_e'        , default = None , type=float )
 parser.add_argument( '--n_tasks'    , default = 10   , type=int   )
 parser.add_argument( '--n_files'    , default = None , type=int   )
-parser.add_argument( '--output_file', default = 'el_data.h5'      )
+parser.add_argument( '--output_file', default = 'e-ID.h5'      )
 parser.add_argument( '--sampling'   , default = 'ON'              )
 parser.add_argument( '--merging'    , default = 'OFF'             )
 parser.add_argument( '--eta_region' , default = 'barrel'          )
@@ -20,10 +20,10 @@ args = parser.parse_args()
 
 
 # DATASET
-if args.eta_region == 'barrel': data_path = '/opt/tmp/godin/el_data/2019-06-20/0.0_1.3'
-#if args.eta_region == 'barrel': data_path = '/opt/tmp/godin/el_data/2020-05-08/0.0_1.3'
-if args.eta_region == 'gap'   : data_path = '/opt/tmp/godin/el_data/2020-05-08/1.3_1.6'
-if args.eta_region == 'endcap': data_path = '/opt/tmp/godin/el_data/2020-05-08/1.6_2.5'
+if args.eta_region == 'barrel_old': data_path = '/opt/tmp/godin/e-ID_data/2019-06-20/0.0-1.3'
+if args.eta_region == 'barrel'    : data_path = '/opt/tmp/godin/e-ID_data/2020-05-08/0.0-1.3'
+if args.eta_region == 'gap'       : data_path = '/opt/tmp/godin/e-ID_data/2020-05-08/1.3-1.6'
+if args.eta_region == 'endcap'    : data_path = '/opt/tmp/godin/e-ID_data/2020-05-08/1.6-2.5'
 if not os.path.isdir(data_path+'/'+'output'): os.mkdir(data_path+'/'+'output')
 output_dir = data_path+'/'+'output'
 data_files = [data_path+'/'+h5_file for h5_file in os.listdir(data_path) if '.h5' in h5_file]
@@ -75,7 +75,7 @@ integers = ['p_truthType'     , 'p_TruthType'     , 'p_iffTruth'      , 'p_nTrac
 
 
 # REMOVING TEMPORARY FILES (if any)
-h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'el_data_' in h5_file]
+h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file]
 for h5_file in h5_files: os.remove(output_dir+'/'+h5_file)
 
 

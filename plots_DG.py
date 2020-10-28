@@ -34,41 +34,76 @@ def plot_history(history, output_dir, key='accuracy'):
     min_acc = np.floor(100*min( history.history[key]+history.history['val_'+key] ))
     max_acc = np.ceil (100*max( history.history[key]+history.history['val_'+key] ))
     plt.xlim([1, max(history.epoch)+1])
-    plt.xticks( np.append(1,np.arange(5,max(history.epoch)+2,step=5)) )
+    plt.xticks( np.append(1, np.arange(5, max(history.epoch)+2, step=5)) )
     plt.xlabel('Epochs',fontsize=25)
     plt.ylim( max(70,min_acc),max_acc )
-    plt.yticks( np.arange(max(80,min_acc),max_acc+1,step=1) )
+    plt.yticks( np.arange(max(80,min_acc), max_acc+1, step=1) )
     plt.ylabel(key.title()+' (%)',fontsize=25)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
-    file_name = output_dir+'/history.png'
+    file_name = output_dir+'/'+'history.png'
     print('Saving training accuracy history to:', file_name, '\n'); plt.savefig(file_name)
 
 
-def var_histogram(sample, labels, weights, output_dir, prefix, var):
+def plot_heatmaps(sample, labels, output_dir):
+    n_classes = max(labels)+1
+    label_dict = {0:'iso electron', 1:'charge flip'  , 2:'photon conversion'    , 3  :'b/c hadron',
+                  4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
+    pt  =     sample['pt']  ;  pt_bins = np.arange(0,81,1)
+    eta = abs(sample['eta']); eta_bins = np.arange(0,2.55,0.05)
+    extent = [eta_bins[0], eta_bins[-1], pt_bins[0], pt_bins[-1]]
+    fig = plt.figure(figsize=(20,10)); axes = plt.gca()
+    for n in np.arange(n_classes):
+        plt.subplot(2, 3, n+1)
+        heatmap = np.histogram2d(eta[labels==n], pt[labels==n], bins=[eta_bins,pt_bins], density=False)[0]
+        plt.imshow(heatmap.T, origin='lower', extent=extent, cmap='Blues', interpolation='bilinear', aspect="auto")
+        plt.title(label_dict[n]+' ('+format(100*np.sum(labels==n)/len(labels),'.1f')+'%)', fontsize=25)
+        if n//3 == 1: plt.xlabel('abs('+'$\eta$'+')', fontsize=25)
+        if n %3 == 0: plt.ylabel('$p_t$ (GeV)', fontsize=25)
+    fig.subplots_adjust(left=0.05, top=0.95, bottom=0.1, right=0.95, wspace=0.15, hspace=0.25)
+    file_name = output_dir+'/'+'heatmap.png'
+    print('Saving heatmap plots to:', file_name)
+    plt.savefig(file_name)
+
+
+def var_histogram(sample, labels, weights, output_dir, prefix, var, density=True, separate_norm=True):
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     if var == 'pt':
         variable = sample[var]
-        bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
-        plt.xticks(np.arange(0,bins[-1]+1,step=100)); plt.xlabel('$p_t$ (GeV)', fontsize=25)
+        bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500] #bins = np.arange(0, 101, 1)
+        plt.xticks(np.arange(0,bins[-1]+1,step=10)); tag='$p_t$'; plt.xlabel(tag+' (GeV)', fontsize=25)
     if var == 'eta':
         variable = abs(sample[var])
-        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
-        plt.xticks(bins); plt.xlabel('abs($\eta$)', fontsize=25)
-    sig = variable[labels==0]; bkg = variable[labels!=0]
-    if weights is None:
-        sig_weights = len(sig)*[100/len(variable)]
-        bkg_weights = len(bkg)*[100/len(variable)]
-    else:
-        sig_weights = 100*weights[labels==0]/len(variable)
-        bkg_weights = 100*weights[labels!=0]/len(variable)
-    pylab.xlim(bins[0], bins[-1]); bins[-1] = max(bins[-1], max(variable))
-    hs = pylab.hist(sig, bins, label='signal'    , histtype='step', weights=sig_weights, lw=2)[0]
-    hb = pylab.hist(bkg, bins, label='background', histtype='step', weights=bkg_weights, lw=2)[0]
+        bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]; plt.xticks(bins, [str(n) for n in bins])
+        #bins = np.arange(0, 2.501, 0.1); plt.xticks(bins, [format(n,'.1f') for n in bins])
+        tag='$\eta$'; plt.xlabel('abs('+tag+')', fontsize=25)
+    pylab.xlim(bins[0], bins[-1]); bins[-1] = max(bins[-1], max(variable)+1e-3)
+    label_dict = {0:'iso electron', 1:'charge flip'  , 2:'photon conversion'    , 3  :'b/c hadron',
+                  4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
+    color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            , 3  :'tab:red'   ,
+                  4:'tab:purple'                     , 5:'tab:brown'            }
+    n_classes = max(labels)+1
+    if n_classes == 2: label_dict[1] = 'background'
+    else             : separate_norm = True
+    if np.all(weights) == None: weights = np.ones(len(variable))
+    h = np.zeros((len(bins)-1,n_classes))
+    for n in np.arange(n_classes):
+        class_values  = variable[labels==n]; class_weights = weights[labels==n]
+        class_weights = 100*class_weights/(np.sum(class_weights) if separate_norm else len(variable))
+        if density:
+            indices        = np.searchsorted(bins, class_values, side='right')
+            class_weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+        label  = 'class '+str(n)+': '+label_dict[n]
+        h[:,n] = pylab.hist(class_values, bins, histtype='step', weights=class_weights, color=color_dict[n],
+                            label=label+' ('+format(100*len(class_values)/len(variable),'.1f')+'%)', lw=2)[0]
     axes.xaxis.set_minor_locator(FixedLocator(bins)) #axes.xaxis.set_minor_locator(AutoMinorLocator(10))
-    step = 5; y_max = step*(max(np.append(hs,hb))//step+1)
-    pylab.ylim(0, y_max); plt.yticks(np.arange(0, y_max+1, step))
-    plt.ylabel('Distribution (% per bin)', fontsize=25)
-    plt.legend(loc='upper right', fontsize=16); file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
+    values = np.ravel([(10.**n)*np.array([1, 5]) for n in np.arange(-5,5)])
+    step   = values[values<=np.max(h)][-2]
+    y_max = step*(np.max(h)//step+1)
+    pylab.ylim(0, y_max); plt.yticks(np.arange(0, y_max+step, step))
+    plt.ylabel('Distribution density (%/$\Delta$'+tag+')' if density else 'Distribution (%/bin)', fontsize=25)
+    axes.tick_params(axis='both', which='major', labelsize=12)
+    plt.legend(loc='upper center', fontsize=16 if n_classes==2 else 14)
+    file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
     print('Saving', prefix, 'sample', format(var,'3s'), 'distributions to:', file_name)
     plt.savefig(file_name)
 
@@ -105,7 +140,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
                 fpr, tpr, threshold = metrics.roc_curve(new_y_true, new_y_prob[:,0], pos_label=0)
                 axes.axvline(threshold[np.argmax(tpr-fpr)], ymin=0, ymax=1, ls='--', lw=1, color=colors[n])
         for n in np.arange(1, n_classes): print_JSD(h[:,0], h[:,n], n, colors[n], str(n))
-        if n_classes > 2: print_JSD(h[:,0], np.sum(h[:,1:],axis=1), n_classes, 'black', '\mathrm{bkg}')
+        if n_classes > 2: print_JSD(h[:,0], np.sum(h[:,1:], axis=1), n_classes, 'black', '\mathrm{bkg}')
     plt.figure(figsize=(12,16))
     plt.subplot(2, 1, 1); pylab.grid(True); axes = plt.gca()
     pylab.xlim(0,100); pylab.ylim(1e-5 if n_classes>2 else 1e-5, 1e2)
@@ -134,6 +169,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
     plt.xlabel('Signal Probability (%)', fontsize=25)
     plt.ylabel('Distribution (% per bin '+str(bin_step)+')', fontsize=25)
     location = 'upper left' if n_classes==2 else 'upper left'
+    axes.tick_params(axis='both', which='major', labelsize=12)
     plt.legend(loc=location, fontsize=16 if n_classes==2 else 14, numpoints=3)
     plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.2)
     file_name = output_dir+'/distributions.png'
@@ -168,11 +204,12 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         for LLH in zip(LLH_tpr, LLH_fpr, colors, labels):
             plt.scatter(LLH[0], 1-LLH[1], s=40, marker='o', c=LLH[2], label='('+format(100*LLH[0],'.1f')
                         +'%, '+format(100*(1-LLH[1]),'.1f')+')'+r'$\rightarrow$'+LLH[3])
+        axes.tick_params(axis='both', which='major', labelsize=12)
         plt.legend(loc='upper right', fontsize=15, numpoints=3)
     if ROC_type == 2:
         pylab.grid(False)
         len_0 = np.sum(fpr==0)
-        x_min = min(60, 10*np.floor(10*LLH_tpr[0]))
+        x_min = min(70, 10*np.floor(10*LLH_tpr[0]))
         if fpr[np.argwhere(tpr >= x_min/100)[0]] != 0:
             y_max = 100*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min/100)[0]], 1/LLH_fpr[0])/100)
         else: y_max = 10000
@@ -187,7 +224,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
             axes.axvline(100*LLH_tpr[n], ymin=abs(1/LLH_fpr[n]-1)/(plt.yticks()[0][-1]-1),
             ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='tab:blue')
         for val in LLH_scores:
-            plt.text(100.2, val, str(int(val)), {'color': '#1f77b4', 'fontsize': 10}, va="center", ha="left")
+            plt.text(100.2, val, str(int(val)), {'color':'#1f77b4', 'fontsize':12}, va="center", ha="left")
         axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
         plt.xlabel('Signal Efficiency '+sig_eff+' (%)', fontsize=25)
         plt.ylabel('Background Rejection 1/'+bkg_eff, fontsize=25)
@@ -198,6 +235,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         for LLH in zip( LLH_tpr, LLH_fpr, colors, labels ):
             plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker='o', c=LLH[2], label='('+format(100*LLH[0],'.1f')
                          +'%, '+str(format(1/LLH[1],'>3.0f'))+')'+r'$\rightarrow$'+LLH[3] )
+        axes.tick_params(axis='both', which='major', labelsize=12)
         plt.legend(loc='upper right', fontsize=15, numpoints=3)
     if ROC_type == 3:
         def make_plot(location):
@@ -229,6 +267,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
         lab += [1, 10, 50, 90, 99] + ['99.'+n*'9'     for n in np.arange(1,x_max-1)         ]
         plt.xscale('logit'); plt.xticks(pos, lab)
         plt.yscale('logit'); plt.yticks([0.1, 0.5, 0.9, 0.99, 0.999, 0.9999], [10, 50, 90, 99, 99.9, 99.99])
+        axes.tick_params(axis='both', which='major', labelsize=12)
         axes.xaxis.set_minor_formatter(plt.NullFormatter())
         axes.yaxis.set_minor_formatter(plt.NullFormatter())
         make_plot('upper center')
@@ -246,7 +285,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, output_dir):
                      label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
-    print('Saving test sample ROC'+str(ROC_type)+' curve    to:', file_name); plt.savefig(file_name)
+    print('Saving test sample ROC'+str(ROC_type)+' curve to   :', file_name); plt.savefig(file_name)
 
 
 def combine_ROC_curves(output_dir, cuts=''):
@@ -344,7 +383,8 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
             #image_dict[(e_class,key)] = abs(image_dict[(e_class,key)])
             if scale == 'layer':
                 vmax = max([np.max(image_dict[(e_class,key)]) for e_class in np.arange(n_classes)])
-            if scale == 'free' : vmax = np.max(image_dict[(e_class,key)])
+            if scale == 'free':
+                vmax = np.max(image_dict[(e_class,key)])
             plot_image(100*image_dict[(e_class,key)], n_classes, e_class, layers, key, 100*vmax, soft)
     wspace = -0.1 if n_classes == 2 else 0.2
     fig.subplots_adjust(left=0.05, top=0.95, bottom=0.05, right=0.95, hspace=0.6, wspace=wspace)
