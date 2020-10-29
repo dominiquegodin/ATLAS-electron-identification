@@ -7,7 +7,7 @@
 #SBATCH --time=00-12:00         #time limit (DD-HH:MM)
 #SBATCH --nodes=1               #number of nodes
 #SBATCH --mem=128G              #memory per node (on Beluga)
-#SBATCH --cpus-per-task=8       #number of CPU threads per node
+#SBATCH --cpus-per-task=4       #number of CPU threads per node
 #SBATCH --gres=gpu:4            #number of GPU(s) per node
 #SBATCH --job-name=e-ID
 #SBATCH --output=outputs/log_files/%x_%A_%a.out
@@ -34,5 +34,5 @@ else
     fi
     module load singularity/3.6
     SIF=/project/def-arguinj/shared/sing_images/tf-2.1.0-gpu-py3_sing-3.5.sif
-    singularity shell --nv --bind /project,$NODE_DIR $SIF < classifier.sh $SBATCH_VAR $NODE_DIR $SCRIPT_VAR
+    singularity shell --nv --bind /project/def-arguinj,$NODE_DIR $SIF < classifier.sh $SBATCH_VAR $HOST_NAME $NODE_DIR
 fi
