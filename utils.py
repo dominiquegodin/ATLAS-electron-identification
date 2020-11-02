@@ -237,10 +237,11 @@ def get_class_weight(labels, bkg_ratio):
     return class_weight
 
 
-def get_sample_weight(sample, labels, weight_type=None, bkg_ratio=None, hist='2d', density=False):
+def get_sample_weight(sample, labels, weight_type=None, bkg_ratio=None, hist='2d', density=True):
     if weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max']: return None
     n_classes = max(labels)+1
     pt  =     sample['pt']  ;  pt_bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500        ]
+    #pt_bins = np.float_(np.arange(0,502,1))
     eta = abs(sample['eta']); eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
     pt_bins [-1] = max( pt_bins[-1], max( pt)) + 1e-3
     eta_bins[-1] = max(eta_bins[-1], max(eta)) + 1e-3
@@ -252,6 +253,7 @@ def get_sample_weight(sample, labels, weight_type=None, bkg_ratio=None, hist='2d
     eta_ind  = np.digitize(eta, eta_bins, right=False) -1
     hist_sig = np.histogram2d(pt[labels==0], eta[labels==0], bins=[pt_bins,eta_bins], density=density)[0]
     if density: hist_sig *= np.sum(labels==0)
+    hist_sig = np.maximum(hist_sig, np.min(hist_sig[hist_sig!=0]))
     total_sig_array = []; total_bkg_array = []; hist_bkg_array = []
     for n in np.arange(1, n_classes):
         hist_bkg = np.histogram2d(pt[labels==n], eta[labels==n], bins=[pt_bins,eta_bins], density=density)[0]
@@ -352,7 +354,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_files, inputs, va
     if False or len(valid_data) == 1: #add variables to the results
         print('CLASSIFIER: loading valid sample', n_e, end=' --> ', flush=True)
         sample, labels = merge_samples(data_files, n_valid, inputs, n_tracks=5, n_classes=probs.shape[1],
-                                       valid_cuts=valid_cuts, s_scaler=None, t_scaler=None)
+                                       valid_cuts=valid_cuts, scaler=None)
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
     if False: #save the added variables to the results file
@@ -432,32 +434,21 @@ def make_labels(sample, n_classes):
 
 
 def batch_idx(data_files, batch_size, interval, weights=None, shuffle='OFF'):
-    def return_idx(cum_batches, batch_size, index):
+    def return_idx(n_e, cum_batches, batch_size, index):
         file_index  = np.searchsorted(cum_batches, index, side='right')
         batch_index = index - np.append(0, cum_batches)[file_index]
         idx         = batch_index*batch_size; idx = [idx, min(idx+batch_size, n_e[file_index])]
         return file_index, idx
     n_e = [len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files]
     cum_batches = np.cumsum(np.int_(np.ceil(np.array(n_e)/batch_size)))
-    indexes = [return_idx(cum_batches, batch_size, index) for index in np.arange(cum_batches[-1])]
-    cum_n_e    = np.cumsum(np.diff(list(zip(*indexes))[1]))
-    n_e_index  = np.searchsorted(cum_n_e, [interval[0],interval[1]-1], side='right')
-    batch_list = [indexes[n] for n in np.arange(cum_batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
-    cum_n_e    = [cum_n_e[n] for n in np.arange(cum_batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
+    indexes     = [return_idx(n_e, cum_batches, batch_size, index) for index in np.arange(cum_batches[-1])]
+    cum_n_e     = np.cumsum(np.diff(list(zip(*indexes))[1]))
+    n_e_index   = np.searchsorted(cum_n_e, [interval[0],interval[1]-1], side='right')
+    batch_list  = [indexes[n] for n in np.arange(cum_batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
+    cum_n_e     = [cum_n_e[n] for n in np.arange(cum_batches[-1]) if n >= n_e_index[0] and n <= n_e_index[1]]
     batch_list[ 0][1][0] = batch_list[ 0][1][1] + interval[0] - cum_n_e[ 0]
     batch_list[-1][1][1] = batch_list[-1][1][1] + interval[1] - cum_n_e[-1]
     if shuffle == 'ON': batch_list = utils.shuffle(batch_list, random_state=0)
-    '''
-    if np.all(weights) != None:
-        weights = np.split(weights, np.cumsum(n_e))
-        print(n_e, sum(n_e)); print()
-        print(np.cumsum(n_e)); print()
-        print(weights); print()
-        print(len(weights)); print()
-        print(batch_list); print()
-        for n in batch_list: print(weights[n[0]][n[1][0]:n[1][1]])
-        sys.exit()
-    '''
     batch_dict = {batch_list.index(n):{'file':n[0], 'indices':n[1], 'weights':None} for n in batch_list}
     if np.all(weights) != None:
         weights = np.split(weights, np.cumsum(n_e))
@@ -466,7 +457,35 @@ def batch_idx(data_files, batch_size, interval, weights=None, shuffle='OFF'):
     return batch_dict
 
 
-def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, s_scaler=None, t_scaler=None):
+def shuffle_data(data_files, n_files):
+    cum_n_e = np.cumsum([len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files])
+    indices = utils.shuffle(np.arange(cum_n_e[-1]), random_state=0)
+    indices = np.split(indices, n_files)
+    for idx in indices[:1]:
+        file_idx = np.searchsorted(cum_n_e, idx, side='right')
+        idx_list = [idx[file_idx==n] -np.append([0],cum_n_e[:-1])[n] for n in np.arange(len(cum_n_e))]
+    for n in idx_list: print(n, len(n))
+    #print( np.sum([len(n) for n in idx_list]) ); sys.exit()
+
+    sample = []
+    for h5_file in data_files:#[:3]:
+        with h5py.File(h5_file,'r') as data:
+            start_time = time.time()
+            print(h5_file)
+            sample += [{key:np.take(data[key],idx_list[1]) for key in data}]
+            #for key in data: print(key, len(data[key]))
+            #for key in sample: print(key, sample[key].shape)
+            print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)') 
+    print( len(sample) )
+
+    #for n in np.arange(len(cum_n_e)):
+    #    file_idx = [ idx[np.searchsorted(cum_n_e, idx, side='right')==n]
+    #                 - np.append([0],cum_n_e[:-1])[n] for idx in indices ]
+    #    idx_list = np.concatenate( file_idx )
+    #    print( np.allclose(sorted(idx_list), np.arange(n_e[n])) )
+
+
+def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, scaler=None):
     batch_dict = batch_idx(data_files, np.diff(idx)[0], idx)
     sample, labels = zip(*[make_sample(data_files[batch_dict[key]['file']], batch_dict[key]['indices'],
                            input_data, n_tracks, n_classes, verbose='ON') for key in batch_dict])
@@ -474,8 +493,7 @@ def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, s_scal
     labels  = np.concatenate(labels)
     indices = np.where( np.logical_and(labels!=-1, eval(cuts) if cuts!='' else True) )[0]
     sample, labels, _ = sample_cuts(sample, labels, cuts=cuts, verbose='ON')
-    if s_scaler != None: sample = apply_s_scaler(sample, input_data['scalars'], s_scaler, verbose='ON')
-    if t_scaler != None: sample = apply_t_scaler(sample,                        t_scaler, verbose='ON')
+    if scaler != None: sample = apply_scaler(sample, input_data['scalars'], scaler, verbose='ON')
     else: print()
     return sample, labels, indices
     #for key in list(batch_dict.keys())[0:1]:
@@ -491,11 +509,12 @@ def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, s_scal
 
 class Batch_Generator(tf.keras.utils.Sequence):
     def __init__(self, data_files, indexes, input_data, n_tracks, n_classes,
-                 batch_size, cuts, s_scaler, t_scaler, weights=None, shuffle='OFF'):
-        self.data_files = data_files; self.indexes   = indexes  ; self.input_data = input_data
-        self.n_tracks   = n_tracks  ; self.n_classes = n_classes; self.batch_size = batch_size
-        self.cuts       = cuts      ; self.s_scaler  = s_scaler ; self.t_scaler   = t_scaler
-        self.weights    = weights   ; self.shuffle   = shuffle
+                 batch_size, cuts, scaler, weights=None, shuffle='OFF'):
+        self.data_files = data_files; self.indexes    = indexes
+        self.input_data = input_data; self.n_tracks   = n_tracks
+        self.n_classes  = n_classes ; self.batch_size = batch_size
+        self.cuts       = cuts      ; self.scaler     = scaler
+        self.weights    = weights   ; self.shuffle    = shuffle
         self.batch_dict = batch_idx(self.data_files, self.batch_size, self.indexes, self.weights, self.shuffle)
     def __len__(self):
         return len(self.batch_dict) #number of batches per epoch
@@ -507,8 +526,7 @@ class Batch_Generator(tf.keras.utils.Sequence):
         sample, labels = make_sample(data_file, file_idx, self.input_data, self.n_tracks, self.n_classes)
         sample, labels, weights = sample_cuts(sample, labels, weights, self.cuts)
         if len(labels) != 0:
-            if self.s_scaler != None: sample = apply_s_scaler(sample, self.input_data['scalars'], self.s_scaler)
-            if self.t_scaler != None: sample = apply_t_scaler(sample,                             self.t_scaler)
+            if self.scaler != None: sample = apply_scaler(sample, self.input_data['scalars'], self.scaler)
         return sample, labels, weights
 
 
@@ -556,7 +574,7 @@ def process_images(sample, image_list, n_tasks=16):
     return sample
 
 
-def fit_s_scaler(sample, scalars, scaler_out):
+def fit_scaler(sample, scalars, scaler_out):
     print('CLASSIFIER: fitting quantile transform to training scalars', end=' --> ', flush=True)
     start_time    = time.time()
     scalars_array = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
@@ -568,7 +586,7 @@ def fit_s_scaler(sample, scalars, scaler_out):
     return scaler
 
 
-def apply_s_scaler(sample, scalars, scaler, verbose='OFF'):
+def apply_scaler(sample, scalars, scaler, verbose='OFF'):
     if verbose == 'ON':
         start_time = time.time()
         print('CLASSIFIER: applying quantile transform to scalar features', end=' --> ', flush=True)
@@ -675,7 +693,7 @@ def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_f
     for fold_number in np.arange(1, n_folds+1):
         print('FOLD '+str(fold_number)+'/'+str(n_folds), 'EVALUATION')
         weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
-        scaler_file = output_dir+'/s_scaler_'+str(fold_number)+'.pkl'
+        scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
         print('CLASSIFIER: loading pre-trained weights from', weight_file)
         model.load_weights(weight_file); start_time = time.time()
         indices =               np.where(event_number%n_folds==fold_number-1)[0]
@@ -684,12 +702,12 @@ def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_f
         if scalars != [] and os.path.isfile(scaler_file):
             print('CLASSIFIER: loading scalars scaler from', scaler_file)
             scaler = pickle.load(open(scaler_file, 'rb'))
-            sample = apply_s_scaler(sample, scalars, scaler, verbose='ON')
+            sample = apply_scaler(sample, scalars, scaler, verbose='ON')
         print('\033[FCLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
         if generator == 'ON':
             valid_cuts = '(sample["eventNumber"]%'+str(n_folds)+'=='+str(fold_number-1)+')'
             valid_gen  = Batch_Generator(data_files, n_valid, input_data, n_tracks, n_classes,
-                                         batch_size=20000, cuts=valid_cuts, s_scaler=scaler, t_scaler=None)
+                                         batch_size=20000, cuts=valid_cuts, scaler=scaler)
             probs = model.predict(valid_gen, workers=4, verbose=verbose)
         else: probs = model.predict(sample, batch_size=20000, verbose=verbose)
         print('FOLD '+str(fold_number)+'/'+str(n_folds)+' ACCURACY: ', end='')
@@ -701,11 +719,11 @@ def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_f
     return valid_probs
 
 
-def binarization(sample, labels, probs, class_1=['bkg'], class_0=[0], normalization=True, LR=False):
+def binarization(sample, labels, probs, class_1=['bkg'], class_0=[0], normalization=True, bkg_weights=True):
     from functools import reduce
     if class_1==['bkg'] or class_1==class_0: class_1 = set(np.arange(max(labels)+1)) - set(class_0)
     print_dict[1] += 'BINARIZATION: CLASS 0 = '+str(set(class_0))+' vs CLASS 1 = '+str(set(class_1))+'\n'
-    ratios  = class_ratios(labels) if LR else (max(labels)+1)*[1]
+    ratios  = class_ratios(labels) if bkg_weights else (max(labels)+1)*[1]
     labels  = np.array([0 if label in class_0 else 1 if label in class_1 else -1 for label in labels])
     probs_0 = reduce(np.add, [ratios[n]*probs[:,n] for n in class_0])[labels!=-1]
     probs_1 = reduce(np.add, [ratios[n]*probs[:,n] for n in class_1])[labels!=-1]
@@ -877,13 +895,15 @@ def feature_removal(scalars, images, groups, index):
     if   index <= 0: return scalars, images, 'none'
     elif index  > len(scalars+images+groups): sys.exit()
     elif index <= len(scalars+images):
-        removed_feature = (scalars+images)[index-1]
-        scalars_list = list(set(scalars) - set([removed_feature]))
-        images_list  = list(set(images ) - set([removed_feature]))
+        #removed_feature = (scalars+images)[index-1]
+        removed_feature = dict(zip(np.arange(1, len(scalars+images)+1), scalars+images))[index]
+        scalars_list    = list(set(scalars) - set([removed_feature]))
+        images_list     = list(set(images ) - set([removed_feature]))
     elif index  > len(scalars+images):
         removed_feature = groups[index-1-len(scalars+images)]
-        scalars_list = list(set(scalars) - set(removed_feature))
-        images_list  = list(set(images ) - set(removed_feature))
+        scalars_list    = list(set(scalars) - set(removed_feature))
+        images_list     = list(set(images ) - set(removed_feature))
+        removed_feature = 'group_'+str(index-len(scalars+images))
     scalars = [scalar for scalar in scalars if scalar in scalars_list]
     images  = [ image for  image in  images if  image in  images_list]
     return scalars, images, removed_feature

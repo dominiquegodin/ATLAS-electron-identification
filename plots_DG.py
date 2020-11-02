@@ -65,12 +65,13 @@ def plot_heatmaps(sample, labels, output_dir):
     plt.savefig(file_name)
 
 
-def var_histogram(sample, labels, weights, output_dir, prefix, var, density=True, separate_norm=True):
+def var_histogram(sample, labels, weights, output_dir, prefix, var, density=False, separate_norm=False):
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     if var == 'pt':
         variable = sample[var]
-        bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500] #bins = np.arange(0, 101, 1)
-        plt.xticks(np.arange(0,bins[-1]+1,step=10)); tag='$p_t$'; plt.xlabel(tag+' (GeV)', fontsize=25)
+        bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
+        #bins = np.float_(np.arange(0,502,1))
+        plt.xticks(np.arange(0,bins[-1]+1,step=100)); tag='$p_t$'; plt.xlabel(tag+' (GeV)', fontsize=25)
     if var == 'eta':
         variable = abs(sample[var])
         bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]; plt.xticks(bins, [str(n) for n in bins])
@@ -153,7 +154,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
     plt.ylabel('Distribution (% per '+ str(bin_step) +' % bin)', fontsize=25)
     plt.legend(loc='upper center', fontsize=16 if n_classes==2 else 14, numpoints=3)
     plt.subplot(2, 1, 2); pylab.grid(True); axes = plt.gca()
-    x_min=-10; x_max=6; pylab.xlim(x_min, x_max); pylab.ylim(1e-4 if n_classes>2 else 1e-4, 1e1)
+    x_min=-10; x_max=6; pylab.xlim(x_min, x_max); pylab.ylim(1e-4 if n_classes>2 else 1e-3, 1e1)
     pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     pos += [0.5]           + [1-10**float(n)      for n in np.arange(-1,-x_max-1,-1)]
     lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min+2,0)     ]

@@ -5,8 +5,7 @@ import os, sys, h5py, pickle
 from   argparse  import ArgumentParser
 from   tabulate  import tabulate
 from   itertools import accumulate
-from   utils     import validation, make_sample, merge_samples, sample_composition
-from   utils     import fit_s_scaler, apply_s_scaler, fit_t_scaler, apply_t_scaler
+from   utils     import validation, make_sample, merge_samples, sample_composition, fit_scaler, apply_scaler
 from   utils     import compo_matrix, get_sample_weight, get_class_weight, gen_weights, sample_weights
 from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms, Batch_Generator
 from   utils     import feature_removal, feature_ranking
@@ -39,7 +38,7 @@ parser.add_argument( '--valid_cuts'     , default = ''                  )
 parser.add_argument( '--NN_type'        , default = 'CNN'               )
 parser.add_argument( '--images'         , default = 'ON'                )
 parser.add_argument( '--scalars'        , default = 'ON'                )
-parser.add_argument( '--s_scaling'      , default = 'ON'                )
+parser.add_argument( '--scaling'        , default = 'ON'                )
 parser.add_argument( '--t_scaling'      , default = 'OFF'               )
 parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
@@ -49,10 +48,8 @@ parser.add_argument( '--eta_region'     , default = ''                  )
 parser.add_argument( '--output_dir'     , default = 'outputs'           )
 parser.add_argument( '--model_in'       , default = ''                  )
 parser.add_argument( '--model_out'      , default = 'model.h5'          )
-parser.add_argument( '--s_scaler_in'    , default = ''                  )
-parser.add_argument( '--s_scaler_out'   , default = 's_scaler.pkl'      )
-parser.add_argument( '--t_scaler_in'    , default = ''                  )
-parser.add_argument( '--t_scaler_out'   , default = 't_scaler.pkl'      )
+parser.add_argument( '--scaler_in'      , default = ''                  )
+parser.add_argument( '--scaler_out'     , default = 'scaler.pkl'        )
 parser.add_argument( '--results_in'     , default = ''                  )
 parser.add_argument( '--results_out'    , default = ''                  )
 parser.add_argument( '--runDiffPlots'   , default = 0, type = int       )
@@ -78,7 +75,7 @@ midgap_files = sorted([midgap_dir+'/'+h5_file for h5_file in os.listdir(midgap_d
 endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
 data_files = [h5_file for pair in zip(barrel_files, midgap_files, endcap_files) for h5_file in pair]
 #old_dir = args.node_dir+'/'+'0.0-1.3_old'
-#old_files    = sorted([   old_dir+'/'+h5_file for h5_file in os.listdir(   old_dir) if 'e-ID_' in h5_file])
+#old_files = sorted([old_dir+'/'+h5_file for h5_file in os.listdir(old_dir) if 'e-ID_' in h5_file])
 if args.eta_region != '': data_files = [h5_file for h5_file in data_files if args.eta_region in h5_file]
 #for key, val in h5py.File(data_files[0], 'r').items(): print(key, val.shape)
 
@@ -103,6 +100,16 @@ images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_
 others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
            'p_firstEgMotherTruthType'      , 'p_firstEgMotherTruthOrigin'  , 'correctedAverageMu'         ]
+
+
+# FEATURE REMOVAL IMPORTANCE RANKING
+if args.feature_removal == 'ON':
+    groups = [('em_barrel_Lr1','em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2','em_barrel_Lr3')]
+    scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
+    args.output_dir += '/'+removed_feature
+
+
+# TRAINING DICTIONARY
 keys    = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])
 images  = [key for key in images  if key in keys or key=='tracks_image']
 scalars = [key for key in scalars if key in keys]
@@ -110,15 +117,6 @@ others  = [key for key in others  if key in keys]
 if args.scalars != 'ON': scalars=[]
 if args.images  != 'ON': images =[]
 if images == []: args.NN_type = 'FCN'
-
-
-# FEATURE REMOVAL IMPORTANCE RANKING
-if args.feature_removal == 'ON':
-    groups = [('em_barrel_Lr1','em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2','em_barrel_Lr3')]
-    scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
-
-
-# TRAINING DICTIONARY
 train_data = {'scalars':scalars, 'images':images}
 input_data = {**train_data, 'others':others}
 
@@ -135,6 +133,9 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     inputs = {'scalars':scalars, 'images':[], 'others':others}
+    if args.eta_region == '0.0-1.3': args.valid_cuts = '(abs(sample["eta"]) > 0.0) & (abs(sample["eta"]) < 1.3)'
+    if args.eta_region == '1.3-1.6': args.valid_cuts = '(abs(sample["eta"]) > 1.3) & (abs(sample["eta"]) < 1.6)'
+    if args.eta_region == '1.6-2.5': args.valid_cuts = '(abs(sample["eta"]) > 1.6) & (abs(sample["eta"]) < 2.5)'
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_files,
                inputs, args.valid_cuts, args.sep_bkg, args.runDiffPlots)
 elif args.results_in != '': print('\nOption [--results_in] not matching any file --> aborting\n')
@@ -151,8 +152,8 @@ model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CN
 
 
 # ARGUMENTS AND VARIABLES SUMMARY
-args.s_scaling  = args.s_scaling == 'ON' and scalars != []
-args.t_scaling  = args.t_scaling == 'ON' and 'tracks_image' in images
+args.scaling = args.scaling == 'ON' and scalars != []
+args.t_scaling = args.t_scaling == 'ON' and 'tracks_image' in images
 if args.NN_type == 'CNN':
     print('\nCNN ARCHITECTURES:')
     for shape in [shape for shape in CNN if shape in [sample[key].shape[1:] for key in sample]]:
@@ -164,32 +165,27 @@ table   = [train_data[key] for key in train_data if train_data[key]!=[]]
 length  = max([len(n) for n in table])
 table   = list(map(list, zip(*[n+(length-len(n))*[''] for n in table])))
 print(tabulate(table, headers=headers, tablefmt='psql')); print()
-args.model_in    = args.output_dir+'/'+args.model_in    ; args.model_out    = args.output_dir+'/'+args.model_out
-args.s_scaler_in = args.output_dir+'/'+args.s_scaler_in ; args.s_scaler_out = args.output_dir+'/'+args.s_scaler_out
-args.t_scaler_in = args.output_dir+'/'+args.t_scaler_in ; args.t_scaler_out = args.output_dir+'/'+args.t_scaler_out
-args.results_in  = args.output_dir+'/'+args.results_in  ; args.results_out  = args.output_dir+'/'+args.results_out
+args.model_in   = args.output_dir+'/'  +args.model_in  ; args.model_out    = args.output_dir+'/'  +args.model_out
+args.scaler_in  = args.output_dir+'/' +args.scaler_in  ; args.scaler_out   = args.output_dir+'/' +args.scaler_out
+args.results_in = args.output_dir+'/'+args.results_in  ; args.results_out  = args.output_dir+'/'+args.results_out
 
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
 if os.path.isfile(args.model_in):
     print('CLASSIFIER: loading pre-trained weights from', args.model_in, '\n')
     model.load_weights(args.model_in)
-if args.s_scaling and os.path.isfile(args.s_scaler_in):
-    print('CLASSIFIER: loading scalars scaler from', args.s_scaler_in, '\n')
-    s_scaler = pickle.load(open(args.s_scaler_in, 'rb'))
-else: s_scaler = None
-if args.t_scaling and os.path.isfile(args.t_scaler_in):
-    print('CLASSIFIER: loading tracks scaler from ', args.t_scaler_in, '\n')
-    t_scaler = pickle.load(open(args.t_scaler_in, 'rb'))
-else: t_scaler = None
+if args.scaling and os.path.isfile(args.scaler_in):
+    print('CLASSIFIER: loading scalars scaler from', args.scaler_in, '\n')
+    scaler = pickle.load(open(args.scaler_in, 'rb'))
+else: scaler = None
 print('CLASSIFIER: LOADING', np.diff(args.n_valid)[0], 'VALIDATION SAMPLES')
 if args.generator == 'ON':
     valid_gen = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, args.n_classes,
-                                valid_batch_size, args.valid_cuts, s_scaler, t_scaler, shuffle='OFF')
+                                valid_batch_size, args.valid_cuts, scaler, shuffle='OFF')
 inputs = {'scalars':scalars, 'images':[], 'others':others} if args.generator == 'ON' else input_data
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks, args.n_classes,
-                                              args.valid_cuts, None if args.generator=='ON' else s_scaler, t_scaler)
-#sample_analysis(valid_sample, valid_labels, scalars, s_scaler, args.output_dir); sys.exit()
+                                              args.valid_cuts, None if args.generator=='ON' else scaler)
+#sample_analysis(valid_sample, valid_labels, scalars, scaler, args.output_dir); sys.exit()
 
 
 # EVALUATING FEATURES CORRELATIONS
@@ -211,21 +207,16 @@ if args.n_epochs > 0:
     print('CLASSIFIER: LOADING', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
     if args.generator == 'ON' and args.t_scaling:
         inputs = {'scalars':scalars, 'images':['tracks_image'], 'others':others}
-    train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks, args.n_classes,
-                                                           args.train_cuts, s_scaler=None, t_scaler=None)
-    if args.s_scaling:
-        if not os.path.isfile(args.s_scaler_in):
-            s_scaler = fit_s_scaler(train_sample, scalars, args.s_scaler_out)
-            if args.generator != 'ON': valid_sample = apply_s_scaler(valid_sample, scalars, s_scaler, verbose='OFF')
-        if args.generator != 'ON'    : train_sample = apply_s_scaler(train_sample, scalars, s_scaler, verbose='ON')
-    if args.t_scaling:
-        if not os.path.isfile(args.t_scaler_in):
-            t_scaler = fit_t_scaler(train_sample, args.t_scaler_out)
-            if args.generator != 'ON': valid_sample = apply_t_scaler(valid_sample, t_scaler, verbose='OFF')
-        if args.generator != 'ON'    : train_sample = apply_t_scaler(train_sample, t_scaler, verbose='ON')
+    train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
+                                                           args.n_classes, args.train_cuts, scaler=None)
+    if args.scaling:
+        if not os.path.isfile(args.scaler_in):
+            scaler = fit_scaler(train_sample, scalars, args.scaler_out)
+            if args.generator != 'ON': valid_sample = apply_scaler(valid_sample, scalars, scaler, verbose='OFF')
+        if args.generator != 'ON'    : train_sample = apply_scaler(train_sample, scalars, scaler, verbose='ON')
     sample_composition(train_sample); compo_matrix(valid_labels, train_labels=train_labels); print()
     #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
-    sample_weight = get_sample_weight(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='eta')
+    sample_weight = get_sample_weight(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2D')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, sample_weight, args.output_dir)
     callbacks = callback(args.model_out, args.patience, args.metrics); print()
     if args.generator == 'ON':
@@ -233,9 +224,9 @@ if args.n_epochs > 0:
         if np.all(sample_weight) != None: sample_weight = gen_weights(args.n_train, weight_idx, sample_weight)
         print('CLASSIFIER: LAUNCHING GENERATOR FOR', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
         valid_gen = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, args.n_classes,
-                                    valid_batch_size, args.valid_cuts, s_scaler, t_scaler, shuffle='OFF')
+                                    valid_batch_size, args.valid_cuts, scaler, shuffle='OFF')
         train_gen = Batch_Generator(data_files, args.n_train, input_data, args.n_tracks, args.n_classes,
-                                    train_batch_size, args.train_cuts, s_scaler, t_scaler, sample_weight, shuffle='ON')
+                                    train_batch_size, args.train_cuts, scaler, sample_weight, shuffle='ON')
         training  = model.fit( train_gen, validation_data=valid_gen, max_queue_size=10*max(1,n_gpus),
                                callbacks=callbacks, workers=1, epochs=args.n_epochs, verbose=args.verbose )
     else:
