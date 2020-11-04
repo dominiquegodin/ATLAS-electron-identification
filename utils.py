@@ -210,6 +210,21 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
+def get_dataset(host_name='lps', node_dir='', eta_region=''):
+    if 'lps'    in host_name                   : node_dir = '/opt/tmp/godin/e-ID_data/presamples'
+    if 'beluga' in host_name and node_dir == '': node_dir = '/project/def-arguinj/shared/e-ID_data'
+    barrel_dir, midgap_dir, endcap_dir = [node_dir+'/'+folder for folder in ['0.0-1.3', '1.3-1.6', '1.6-2.5']]
+    barrel_files = sorted([barrel_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
+    midgap_files = sorted([midgap_dir+'/'+h5_file for h5_file in os.listdir(midgap_dir) if 'e-ID_' in h5_file])
+    endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
+    data_files = [h5_file for pair in zip(barrel_files, midgap_files, endcap_files) for h5_file in pair]
+    if eta_region in ['0.0-1.3', '0.0-1.3_old', '1.3-1.6', '1.6-2.5', '0.0-2.5']:
+        folder = node_dir+'/'+eta_region
+        data_files = sorted([folder+'/'+h5_file for h5_file in os.listdir(folder) if 'e-ID_' in h5_file])
+    #for key, val in h5py.File(data_files[0], 'r').items(): print(key, val.shape)
+    return data_files
+
+
 def sample_histograms(valid_sample, valid_labels, train_sample, train_labels, sample_weight, output_dir):
     arguments  = [(valid_sample, valid_labels,     None     , output_dir, 'valid')]
     arguments += [(train_sample, train_labels, sample_weight, output_dir, 'train')]
@@ -427,9 +442,6 @@ def make_labels(sample, n_classes):
         labels = np.where(np.logical_and(IFF_type ==10,  MC_type ==16),  4, labels  )
         labels = np.where(np.logical_and(IFF_type ==10,  MC_type ==17),  5, labels  )
         return   np.where(  labels == 10                              , -1, labels  )
-    elif n_classes == 9:
-        labels = np.where(IFF_type == 9                               ,  4, IFF_type)
-        return   np.where(IFF_type ==10                               ,  6, labels  )
     else: print('\nERROR:', n_classes, 'classes not supported -> exiting program\n'); sys.exit()
 
 
@@ -457,54 +469,42 @@ def batch_idx(data_files, batch_size, interval, weights=None, shuffle='OFF'):
     return batch_dict
 
 
-def shuffle_data(data_files, n_files):
-    cum_n_e = np.cumsum([len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files])
-    indices = utils.shuffle(np.arange(cum_n_e[-1]), random_state=0)
-    indices = np.split(indices, n_files)
-    for idx in indices[:1]:
-        file_idx = np.searchsorted(cum_n_e, idx, side='right')
-        idx_list = [idx[file_idx==n] -np.append([0],cum_n_e[:-1])[n] for n in np.arange(len(cum_n_e))]
-    for n in idx_list: print(n, len(n))
-    #print( np.sum([len(n) for n in idx_list]) ); sys.exit()
-
-    sample = []
-    for h5_file in data_files:#[:3]:
-        with h5py.File(h5_file,'r') as data:
-            start_time = time.time()
-            print(h5_file)
-            sample += [{key:np.take(data[key],idx_list[1]) for key in data}]
-            #for key in data: print(key, len(data[key]))
-            #for key in sample: print(key, sample[key].shape)
-            print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)') 
-    print( len(sample) )
-
-    #for n in np.arange(len(cum_n_e)):
-    #    file_idx = [ idx[np.searchsorted(cum_n_e, idx, side='right')==n]
-    #                 - np.append([0],cum_n_e[:-1])[n] for idx in indices ]
-    #    idx_list = np.concatenate( file_idx )
-    #    print( np.allclose(sorted(idx_list), np.arange(n_e[n])) )
+def shuffle_sample(output_dir, data_files, index):
+    features = list(set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])); print()
+    for key in features:
+        print('Merging e-ID_'+'{:=02}'.format(index)+'.h5 files for', format(key,'29s'), end='-->', flush=True)
+        start_time = time.time()
+        sample_list = []
+        for h5_file in data_files[3*index:3*(index+1)]:
+            try: sample_list += [h5py.File(h5_file,'r')[key]]
+            except KeyError:
+                n_e = len(h5py.File(h5_file,'r')['eventNumber'])
+                if 'fine' in key: sample_list += [np.zeros((n_e,)+(56,11), dtype=np.int8)]
+                else            : sample_list += [np.zeros((n_e,)+( 7,11), dtype=np.int8)]
+        sample = np.concatenate(sample_list)
+        file_name = 'e-ID_'+'{:=02}'.format(index)+'.h5'
+        with h5py.File(output_dir+'/'+file_name, 'w' if key==features[0] else 'a') as data:
+            shape = (len(sample),) + sample.shape[1:]
+            data.create_dataset(key, shape, dtype='i4' if sample.dtype=='int32' else'f2')
+            data[key][:] = utils.shuffle(sample, random_state=0)
+        print(' (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
 
 
 def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, scaler=None):
     batch_dict = batch_idx(data_files, np.diff(idx)[0], idx)
     sample, labels = zip(*[make_sample(data_files[batch_dict[key]['file']], batch_dict[key]['indices'],
                            input_data, n_tracks, n_classes, verbose='ON') for key in batch_dict])
-    sample  = {key:np.concatenate([n[key] for n in sample]) for key in sample[0]}
+    #inputs = {key:np.concatenate([n[key] for n in sample]) for key in sample[0]}
+    inputs = {}
+    for key in list(sample[0].keys()):
+        inputs[key] = np.concatenate([n[key] for n in sample])
+        for n in sample: n.pop(key)
     labels  = np.concatenate(labels)
     indices = np.where( np.logical_and(labels!=-1, eval(cuts) if cuts!='' else True) )[0]
-    sample, labels, _ = sample_cuts(sample, labels, cuts=cuts, verbose='ON')
-    if scaler != None: sample = apply_scaler(sample, input_data['scalars'], scaler, verbose='ON')
+    inputs, labels, _ = sample_cuts(inputs, labels, cuts=cuts, verbose='ON')
+    if scaler != None: inputs = apply_scaler(inputs, input_data['scalars'], scaler, verbose='ON')
     else: print()
-    return sample, labels, indices
-    #for key in list(batch_dict.keys())[0:1]:
-    #    valid_sample, valid_labels = make_sample(data_files[batch_dict[key]['file']], input_data, batch_dict[key]['indices'],
-    #                                             args.n_tracks, args.n_classes, args.valid_cuts, args.scaler_in)
-    #for key in list(batch_dict.keys())[1:]:
-    #    sample, labels = make_sample(data_files[batch_dict[key]['file']], input_data, batch_dict[key]['indices'],
-    #                                             args.n_tracks, args.n_classes, args.valid_cuts, args.scaler_in)
-    #print(valid_labels.shape, labels.shape)
-    #    valid_sample = {key: np.concatenate([valid_sample[key][:], sample[key][:]]) for key in sample}
-    #    valid_labels = np.concatenate([valid_labels, labels])
+    return inputs, labels, indices
 
 
 class Batch_Generator(tf.keras.utils.Sequence):
@@ -547,7 +547,6 @@ def sample_cuts(sample, labels, weights=None, cuts='', verbose='OFF'):
         if verbose == 'ON':
             print('CLASSIFIER: applying features cuts -->', format(len(labels),'8d') ,'e conserved', end='')
             print(' ('+format(100*len(labels)/length,'.2f')+' %)\nCLASSIFIER: applied cuts:', cuts)
-    if np.any(weights==0): print('EMPTY WEIGHTS'); sys.exit()
     return sample, labels, weights
 
 
@@ -725,6 +724,8 @@ def binarization(sample, labels, probs, class_1=['bkg'], class_0=[0], normalizat
     print_dict[1] += 'BINARIZATION: CLASS 0 = '+str(set(class_0))+' vs CLASS 1 = '+str(set(class_1))+'\n'
     ratios  = class_ratios(labels) if bkg_weights else (max(labels)+1)*[1]
     labels  = np.array([0 if label in class_0 else 1 if label in class_1 else -1 for label in labels])
+    #print( probs[:,0].shape, probs[:,1:].shape, np.mean(probs,axis=1)[:,np.newaxis].shape ); sys.exit()
+    #probs[:,1:] = np.where(probs[:,0][:,np.newaxis]>0.16, probs[:,1:]/np.mean(probs[:,1:],axis=1)[:,np.newaxis], probs[:,1:])
     probs_0 = reduce(np.add, [ratios[n]*probs[:,n] for n in class_0])[labels!=-1]
     probs_1 = reduce(np.add, [ratios[n]*probs[:,n] for n in class_1])[labels!=-1]
     sample  = {key:sample[key][labels!=-1] for key in sample}; labels = labels[labels!=-1]

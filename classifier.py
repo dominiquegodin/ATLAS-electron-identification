@@ -5,10 +5,10 @@ import os, sys, h5py, pickle
 from   argparse  import ArgumentParser
 from   tabulate  import tabulate
 from   itertools import accumulate
-from   utils     import validation, make_sample, merge_samples, sample_composition, fit_scaler, apply_scaler
+from   utils     import get_dataset, validation, make_sample, merge_samples, sample_composition
 from   utils     import compo_matrix, get_sample_weight, get_class_weight, gen_weights, sample_weights
 from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms, Batch_Generator
-from   utils     import feature_removal, feature_ranking
+from   utils     import feature_removal, feature_ranking, fit_scaler, apply_scaler
 from   models    import multi_CNN, callback, create_model
 #os.system('nvidia-modprobe -u -c=0') # for atlas15
 
@@ -54,6 +54,7 @@ parser.add_argument( '--results_in'     , default = ''                  )
 parser.add_argument( '--results_out'    , default = ''                  )
 parser.add_argument( '--runDiffPlots'   , default = 0, type = int       )
 parser.add_argument( '--feature_removal', default = 'OFF'               )
+parser.add_argument( '--correlations'   , default = 'OFF'               )
 args = parser.parse_args()
 
 
@@ -64,20 +65,6 @@ if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'ma
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weights file required with n_epochs < 1 --> aborting\n'); sys.exit()
-
-
-# DATASET
-if 'lps'    in args.host_name                        : args.node_dir = '/opt/tmp/godin/e-ID_data/presamples'
-if 'beluga' in args.host_name and args.node_dir == '': args.node_dir = '/project/def-arguinj/shared/e-ID_data'
-barrel_dir, midgap_dir, endcap_dir = [args.node_dir+'/'+dir for dir in ['0.0-1.3', '1.3-1.6', '1.6-2.5']]
-barrel_files = sorted([barrel_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
-midgap_files = sorted([midgap_dir+'/'+h5_file for h5_file in os.listdir(midgap_dir) if 'e-ID_' in h5_file])
-endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
-data_files = [h5_file for pair in zip(barrel_files, midgap_files, endcap_files) for h5_file in pair]
-#old_dir = args.node_dir+'/'+'0.0-1.3_old'
-#old_files = sorted([old_dir+'/'+h5_file for h5_file in os.listdir(old_dir) if 'e-ID_' in h5_file])
-if args.eta_region != '': data_files = [h5_file for h5_file in data_files if args.eta_region in h5_file]
-#for key, val in h5py.File(data_files[0], 'r').items(): print(key, val.shape)
 
 
 # CNN PARAMETERS
@@ -109,11 +96,12 @@ if args.feature_removal == 'ON':
     args.output_dir += '/'+removed_feature
 
 
-# TRAINING DICTIONARY
-keys    = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])
-images  = [key for key in images  if key in keys or key=='tracks_image']
-scalars = [key for key in scalars if key in keys]
-others  = [key for key in others  if key in keys]
+# DATASET AND TRAINING DICTIONARY
+data_files = get_dataset(args.host_name, args.node_dir, args.eta_region)
+keys       = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])
+images     = [key for key in images  if key in keys or key=='tracks_image']
+scalars    = [key for key in scalars if key in keys]
+others     = [key for key in others  if key in keys]
 if args.scalars != 'ON': scalars=[]
 if args.images  != 'ON': images =[]
 if images == []: args.NN_type = 'FCN'
@@ -132,14 +120,14 @@ if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
-    inputs = {'scalars':scalars, 'images':[], 'others':others}
     if args.eta_region == '0.0-1.3': args.valid_cuts = '(abs(sample["eta"]) > 0.0) & (abs(sample["eta"]) < 1.3)'
     if args.eta_region == '1.3-1.6': args.valid_cuts = '(abs(sample["eta"]) > 1.3) & (abs(sample["eta"]) < 1.6)'
     if args.eta_region == '1.6-2.5': args.valid_cuts = '(abs(sample["eta"]) > 1.6) & (abs(sample["eta"]) < 2.5)'
+    inputs = {'scalars':scalars, 'images':[], 'others':others}
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_files,
                inputs, args.valid_cuts, args.sep_bkg, args.runDiffPlots)
 elif args.results_in != '': print('\nOption [--results_in] not matching any file --> aborting\n')
-if args.results_in != '': sys.exit()
+if   args.results_in != '': sys.exit()
 
 
 # MODEL CREATION AND MULTI-GPU DISTRIBUTION
@@ -189,8 +177,9 @@ valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, 
 
 
 # EVALUATING FEATURES CORRELATIONS
-#from importance import correlations
-#correlations(images, scalars, valid_sample, valid_labels, args.eta_region, args.output_dir, args.images)
+if args.correlations == 'ON':
+    from importance import correlations
+    correlations(images, scalars, valid_sample, valid_labels, args.eta_region, args.output_dir, args.images)
 
 
 # TRAINING LOOP
@@ -251,7 +240,7 @@ if '.pkl' in args.results_out:
     if args.feature_removal == 'ON':
         args.results_out = args.output_dir[0:args.output_dir.rfind('/')]+'/'+args.results_out.split('/')[-1]
         try: pickle.dump({removed_feature:bkg_rej}, open(args.results_out,'ab'))
-        except IOError: print('FILE ACCESS CONFLICT FOR FEAT_'+str(args.sbatch_var), '--> ABORTING\n')
+        except IOError: print('FILE ACCESS CONFLICT FOR', removed_feature, '--> SKIPPING FILE ACCESS\n')
         feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[])
     else:
         if args.n_folds > 1 and False: valid_data = (valid_probs,)

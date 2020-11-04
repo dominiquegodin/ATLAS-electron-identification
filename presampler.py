@@ -4,7 +4,7 @@ import multiprocessing as mp
 import time, os, sys, h5py
 from   argparse  import ArgumentParser
 from   functools import partial
-from   utils     import presample, merge_presamples
+from   utils     import presample, merge_presamples, get_dataset, shuffle_sample
 
 
 # OPTIONS
@@ -12,11 +12,24 @@ parser = ArgumentParser()
 parser.add_argument( '--n_e'        , default = None , type=float )
 parser.add_argument( '--n_tasks'    , default = 10   , type=int   )
 parser.add_argument( '--n_files'    , default = None , type=int   )
-parser.add_argument( '--output_file', default = 'e-ID.h5'      )
+parser.add_argument( '--output_file', default = 'e-ID.h5'         )
 parser.add_argument( '--sampling'   , default = 'ON'              )
 parser.add_argument( '--merging'    , default = 'OFF'             )
+parser.add_argument( '--shuffling'  , default = 'OFF'             )
 parser.add_argument( '--eta_region' , default = 'barrel'          )
 args = parser.parse_args()
+
+
+if args.shuffling == 'ON':
+    data_files = get_dataset()
+    args.output_dir = 'outputs/test'
+    for n in np.arange(1):
+        shuffle_sample(args.output_dir, data_files, index=n)
+    #arguments = [(args.output_dir, data_files, index) for index in np.arange(10)]
+    #processes = [mp.Process(target=shuffle_sample, args=arg) for arg in arguments]
+    #for job in processes: job.start()
+    #for job in processes: job.join()
+    sys.exit()
 
 
 # DATASET
