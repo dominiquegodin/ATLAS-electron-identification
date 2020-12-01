@@ -68,8 +68,8 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 
 
 # CNN PARAMETERS
-CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,3) ], 'pools':[ (4,1) , (2,1) ]},
-        (7,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,3) ], 'pools':[ (1,1) , (1,1) ]},
+CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (4,1) , (2,1) ]},
+        (7,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (1,1) , (1,1) ]},
         #(7,11):{'maps':[200,200], 'kernels':[(3,5,7),(3,5,1)], 'pools':[(1,1,1),(1,1,1)]},
       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
