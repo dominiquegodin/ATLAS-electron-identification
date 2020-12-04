@@ -90,13 +90,6 @@ others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_
            'correctedAverageMu', 'p_firstEgMotherPdgId'                                                   ]
 
 
-# FEATURE REMOVAL IMPORTANCE RANKING
-if args.feature_removal == 'ON':
-    groups = [('em_barrel_Lr1','em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2','em_barrel_Lr3')]
-    scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
-    args.output_dir += '/'+removed_feature
-
-
 # DATASET AND TRAINING DICTIONARY
 data_files = get_dataset(args.host_name, args.node_dir, args.eta_region)
 keys       = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])
@@ -105,6 +98,10 @@ scalars    = [key for key in scalars if key in keys]
 others     = [key for key in others  if key in keys]
 if args.scalars != 'ON': scalars=[]
 if args.images  != 'ON': images =[]
+if args.feature_removal == 'ON':
+    groups = [('em_barrel_Lr1','em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2','em_barrel_Lr3')]
+    scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
+    args.output_dir += '/'+removed_feature
 if images == []: args.NN_type = 'FCN'
 train_data = {'scalars':scalars, 'images':images}
 input_data = {**train_data, 'others':others}
