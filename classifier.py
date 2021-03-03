@@ -6,7 +6,7 @@ from   argparse  import ArgumentParser
 from   tabulate  import tabulate
 from   itertools import accumulate
 from   utils     import get_dataset, validation, make_sample, merge_samples, sample_composition
-from   utils     import compo_matrix, get_sample_weight, get_class_weight, gen_weights, sample_weights
+from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_weights, sample_weights
 from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms, Batch_Generator
 from   utils     import feature_removal, feature_ranking, fit_scaler, apply_scaler
 from   models    import callback, create_model
@@ -44,7 +44,7 @@ parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
 parser.add_argument( '--sep_bkg'        , default = 'OFF'               )
 parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
-parser.add_argument( '--eta_region'     , default = ''                  )
+parser.add_argument( '--eta_region'     , default = '0.0-2.5'           )
 parser.add_argument( '--output_dir'     , default = 'outputs'           )
 parser.add_argument( '--model_in'       , default = ''                  )
 parser.add_argument( '--model_out'      , default = 'model.h5'          )
@@ -60,8 +60,8 @@ args = parser.parse_args()
 
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_eval', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2max', 'none']:
-    print('\nweight_type: \"', args.weight_type, '\" not recognized, resetting it to none!!!')
+if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2class', 'match2max', 'none']:
+    print('\nweight_type', args.weight_type, 'not recognized --> resetting it to none\n')
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
     print('\nERROR: weights file required with n_epochs < 1 --> aborting\n'); sys.exit()
@@ -75,10 +75,15 @@ CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (4,1) ,
 
 
 # TRAINING VARIABLES
-scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rphi'  , 'p_TRTPID' , 'p_numberOfSCTHits'           ,
-           'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_deltaPhiRescaled2'         ,
-           'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_sct_weight_charge'         ,
-           'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfInnermostPixelHits']
+#scalars = ['p_Eratio' , 'p_Reta'     , 'p_Rhad'   , 'p_Rhad1' , 'p_Rphi'  , 'p_TRTPID', 'p_numberOfSCTHits',
+#           'p_dPOverP', 'p_deltaEta1', 'p_f1'     , 'p_f3'    , 'p_deltaPhiRescaled2' , 'p_weta2' , 'p_d0' ,
+#           'p_d0Sig'  ,'p_eta'       , 'p_et_calo', 'p_EoverP', 'p_wtots1', 'p_numberOfPixelHits'          ,
+#           'p_numberOfInnermostPixelHits']
+scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_deltaPhiRescaled2'         ,
+           'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'         ,
+           'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'           ,
+           'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'         ,
+           'p_TRTPID', 'p_numberOfInnermostPixelHits'                                                     ]
 images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine',
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine',
@@ -116,25 +121,28 @@ if args.n_eval != 0: args.n_eval = [args.n_valid[0], min(args.n_valid[1],args.n_
 else               : args.n_eval = args.n_valid
 #args.train_cuts = '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
 #args.valid_cuts = '(sample["p_et_calo"] > 4.5) & (sample["p_et_calo"] < 20)'
-#args.valid_cuts = '(sample["p_et_calo"] >= 5) & (sample["p_vertexIndex"] != -999)'
+#args.train_cuts = '((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)'
+#args.valid_cuts = '((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)'
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     if args.eta_region in ['0.0-1.3', '1.3-1.6', '1.6-2.5']:
-        eta_1, eta_2    = args.eta_region.split('-')
-        args.valid_cuts = '(abs(sample["eta"]) >= '+str(eta_1)+') & (abs(sample["eta"]) <= '+str(eta_2)+')'
+        eta_1, eta_2 = args.eta_region.split('-')
+        valid_cuts   = '(abs(sample["eta"]) >= '+str(eta_1)+') & (abs(sample["eta"]) <= '+str(eta_2)+')'
+        if args.valid_cuts == '': args.valid_cuts  = valid_cuts
+        else                    : args.valid_cuts  = valid_cuts + '& ('+args.valid_cuts+')'
     inputs = {'scalars':scalars, 'images':[], 'others':others}
     validation(args.output_dir, args.results_in, args.plotting, args.n_valid, data_files,
                inputs, args.valid_cuts, args.sep_bkg, args.runDiffPlots)
-elif args.results_in != '': print('\nOption [--results_in] not matching any file --> aborting\n')
+elif args.results_in != '': print('\nOption --results_in not matching any file --> aborting\n')
 if   args.results_in != '': sys.exit()
 
 
 # MODEL CREATION AND MULTI-GPU DISTRIBUTION
 n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
 train_batch_size = max(1,n_gpus) * args.batch_size
-valid_batch_size = max(1,n_gpus) * int(1e4)
+valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(1e4))
 sample = make_sample(data_files[0], [0,1], input_data, args.n_tracks, args.n_classes)[0]
 model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CNN,
                       args.l2, args.dropout, train_data, n_gpus)
@@ -163,13 +171,10 @@ if os.path.isfile(args.model_in):
     print('CLASSIFIER: loading pre-trained weights from', args.model_in, '\n')
     model.load_weights(args.model_in)
 if args.scaling and os.path.isfile(args.scaler_in):
-    print('CLASSIFIER: loading scalars scaler from', args.scaler_in, '\n')
+    print('CLASSIFIER: loading quantile transform from', args.scaler_in, '\n')
     scaler = pickle.load(open(args.scaler_in, 'rb'))
 else: scaler = None
 print('CLASSIFIER: LOADING', np.diff(args.n_valid)[0], 'VALIDATION SAMPLES')
-if args.generator == 'ON':
-    valid_gen = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, args.n_classes,
-                                valid_batch_size, args.valid_cuts, scaler, shuffle='OFF')
 inputs = {'scalars':scalars, 'images':[], 'others':others} if args.generator == 'ON' else input_data
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks, args.n_classes,
                                               args.valid_cuts, None if args.generator=='ON' else scaler)
@@ -202,25 +207,25 @@ if args.n_epochs > 0:
             if args.generator != 'ON': valid_sample = apply_scaler(valid_sample, scalars, scaler, verbose='OFF')
         if args.generator != 'ON'    : train_sample = apply_scaler(train_sample, scalars, scaler, verbose='ON')
     sample_composition(train_sample); compo_matrix(valid_labels, train_labels=train_labels); print()
-    #sample_weight = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
-    sample_weight = get_sample_weight(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='2D')
-    sample_histograms(valid_sample, valid_labels, train_sample, train_labels, sample_weight, args.output_dir)
+    #train_weights = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
+    train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
+    sample_histograms(valid_sample, valid_labels, train_sample, train_labels, train_weights, bins, args.output_dir)
     callbacks = callback(args.model_out, args.patience, args.metrics); print()
     if args.generator == 'ON':
         del(train_sample)
-        if np.all(sample_weight) != None: sample_weight = gen_weights(args.n_train, weight_idx, sample_weight)
+        if np.all(train_weights) != None: train_weights = gen_weights(args.n_train, weight_idx, train_weights)
         print('CLASSIFIER: LAUNCHING GENERATOR FOR', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
         eval_gen  = Batch_Generator(data_files, args.n_eval, input_data, args.n_tracks, args.n_classes,
                                     valid_batch_size, args.valid_cuts, scaler, shuffle='OFF')
         train_gen = Batch_Generator(data_files, args.n_train, input_data, args.n_tracks, args.n_classes,
-                                    train_batch_size, args.train_cuts, scaler, sample_weight, shuffle='ON')
+                                    train_batch_size, args.train_cuts, scaler, train_weights, shuffle='ON')
         training  = model.fit( train_gen, validation_data=eval_gen, max_queue_size=max(1,n_gpus),
                                callbacks=callbacks, workers=1, epochs=args.n_epochs, verbose=args.verbose )
     else:
-        eval_sample = {key:valid_sample[key][args.n_eval[0]:args.n_eval[1]] for key in valid_sample}
-        eval_labels = valid_labels[args.n_eval[0]:args.n_eval[1]]
+        eval_sample = {key:valid_sample[key][:args.n_eval[1]-args.n_valid[0]] for key in valid_sample}
+        eval_labels =      valid_labels     [:args.n_eval[1]-args.n_valid[0]]
         training    = model.fit( train_sample, train_labels, validation_data=(eval_sample,eval_labels),
-                                 callbacks=callbacks, sample_weight=sample_weight, batch_size=train_batch_size,
+                                 callbacks=callbacks, sample_weight=train_weights, batch_size=train_batch_size,
                                  epochs=args.n_epochs, verbose=args.verbose )
     model.load_weights(args.model_out); print()
 else: train_labels = []; training = None
@@ -232,7 +237,10 @@ if args.n_folds > 1:
                               args.n_valid, input_data, args.n_tracks, args.valid_cuts, model, args.generator)
 else:
     print('Validation sample', args.n_valid, 'class predictions:')
-    if args.generator == 'ON': valid_probs = model.predict(valid_gen, verbose=args.verbose)
+    if args.generator == 'ON':
+        valid_gen   = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, args.n_classes,
+                                      valid_batch_size, args.valid_cuts, scaler, shuffle='OFF')
+        valid_probs = model.predict(valid_gen, verbose=args.verbose)
     else: valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
 bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
                         args.output_dir, args.plotting, args.sep_bkg, args.runDiffPlots)

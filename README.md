@@ -2,23 +2,23 @@
 This is a TensorFlow framework for the identification of ATLAS electrons by using neural networks.
 
 
-# Training at LPS  
+# Training at LPS
 1) login to atlas16 for GPU's avaibility
    ```
    ssh -Y atlas16
    ```
 2) change to user directory
    ```
-   cd /opt/tmp/$USER  
-   ```  
+   cd /opt/tmp/$USER
+   ```
 3) link data file to user directory
    ```
    ln -s /opt/tmp/godin/el_data/2020-05-28/el_data.h5 .
-   ```  
+   ```
 4) clone framework from GitHub
    ```
-   git clone https://github.com/dominiquegodin/el_classifier.git  
-   ```  
+   git clone https://github.com/dominiquegodin/el_classifier.git
+   ```
 5) enter framework directory
    ```
    cd el_classifier
@@ -65,7 +65,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
     ```
 
 
-# Using Slurm jobs manager (LPS or Beluga)
+# Using Slurm jobs manager system (LPS or Beluga)
 1) run classifier.sh script and send jobs to Slurm batch system (This will run the command in classifier.sh)
    ```
    sbatch sbatch.sh
@@ -128,7 +128,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 --NN_type         : CNN or FCN specify the type of neural networks (default=CNN)
 
 --scaling         : applies quantile transform to scalar variables when ON (fit performed on train sample
-	        and applied to whole sample)  
+	        and applied to whole sample)
 
 --cross_valid     : performs k-fold cross-validation
 
@@ -136,7 +136,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 --output_dir      : name of output directory (useful for running jobs in parallel)
 
---model_in        : hdf5 model file from a previous training checkpoint (requires .h5 extension)  
+--model_in        : hdf5 model file from a previous training checkpoint (requires .h5 extension)
 
 --model_out       : name of hdf5 checkpoint file used for saving and updating the model best weights
 
@@ -162,7 +162,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 1) The model and weights are automatically saved to a hdf5 checkpoint for each epoch where the performance
    (either accuracy or loss function) has improved.
 2) An early stopping callback allows the training to stop automatically when the validation performance
-   has stop improving for a pre-determined number of epochs (default=10).  
+   has stop improving for a pre-determined number of epochs (default=10).
 3) Finished or aborted trainings can be resumed from where they were stopped by using previously trained weights
    from other same-model hdf5 checkpoints (see --model_in option).
 4) All plots, weights and models are saved by default in the "outputs" directory.

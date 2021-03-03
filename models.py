@@ -49,7 +49,7 @@ def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, trai
     tf.debugging.set_log_device_placement(False)
     strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
     with strategy.scope():
-        if tf.__version__ >= '2.1.0':# and train_var['images'] != ['tracks_image']:
+        if tf.__version__ >= '2.1.0':
             mixed_precision.experimental.set_policy('mixed_float16')
         if 'tracks_image' in train_var['images']: CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
         model = multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, **train_var)
@@ -72,5 +72,5 @@ def callback(model_out, patience, metrics):
     calls  = [callbacks.ModelCheckpoint(model_out, save_best_only=True, monitor=metrics, verbose=1)]
     calls += [callbacks.ReduceLROnPlateau(patience=3, factor=0.5, min_delta=1e-6, monitor=metrics, verbose=1)]
     calls += [callbacks.EarlyStopping(patience=patience, restore_best_weights=True,
-              min_delta=1e-5, monitor=metrics, verbose=1)]
+                                      min_delta=1e-5, monitor=metrics, verbose=1)]
     return calls + [callbacks.TerminateOnNaN()]

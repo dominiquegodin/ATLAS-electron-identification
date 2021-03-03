@@ -3,8 +3,7 @@
 
 
 # IMPORT PACKAGES AND FUNCTIONS
-import numpy as np
-import os, sys, time, h5py, pickle
+import numpy as np, os, pickle
 import onnx, keras2onnx, onnxruntime as ort
 from   tensorflow.keras import models
 from   argparse         import ArgumentParser
