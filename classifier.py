@@ -8,7 +8,7 @@ from   itertools import accumulate
 from   utils     import get_dataset, validation, make_sample, merge_samples, sample_composition
 from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_weights, sample_weights
 from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms, Batch_Generator
-from   utils     import feature_removal, feature_ranking, fit_scaler, apply_scaler
+from   utils     import feature_removal, feature_ranking, fit_scaler, apply_scaler, fit_t_scaler, apply_t_scaler
 from   models    import callback, create_model
 #os.system('nvidia-modprobe -u -c=0') # for atlas15
 
@@ -40,6 +40,7 @@ parser.add_argument( '--NN_type'        , default = 'CNN'               )
 parser.add_argument( '--images'         , default = 'ON'                )
 parser.add_argument( '--scalars'        , default = 'ON'                )
 parser.add_argument( '--scaling'        , default = 'ON'                )
+parser.add_argument( '--t_scaling'      , default = 'OFF'               )
 parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
 parser.add_argument( '--sep_bkg'        , default = 'OFF'               )
@@ -50,6 +51,8 @@ parser.add_argument( '--model_in'       , default = ''                  )
 parser.add_argument( '--model_out'      , default = 'model.h5'          )
 parser.add_argument( '--scaler_in'      , default = ''                  )
 parser.add_argument( '--scaler_out'     , default = 'scaler.pkl'        )
+parser.add_argument( '--t_scaler_in'    , default = ''                  )
+parser.add_argument( '--t_scaler_out'   , default = 't_scaler.pkl'      )
 parser.add_argument( '--results_in'     , default = ''                  )
 parser.add_argument( '--results_out'    , default = ''                  )
 parser.add_argument( '--runDiffPlots'   , default = 0, type = int       )
@@ -70,15 +73,11 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (4,1) , (2,1) ]},
         (7,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (1,1) , (1,1) ]},
-        #(7,11):{'maps':[200,200], 'kernels':[(3,5,7),(3,5,1)], 'pools':[(1,1,1),(1,1,1)]},
+        #(7,11):{'maps':[100,100], 'kernels':[(3,5,3),(3,5,3)], 'pools':[(1,1,1),(1,1,1)]},
       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # TRAINING VARIABLES
-#scalars = ['p_Eratio' , 'p_Reta'     , 'p_Rhad'   , 'p_Rhad1' , 'p_Rphi'  , 'p_TRTPID', 'p_numberOfSCTHits',
-#           'p_dPOverP', 'p_deltaEta1', 'p_f1'     , 'p_f3'    , 'p_deltaPhiRescaled2' , 'p_weta2' , 'p_d0' ,
-#           'p_d0Sig'  ,'p_eta'       , 'p_et_calo', 'p_EoverP', 'p_wtots1', 'p_numberOfPixelHits'          ,
-#           'p_numberOfInnermostPixelHits']
 scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_deltaPhiRescaled2'         ,
            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'         ,
            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'           ,
@@ -88,18 +87,20 @@ images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine',
            'lar_endcap_Lr0',  'lar_endcap_Lr1',  'lar_endcap_Lr2',  'lar_endcap_Lr3',
-                             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks_image'      ]
+                             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'                      ]
 others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
            'p_vertexIndex'  , 'p_charge'   , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin' ,
            'correctedAverageMu', 'p_firstEgMotherPdgId'                                                   ]
+#scalars += ['tracks']
+images  += ['tracks']
 
 
 # DATASET AND TRAINING DICTIONARY
 data_files = get_dataset(args.host_name, args.node_dir, args.eta_region)
 keys       = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])
-images     = [key for key in images  if key in keys or key=='tracks_image']
-scalars    = [key for key in scalars if key in keys]
+images     = [key for key in images  if key in keys or key=='tracks']
+scalars    = [key for key in scalars if key in keys or key=='tracks']
 others     = [key for key in others  if key in keys]
 if args.scalars != 'ON': scalars=[]
 if args.images  != 'ON': images =[]
@@ -142,7 +143,7 @@ if   args.results_in != '': sys.exit()
 # MODEL CREATION AND MULTI-GPU DISTRIBUTION
 n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
 train_batch_size = max(1,n_gpus) * args.batch_size
-valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(1e4))
+valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(5e3))
 sample = make_sample(data_files[0], [0,1], input_data, args.n_tracks, args.n_classes)[0]
 model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CNN,
                       args.l2, args.dropout, train_data, n_gpus)
@@ -150,8 +151,9 @@ model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CN
 
 # ARGUMENTS AND VARIABLES SUMMARY
 args.scaling = args.scaling == 'ON' and scalars != []
+args.t_scaling = args.t_scaling == 'ON' and 'tracks' in scalars+images
 if args.NN_type == 'CNN':
-    print('\nCNN ARCHITECTURES:')
+    print('\nCNN ARCHITECTURE:')
     for shape in [shape for shape in CNN if shape in [sample[key].shape[1:] for key in sample]]:
         print(format(str(shape),'>8s')+':', str(CNN[shape]))
 print('\nPROGRAM ARGUMENTS:'); print(tabulate(vars(args).items(), tablefmt='psql'))
@@ -161,23 +163,28 @@ table   = [train_data[key] for key in train_data if train_data[key]!=[]]
 length  = max([len(n) for n in table])
 table   = list(map(list, zip(*[n+(length-len(n))*[''] for n in table])))
 print(tabulate(table, headers=headers, tablefmt='psql')); print()
-args.model_in   = args.output_dir+'/'  +args.model_in; args.model_out    = args.output_dir+'/'  +args.model_out
-args.scaler_in  = args.output_dir+'/' +args.scaler_in; args.scaler_out   = args.output_dir+'/' +args.scaler_out
-args.results_in = args.output_dir+'/'+args.results_in; args.results_out  = args.output_dir+'/'+args.results_out
+args.model_in   = args.output_dir+'/'+args.model_in;   args.model_out   = args.output_dir+'/'+args.model_out
+args.scaler_in  = args.output_dir+'/'+args.scaler_in;  args.scaler_out  = args.output_dir+'/'+args.scaler_out
+args.t_scaler_in = args.output_dir+'/'+args.t_scaler_in ; args.t_scaler_out = args.output_dir+'/'+args.t_scaler_out
+args.results_in = args.output_dir+'/'+args.results_in; args.results_out = args.output_dir+'/'+args.results_out
 
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
 if os.path.isfile(args.model_in):
-    print('CLASSIFIER: loading pre-trained weights from', args.model_in, '\n')
+    print('Loading pre-trained weights from', args.model_in, '\n')
     model.load_weights(args.model_in)
 if args.scaling and os.path.isfile(args.scaler_in):
-    print('CLASSIFIER: loading quantile transform from', args.scaler_in, '\n')
+    print('Loading quantile transform from', args.scaler_in, '\n')
     scaler = pickle.load(open(args.scaler_in, 'rb'))
 else: scaler = None
-print('CLASSIFIER: LOADING', np.diff(args.n_valid)[0], 'VALIDATION SAMPLES')
+if args.t_scaling and os.path.isfile(args.t_scaler_in):
+    print('Loading tracks scaler from ', args.t_scaler_in, '\n')
+    t_scaler = pickle.load(open(args.t_scaler_in, 'rb'))
+else: t_scaler = None
+print('LOADING', np.diff(args.n_valid)[0], 'VALIDATION SAMPLES')
 inputs = {'scalars':scalars, 'images':[], 'others':others} if args.generator == 'ON' else input_data
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks, args.n_classes,
-                                              args.valid_cuts, None if args.generator=='ON' else scaler)
+           args.valid_cuts, None if args.generator=='ON' else scaler, None if args.generator=='ON' else t_scaler)
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.output_dir); sys.exit()
 
 
@@ -192,34 +199,41 @@ if args.n_epochs > 0:
     for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
-    print(  'CLASSIFIER: train sample:'   , format(np.diff(args.n_train)[0], '9.0f'), 'e')
-    print(  'CLASSIFIER: valid sample:'   , format(np.diff(args.n_valid)[0], '9.0f'), 'e')
-    print('\nCLASSIFIER: using TensorFlow', tf.__version__ )
-    print(  'CLASSIFIER: using'           , n_gpus, 'GPU(s)')
-    print(  'CLASSIFIER: using'           , args.NN_type, 'architecture with', end=' ')
-    print([key for key in train_data if train_data[key] != []], '\n')
-    print('CLASSIFIER: LOADING', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
+    print(  'Train sample:'   , format(np.diff(args.n_train)[0], '9.0f'), 'e')
+    print(  'Valid sample:'   , format(np.diff(args.n_valid)[0], '9.0f'), 'e')
+    print('\nUsing TensorFlow', tf.__version__                               )
+    print(  'Using'           , n_gpus, 'GPU(s)'                             )
+    print(  'Using'           , args.NN_type, 'architecture with', end=' '   )
+    print([key for key in train_data if train_data[key] != []], '\n'         )
+    print('LOADING', np.diff(args.n_train)[0], 'TRAINING SAMPLES'            )
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
                                                            args.n_classes, args.train_cuts, scaler=None)
     if args.scaling:
         if not os.path.isfile(args.scaler_in):
             scaler = fit_scaler(train_sample, scalars, args.scaler_out)
             if args.generator != 'ON': valid_sample = apply_scaler(valid_sample, scalars, scaler, verbose='OFF')
-        if args.generator != 'ON'    : train_sample = apply_scaler(train_sample, scalars, scaler, verbose='ON')
+        if args.generator != 'ON': train_sample = apply_scaler(train_sample, scalars, scaler, verbose='ON')
+
+    if args.t_scaling:
+        if not os.path.isfile(args.t_scaler_in):
+            t_scaler = fit_t_scaler(train_sample, args.t_scaler_out)
+            if args.generator != 'ON': valid_sample = apply_t_scaler(valid_sample, t_scaler, verbose='OFF')
+        if args.generator != 'ON': train_sample = apply_t_scaler(train_sample, t_scaler, verbose='ON')
+
     sample_composition(train_sample); compo_matrix(valid_labels, train_labels=train_labels); print()
-    #train_weights = sample_weights(train_sample,train_labels,args.n_classes,args.weight_type,args.output_dir)
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, train_weights, bins, args.output_dir)
-    callbacks = callback(args.model_out, args.patience, args.metrics); print()
+    #sys.exit()
+    callbacks = callback(args.model_out, args.patience, args.metrics)
     if args.generator == 'ON':
         del(train_sample)
         if np.all(train_weights) != None: train_weights = gen_weights(args.n_train, weight_idx, train_weights)
-        print('CLASSIFIER: LAUNCHING GENERATOR FOR', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
+        print('\nLAUNCHING GENERATOR FOR', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
         eval_gen  = Batch_Generator(data_files, args.n_eval, input_data, args.n_tracks, args.n_classes,
-                                    valid_batch_size, args.valid_cuts, scaler, shuffle='OFF')
+                                    valid_batch_size, args.valid_cuts, scaler, t_scaler, shuffle='OFF')
         train_gen = Batch_Generator(data_files, args.n_train, input_data, args.n_tracks, args.n_classes,
-                                    train_batch_size, args.train_cuts, scaler, train_weights, shuffle='ON')
-        training  = model.fit( train_gen, validation_data=eval_gen, max_queue_size=max(1,n_gpus),
+                                    train_batch_size, args.train_cuts, scaler, t_scaler, train_weights, shuffle='ON')
+        training  = model.fit( train_gen, validation_data=eval_gen, max_queue_size=100*max(1,n_gpus),
                                callbacks=callbacks, workers=1, epochs=args.n_epochs, verbose=args.verbose )
     else:
         eval_sample = {key:valid_sample[key][:args.n_eval[1]-args.n_valid[0]] for key in valid_sample}
@@ -239,7 +253,7 @@ else:
     print('Validation sample', args.n_valid, 'class predictions:')
     if args.generator == 'ON':
         valid_gen   = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, args.n_classes,
-                                      valid_batch_size, args.valid_cuts, scaler, shuffle='OFF')
+                                      valid_batch_size, args.valid_cuts, scaler, t_scaler, shuffle='OFF')
         valid_probs = model.predict(valid_gen, verbose=args.verbose)
     else: valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
 bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, training,
@@ -251,7 +265,7 @@ if '.pkl' in args.results_out:
         except IOError: print('FILE ACCESS CONFLICT FOR', removed_feature, '--> SKIPPING FILE ACCESS\n')
         feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[])
     else:
-        if args.n_folds > 1 and False: valid_data = (valid_probs,)
+        if args.n_folds > 1 and False: valid_data = (np.float16(valid_probs),)
         else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
-        pickle.dump(valid_data, open(args.results_out,'wb'))
+        pickle.dump(valid_data, open(args.results_out,'wb'), protocol=4)
     print('\nValidation results saved to:', args.results_out, '\n')

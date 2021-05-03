@@ -3,16 +3,19 @@ import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, Conv3D, MaxPooling2D, MaxPooling3D, LeakyReLU
 from tensorflow.keras.layers import Flatten, Dense, concatenate, Reshape, Dropout, BatchNormalization
 from tensorflow.keras        import Input, regularizers, models, callbacks, mixed_precision, optimizers
+import sys
 
 
-def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars, images):
+def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars, images, batchNorm=False):
     regularizer = regularizers.l2(l2)
     input_dict  = {key:Input(shape=sample[key].shape[1:], name=key) for key in scalars+images}
     shape_set   = set([sample[key].shape[1:] for key in images])
     output_list = []
+    #IMAGES CNN
     for shape in shape_set:
         inputs  = [Reshape(shape+(1,))(input_dict[key]) for key in images if sample[key].shape[1:]==shape]
         outputs = concatenate(inputs, axis=3) if len(inputs) > 1 else inputs[0]
+        if batchNorm: outputs = BatchNormalization()(outputs)
         if NN_type == 'CNN':
             n_maps  = [CNN[shape]['maps'   ][layer] for layer in np.arange(len(CNN[shape]['maps']))]
             kernels = [CNN[shape]['kernels'][layer] for layer in np.arange(len(CNN[shape]['maps']))]
@@ -29,15 +32,33 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
                 if len(kernels[layer]) == 3:
                     outputs = Conv3D(n_maps[layer], kernels[layer], kernel_regularizer=regularizer)(outputs)
                     outputs = MaxPooling3D(pools[layer], padding='same')                           (outputs)
-                #outputs = BatchNormalization(renorm=False)                                         (outputs)
+                if batchNorm: outputs = BatchNormalization()                                       (outputs)
                 outputs = LeakyReLU(alpha=0)                                                       (outputs)
                 outputs = Dropout(dropout)                                                         (outputs)
         output_list += [Flatten()(outputs)]
-    for key in scalars: output_list += [Flatten()(input_dict[key])]
+    #TRACKS FCN
+    if 'tracks' in scalars:
+        outputs = Flatten()(input_dict['tracks'])
+        for n_neurons in []:#[200, 200]:
+            outputs = Dense(n_neurons, kernel_regularizer=regularizer)                             (outputs)
+            if batchNorm: outputs = BatchNormalization()                                           (outputs)
+            outputs = LeakyReLU(alpha=0)                                                           (outputs)
+            outputs = Dropout(dropout)                                                             (outputs)
+        output_list += [outputs]
+    #SCALARS
+    outputs = [Flatten()(input_dict[key]) for key in set(scalars)-{'tracks'}]
+    outputs = concatenate(outputs)
+    for n_neurons in []:#[200, 200]:
+        outputs = Dense(n_neurons, kernel_regularizer=regularizer)                                 (outputs)
+        if batchNorm: outputs = BatchNormalization()                                               (outputs)
+        outputs = LeakyReLU(alpha=0)                                                               (outputs)
+        outputs = Dropout(dropout)                                                                 (outputs)
+    output_list += [outputs]
+    #CONCATENATION TO FCN
     outputs = concatenate(output_list) if len(output_list)>1 else output_list[0]
     for n_neurons in FCN_neurons:
         outputs = Dense(n_neurons, kernel_regularizer=regularizer)                                 (outputs)
-        #outputs = BatchNormalization(renorm=False)                                                 (outputs)
+        if batchNorm: outputs = BatchNormalization()                                               (outputs)
         outputs = LeakyReLU(alpha=0)                                                               (outputs)
         outputs = Dropout(dropout)                                                                 (outputs)
     outputs = Dense(n_classes, activation='softmax', dtype='float32')                              (outputs)
@@ -51,9 +72,9 @@ def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, trai
     with strategy.scope():
         if tf.__version__ >= '2.1.0':
             mixed_precision.experimental.set_policy('mixed_float16')
-        if 'tracks_image' in train_var['images']: CNN[sample['tracks_image'].shape[1:]] = CNN.pop('tracks')
+        if 'tracks' in train_var['images']: CNN[sample['tracks'].shape[1:]] = CNN.pop('tracks')
         model = multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, **train_var)
-        print('\nNEURAL NETWORK ARCHITECTURE'); descent_optimizers(); model.summary()
+        print('\nNEURAL NETWORK ARCHITECTURE'); descent_optimizers(); model.summary()#;sys.exit()
         model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     return model
 

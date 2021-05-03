@@ -74,38 +74,36 @@ def plot_heatmaps(sample, labels, output_dir):
     plt.savefig(file_name); sys.exit()
 
 
-def var_histogram(sample, labels, weights, bins, output_dir, prefix, var, density=False, separate_norm=False):
+def var_histogram(sample, labels, weights, bins, output_dir, prefix, var, density=True, separate_norm=False):
+    n_classes = max(labels)+1
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     if var == 'pt':
         variable = sample[var]
-        tag='$p_t$'; plt.xlabel(tag+' (GeV)', fontsize=25)
+        tag=''; plt.xlabel(tag+'$p_t$ (GeV)', fontsize=25)
         if bins == None or len(bins[var]) <= 2:
-            bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
-            #bins = np.arange(np.min(variable), 101, 1)
+            #bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
+            bins = np.arange(np.min(variable), 101, 1)
         else: bins = bins[var]
         axes.xaxis.set_minor_locator(FixedLocator(bins))
-        #plt.xticks(np.arange(0, bins[-1]+100, 100))
-        #pylab.xlim(5, bins[-1])
-        #plt.xlim(0, 100)
-        plt.xlim(5, 1000); plt.ylim(1e-5,10); plt.xscale('log'); plt.yscale('log')
+        #plt.xticks(np.arange(0, bins[-1]+100, 100)); pylab.xlim(5, bins[-1]); plt.xlim(0, 100)
+        if n_classes == 2: plt.xlim(5, 1000); plt.ylim(1e-5,100); plt.xscale('log'); plt.yscale('log')
+        else             : plt.xlim(5, 1000); plt.ylim(1e-5,10) ; plt.xscale('log'); plt.yscale('log')
     if var == 'eta':
         variable = abs(sample[var])
-        tag='$\eta$'; plt.xlabel('abs('+tag+')', fontsize=25)
+        tag=''; plt.xlabel('abs($\eta$)', fontsize=25)
         if bins == None or len(bins[var]) <= 2:
             #bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
             step = 0.05; bins = np.arange(0, 2.5+step, step)
         else: bins = bins[var]
         axes.xaxis.set_minor_locator(FixedLocator(bins)) #axes.xaxis.set_minor_locator(AutoMinorLocator(10))
         plt.xticks(np.arange(0, 2.6, 0.1))
-        #plt.xticks(bins, [str(n) for n in bins])
-        #plt.xticks(bins, [format(n,'.1f') for n in bins])
+        #plt.xticks(bins, [str(n) for n in bins]); plt.xticks(bins, [format(n,'.1f') for n in bins])
         pylab.xlim(0, 2.5)
     bins[-1] = max(bins[-1], max(variable)+1e-3)
     label_dict = {0:'iso electron', 1:'charge flip'  , 2:'photon conversion'    , 3  :'b/c hadron',
                   4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
     color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            , 3  :'tab:red'   ,
                   4:'tab:purple'                     , 5:'tab:brown'            }
-    n_classes = max(labels)+1
     if n_classes == 2: label_dict[1] = 'background'
     if n_classes != 2 and var == 'eta': separate_norm = True
     if np.all(weights) == None: weights = np.ones(len(variable))
@@ -119,12 +117,7 @@ def var_histogram(sample, labels, weights, bins, output_dir, prefix, var, densit
         label  = 'class '+str(n)+': '+label_dict[n]
         h[:,n] = pylab.hist(class_values, bins, histtype='step', weights=class_weights, color=color_dict[n],
                             label=label+' ('+format(100*len(class_values)/len(variable),'.1f')+'%)', lw=2)[0]
-    #axes.xaxis.set_minor_locator(FixedLocator(bins)) #axes.xaxis.set_minor_locator(AutoMinorLocator(10))
-    #values = np.ravel([(10.**n)*np.array([1, 5]) for n in np.arange(-5,5)])
-    #step   = values[values<=np.max(h)][-2]
-    #y_max  = step*(np.max(h)//step+1)
-    #pylab.ylim(0, y_max); plt.yticks(np.arange(0, y_max+step, step))
-    plt.ylabel('Distribution density (%/$\Delta$'+tag+')' if density else 'Distribution (%)', fontsize=25)
+    plt.ylabel('Distribution density (%)' if density else 'Distribution (%)', fontsize=25)
     axes.tick_params(axis='both', which='major', labelsize=12)
     plt.legend(loc='upper right', fontsize=16 if n_classes==2 else 14)
     file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
@@ -133,16 +126,18 @@ def var_histogram(sample, labels, weights, bins, output_dir, prefix, var, densit
 
 
 def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, bkg='bkg'):
-    label_dict = {0:'iso electron', 1:'charge flip'  , 2:'photon conversion'    ,   3  :'b/c hadron',
-                  4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)', 'bkg':'background'}
+    label_dict = {0:'iso electron', 1:'charge flip'  , 2:'photon conversion'    ,   3  :'heavy flavor (b/c)',
+                  4:'light flavor (e$^\pm$/$\gamma$)', 5:'light flavor (hadron)', 'bkg':'background'}
     color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            ,   3  :'tab:red'   ,
                   4:'tab:purple'                     , 5:'tab:brown'            , 'bkg':'tab:orange'}
-    if y_prob.shape[1] > 2 or separation: label_dict.pop('bkg')
-    else: label_dict={0:'iso electron',1:label_dict[bkg]}; color_dict={0:'tab:blue',1:color_dict[bkg]}
+    if separation: label_dict.pop('bkg')
+    else: label_dict={0:'iso electron', 1:label_dict[bkg]}; color_dict={0:'tab:blue', 1:color_dict[bkg]}
     n_classes = len(label_dict)
     def logit(x, delta=1e-16):
-        x = np.float64(x); x = np.minimum(x,1-delta); x = np.maximum(x,delta)
+        x = np.clip(np.float64(x), delta, 1-delta)
         return np.log10(x) - np.log10(1-x)
+    def inverse_logit(x):
+        return 1/(1+10**(-x))
     def print_JSD(P, Q, idx, color, text):
         plt.text(0.945, 1.01-3*idx/100, 'JSD$_{0,\!'+text+'}$:',
                  {'color':'black', 'fontsize':10}, va='center', ha='right', transform=axes.transAxes)
@@ -152,7 +147,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
         h = np.full((len(bins)-1,n_classes), 0.)
         from utils import make_labels; class_labels = make_labels(sample, n_classes)
         for n in np.arange(n_classes):
-            class_probs   = y_prob[:,0][class_labels==n]
+            class_probs   = y_prob[class_labels==n]
             class_weights = len(class_probs)*[100/len(y_true)] #len(class_probs)*[100/len(class_probs)]
             h[:,n] = pylab.hist(class_probs, bins=bins, label='class '+str(n)+': '+label_dict[n],
                                 histtype='step', weights=class_weights, log=True, color=colors[n], lw=2)[0]
@@ -161,7 +156,7 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
             for n in np.arange(1, n_classes):
                 new_y_true = y_true[np.logical_or(y_true==0, class_labels==n)]
                 new_y_prob = y_prob[np.logical_or(y_true==0, class_labels==n)]
-                fpr, tpr, threshold = metrics.roc_curve(new_y_true, new_y_prob[:,0], pos_label=0)
+                fpr, tpr, threshold = metrics.roc_curve(new_y_true, new_y_prob, pos_label=0)
                 axes.axvline(threshold[np.argmax(tpr-fpr)], ymin=0, ymax=1, ls='--', lw=1, color=colors[n])
         for n in np.arange(1, n_classes): print_JSD(h[:,0], h[:,n], n, colors[n], str(n))
         if n_classes > 2: print_JSD(h[:,0], np.sum(h[:,1:], axis=1), n_classes, 'black', '\mathrm{bkg}')
@@ -188,10 +183,10 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
     #lab += ['0.50   '] + ['$1\!-\!10^{'+str(n)+'}$' for n in np.arange(-1,-x_max-1,-1)]
     plt.xticks(logit(np.array(pos)), lab, rotation=15)
     bin_step = 0.1; bins = np.arange(x_min-1, x_max+1, bin_step)
-    y_prob[:,0] = logit(y_prob[:,0])
+    y_prob = logit(y_prob)
     class_histo(y_true, y_prob, bins, color_dict)
-    plt.xlabel('Signal Probability (%)', fontsize=25)
-    plt.ylabel('Distribution (% per bin '+str(bin_step)+')', fontsize=25)
+    plt.xlabel('$p_{\operatorname{sig}}$ (%)', fontsize=25)
+    plt.ylabel('Distribution (%)', fontsize=25)
     location = 'upper left' if n_classes==2 else 'upper left'
     axes.tick_params(axis='both', which='major', labelsize=12)
     plt.legend(loc=location, fontsize=16 if n_classes==2 else 14, numpoints=3)
@@ -200,15 +195,21 @@ def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, 
     print('Saving test sample distributions to:', file_name); plt.savefig(file_name)
 
 
-def plot_ROC_curves(sample, y_true, y_prob, ROC_type, ECIDS, output_dir):
+def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_values=None):
     LLH_fpr, LLH_tpr = LLH_rates(sample, y_true, ECIDS)
-    fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob[:,0], pos_label=0)
+    if ROC_values != None:
+        index = output_dir.split('_')[-1]
+        index = ROC_values[0].shape[1]-1 if index == 'bkg' else int(index)
+        fpr_full, tpr_full = ROC_values[0][:,index], ROC_values[0][:,0]
+        fpr     , tpr      = ROC_values[1][:,index], ROC_values[1][:,0]
+    else:
+        fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob, pos_label=0)
     signal_ratio        = np.sum(y_true==0)/len(y_true)
     accuracy            = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
     best_tpr, best_fpr  = tpr[np.argmax(accuracy)], fpr[np.argmax(accuracy)]
     colors  = ['red', 'blue', 'green', 'red', 'blue', 'green']
-    labels  = ['LLH tight'        , 'LLH medium'        , 'LLH loose'       ,
-               'LLH tight + ECIDS', 'LLH medium + ECIDS', 'LLH loose + ECIDS']
+    labels  = ['tight'      , 'medium'      , 'loose'       ,
+               'tight+ECIDS', 'medium+ECIDS', 'loose+ECIDS']
     markers = 3*['o'] + 3*['D']
     sig_eff, bkg_eff = '$\epsilon_{\operatorname{sig}}$', '$\epsilon_{\operatorname{bkg}}$'
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
@@ -226,7 +227,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, ECIDS, output_dir):
                  {'color':'black', 'fontsize':22},  va='center', ha='center', transform=axes.transAxes)
         val = plt.plot(tpr, (1-fpr), label='Signal vs Background', color='#1f77b4', lw=2)
         plt.scatter( best_tpr, (1-best_fpr), s=40, marker='o', c=val[0].get_color(),
-                     label="{0:<16s} {1:>3.2f}%".format('Best Accuracy:', 100*max(accuracy)) )
+                     label="{0:<16s} {1:>3.2f}%".format('Best accuracy:', 100*max(accuracy)) )
         for LLH in zip(LLH_tpr, LLH_fpr, colors, labels, markers):
             plt.scatter(LLH[0], 1-LLH[1], s=40, marker=LLH[4], c=LLH[2], label='('+format(100*LLH[0],'.1f')
                         +'%, '+format(100*(1-LLH[1]),'.1f')+')'+r'$\rightarrow$'+LLH[3])
@@ -237,19 +238,30 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, ECIDS, output_dir):
         len_0 = np.sum(fpr==0)
         x_min = min(80, 10*np.floor(10*LLH_tpr[0]))
         if fpr[np.argwhere(tpr >= x_min/100)[0]] != 0:
-            y_max = 10*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min/100)[0]], 1/LLH_fpr[0])/10)
+            #y_max = 10*np.ceil(max(1/fpr[np.argwhere(tpr >= x_min/100)[0]], 1/LLH_fpr[0])/10)
+            y_max = 10*np.ceil( 1/min(np.append(fpr[tpr >= x_min/100], LLH_fpr[0]))/10 )
             if y_max > 100: y_max = 100*(np.ceil(y_max/100))
         else: y_max = 1000*np.ceil(max(1/fpr[len_0:])/1000)
         plt.xlim([x_min, 100]); plt.ylim([1, y_max])
         axes.xaxis.set_major_locator(MultipleLocator(10))
         axes.xaxis.set_minor_locator(AutoMinorLocator(10))
         axes.yaxis.set_minor_locator(AutoMinorLocator(5))
-        LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]] for value in LLH_tpr]
+        #LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]][0] for value in LLH_tpr]
+        #LLH_scores = [1/fpr[np.argmin(abs(tpr-value))] for value in LLH_tpr]
+        def interpolation(tpr, fpr, value):
+            try:
+                idx1 = np.where(tpr>value)[0][np.argmin(tpr[tpr>value])]
+                idx2 = np.where(tpr<value)[0][np.argmax(tpr[tpr<value])]
+                M = (1/fpr[idx2]-1/fpr[idx1]) / (tpr[idx2]-tpr[idx1])
+                return 1/fpr[idx1] + M*(value-tpr[idx1])
+            except ValueError:
+                return np.max(1/fpr)
+        LLH_scores = [interpolation(tpr, fpr, value) for value in LLH_tpr]
         for n in np.arange(len(LLH_scores)):
             axes.axhline(LLH_scores[n], xmin=(LLH_tpr[n]-x_min/100)/(1-x_min/100), xmax=1,
-            ls='--', linewidth=0.5, color='#1f77b4')
+            ls='--', linewidth=0.5, color='#1f77b4', zorder=10)
             axes.axvline(100*LLH_tpr[n], ymin=abs(1/LLH_fpr[n]-1)/(plt.yticks()[0][-1]-1),
-            ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='tab:blue')
+            ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='tab:blue', zorder=5)
         if ECIDS:
             for n in np.arange(len(LLH_scores)):
                 plt.text(100.2, LLH_scores[n], str(int(LLH_scores[n])),
@@ -258,20 +270,31 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, ECIDS, output_dir):
             for val in LLH_scores:
                 plt.text(100.2, val, str(int(val)), {'color':'#1f77b4', 'fontsize':12}, va="center", ha="left")
         axes.yaxis.set_ticks( np.append([1],plt.yticks()[0][1:]) )
-        plt.xlabel('Signal Efficiency '+sig_eff+' (%)', fontsize=25)
-        plt.ylabel('Background Rejection 1/'+bkg_eff, fontsize=25)
-        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='#1f77b4', lw=2)
+        plt.xlabel(sig_eff+' (%)', fontsize=25)
+        plt.ylabel('1/'+bkg_eff, fontsize=25)
+        val = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='#1f77b4', lw=2, zorder=10)
+        if ROC_values != None:
+            plt.rcParams['agg.path.chunksize'] = 1000
+            plt.scatter(100*tpr_full[len_0:], 1/fpr_full[len_0:], color='silver', marker='.')
         if best_fpr != 0:
             plt.scatter( 100*best_tpr, 1/best_fpr, s=40, marker='D', c=val[0].get_color(),
-                         label="{0:<15s} {1:>3.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
-        for LLH in zip(LLH_tpr, LLH_fpr, colors, labels, markers):
-            plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker=LLH[4], c=LLH[2], label='('+format(100*LLH[0],'.1f')
-                         +'%, '+str(format(1/LLH[1],'>3.0f'))+')'+r'$\rightarrow$'+LLH[3] )
+                         label="{0:<15s} {1:>3.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
+        #for LLH in zip(LLH_tpr, LLH_fpr, colors, labels, markers):
+        #    plt.scatter( 100*LLH[0], 1/LLH[1], s=40, marker=LLH[4], c=LLH[2], label='('+format(100*LLH[0],'.1f')
+        #                 +'%, '+str(format(1/LLH[1],'>2.0f'))+')'+r'$\rightarrow$'+LLH[3] )
+        for n in np.arange(len(LLH_fpr)):
+            plt.scatter( 100*LLH_tpr[n], 1/LLH_fpr[n], s=40, marker=markers[n], c=colors[n], zorder=10,
+                         label='$\epsilon_{\operatorname{sig}}^{\operatorname{LH}}$'
+                         +'='+format(100*LLH_tpr[n],'.1f') +'%' +r'$\rightarrow$'
+                         +'$\epsilon_{\operatorname{bkg}}^{\operatorname{LH}}$/'
+                         +'$\epsilon_{\operatorname{bkg}}^{\operatorname{NN}}$='
+                         +format(LLH_fpr[n]*LLH_scores[n], '>.1f')
+                         +' ('+labels[n]+')' )
         axes.tick_params(axis='both', which='major', labelsize=12)
-        plt.legend(loc='upper right', fontsize=15, numpoints=3)
+        plt.legend(loc='upper right', fontsize=13 if ECIDS else 15, numpoints=3)
     if ROC_type == 3:
         def make_plot(location):
-            plt.xlabel('Signal Probability as Threshold (%)', fontsize=25); plt.ylabel('(%)',fontsize=25)
+            plt.xlabel('Signal probability threshold (%)', fontsize=25); plt.ylabel('(%)',fontsize=25)
             val_1 = plt.plot(threshold[1:],   tpr[1:], color='tab:blue'  , label='Signal Efficiency'   , lw=2)
             val_2 = plt.plot(threshold[1:], 1-fpr[1:], color='tab:orange', label='Background Rejection', lw=2)
             val_3 = plt.plot(threshold[1:], accuracy[1:], color='black'  , label='Accuracy', zorder=10 , lw=2)
@@ -282,7 +305,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, ECIDS, output_dir):
                                  s=40, marker='o', c=val_2[0].get_color())
             l1 = plt.legend([p1, p2], ['LLH '+sig_eff, 'LLH $1\!-\!$'+bkg_eff], loc='lower left', fontsize=13)
             plt.scatter( best_threshold, max(accuracy), s=40, marker='o', c=val_3[0].get_color(),
-                         label='{0:<10s} {1:>5.2f}%'.format('Best Accuracy:',100*max(accuracy)), zorder=10 )
+                         label='{0:<10s} {1:>5.2f}%'.format('Best accuracy:',100*max(accuracy)), zorder=10 )
             plt.legend(loc=location, fontsize=15, numpoints=3); plt.gca().add_artist(l1)
         best_threshold = threshold[np.argmax(accuracy)]
         plt.figure(figsize=(12,16))
@@ -314,7 +337,7 @@ def plot_ROC_curves(sample, y_true, y_prob, ROC_type, ECIDS, output_dir):
         plt.plot(100*tpr[1:], 100*(1-fpr[1:]), label='Background rejection', color='darkorange', lw=2)
         val = plt.plot(100*tpr[1:], 100*accuracy[1:], label='Accuracy', color='black', lw=2, zorder=10)
         plt.scatter( 100*best_tpr, 100*max(accuracy), s=40, marker='o', c=val[0].get_color(),
-                     label="{0:<10s} {1:>5.2f}%".format('Best Accuracy:',100*max(accuracy)), zorder=10 )
+                     label="{0:<10s} {1:>5.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
     print('Saving test sample ROC'+str(ROC_type)+' curve to   :', file_name); plt.savefig(file_name)
@@ -449,6 +472,21 @@ def plot_image(image, n_classes, e_class, layers, key, vmax, soft=True):
     plt.imshow(np.float32(image), cmap='Reds', interpolation='bilinear' if soft else None,
                extent=limits, vmax=1 if np.max(image)==0 else vmax) #norm=colors.LogNorm(1e-3,vmax))
     plt.colorbar(pad=0.02)
+
+
+def plot_vertex(sample):
+    bins = np.arange(0,50,1)
+    fig = plt.figure(figsize=(12,8))
+    pylab.xlim(-0.5,10.5)
+    plt.xticks (np.arange(0,11,1))
+    pylab.ylim(0,100)
+    plt.xlabel('Track vertex value', fontsize=25)
+    plt.ylabel('Distribution (%)', fontsize=25)
+    weights = len(sample)*[100/len(sample)]
+    pylab.hist(sample, bins=bins, weights=weights, histtype='bar', align='left', rwidth=0.5, lw=2)
+    file_name = 'outputs/tracks_vertex.png'
+    print('Printing:', file_name)
+    plt.savefig(file_name)
 
 
 def plot_scalars(sample, sample_trans, variable):
