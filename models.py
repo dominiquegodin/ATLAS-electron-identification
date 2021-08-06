@@ -46,7 +46,7 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
             outputs = Dropout(dropout)                                                             (outputs)
         output_list += [outputs]
     #SCALARS
-    outputs = [Flatten()(input_dict[key]) for key in set(scalars)-{'tracks'}]
+    outputs = [Flatten()(input_dict[key]) for key in scalars if key!='tracks']
     outputs = concatenate(outputs)
     for n_neurons in []:#[200, 200]:
         outputs = Dense(n_neurons, kernel_regularizer=regularizer)                                 (outputs)

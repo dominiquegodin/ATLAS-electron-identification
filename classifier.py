@@ -87,13 +87,11 @@ images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine',
            'lar_endcap_Lr0',  'lar_endcap_Lr1',  'lar_endcap_Lr2',  'lar_endcap_Lr3',
-                             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'                      ]
+                             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3', 'tracks'            ]
 others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
            'p_vertexIndex'  , 'p_charge'   , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin' ,
            'correctedAverageMu', 'p_firstEgMotherPdgId'                                                   ]
-#scalars += ['tracks']
-images  += ['tracks']
 
 
 # DATASET AND TRAINING DICTIONARY
@@ -150,7 +148,7 @@ model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CN
 
 
 # ARGUMENTS AND VARIABLES SUMMARY
-args.scaling = args.scaling == 'ON' and scalars != []
+args.scaling = args.scaling == 'ON' and list(set(scalars)-{'tracks'}) != []
 args.t_scaling = args.t_scaling == 'ON' and 'tracks' in scalars+images
 if args.NN_type == 'CNN':
     print('\nCNN ARCHITECTURE:')

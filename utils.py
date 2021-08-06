@@ -448,6 +448,7 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     labels[ sample[iffTruth] ==  5                                                   ] = 2
     labels[(sample[iffTruth] ==  8) | (sample[iffTruth ] ==  9)                      ] = 3
     labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 4
+    labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  8)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
     if n_classes == 2: labels[labels >= 2] = 1
@@ -587,9 +588,8 @@ def process_images_mp(sample, image_list, verbose='OFF', n_tasks=16):
 
 
 def fit_scaler(sample, scalars, scaler_out):
-    print('Fitting quantile transform to training scalars', end=' --> ', flush=True)
-    start_time = time.time()
-    scalars = [scalar for scalar in scalars if scalar != 'tracks']
+    print('Fitting quantile transform to training scalars', end=' --> ', flush=True); start_time = time.time()
+    scalars = [key for key in scalars if key != 'tracks']
     scalars_array = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
     scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
     scaler.fit(scalars_array) #scaler.fit_transform(scalars_array)
@@ -601,9 +601,8 @@ def fit_scaler(sample, scalars, scaler_out):
 
 def apply_scaler(sample, scalars, scaler, verbose='OFF'):
     if verbose == 'ON':
-        start_time = time.time()
-        print('Applying quantile transform to scalar features', end=' --> ', flush=True)
-    scalars = [scalar for scalar in scalars if scalar != 'tracks']
+        print('Applying quantile transform to scalars', end=' --> ', flush=True); start_time = time.time()
+    scalars = [key for key in scalars if key != 'tracks']
     scalars_array = scaler.transform(np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars]))
     for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_array[:,n]
     if verbose == 'ON': print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
@@ -611,21 +610,19 @@ def apply_scaler(sample, scalars, scaler, verbose='OFF'):
 
 
 def fit_t_scaler(sample, scaler_out):
-    print('CLASSIFIER: fitting quantile transform to training tracks', end='  --> ', flush=True)
-    start_time = time.time()
+    print('Fitting quantile transform to training tracks', end='  --> ', flush=True); start_time = time.time()
     tracks = sample['tracks']; shape = tracks.shape
     scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
     scaler.fit(np.reshape(tracks, (shape[0]*shape[1],-1)))
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print('CLASSIFIER: saving tracks scaler file in', scaler_out, '\n')
+    print('Saving tracks scaler file in', scaler_out, '\n')
     pickle.dump(scaler, open(scaler_out, 'wb'))
     return scaler
 
 
 def apply_t_scaler(sample, scaler, verbose='OFF'):
     if verbose == 'ON':
-        start_time = time.time()
-        print('CLASSIFIER: applying robust transform to tracks features', end=' --> ', flush=True)
+        print('Applying robust transform to tracks', end=' --> ', flush=True); start_time = time.time()
     tracks = sample['tracks']; shape = tracks.shape
     tracks = np.reshape(tracks, (shape[0]*shape[1],-1))
     tracks = scaler.transform(tracks)
@@ -708,7 +705,6 @@ def validation(output_dir, results_in, plotting, n_valid, data_files, inputs, va
                                           valid_cuts=valid_cuts, scaler=None)
         n_e = len(labels)
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    #multi_cuts(sample, labels, probs, output_dir); sys.exit()
     if False: #save the added variables to the results file
         print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
         pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
@@ -724,22 +720,20 @@ def validation(output_dir, results_in, plotting, n_valid, data_files, inputs, va
         cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
     if len(labels) == n_e: print('')
     else: print('('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
+    #multi_cuts(sample, labels, probs, output_dir); sys.exit()
     valid_results(sample, labels, probs, [], None, output_dir, plotting, sep_bkg, diff_plots); print()
     #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
 
 
-def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.1, index=6, multi=True):
+def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, index=6, multi=False):
     import itertools; from functools import partial
-    global classes_eff, efficiencies
-    def efficiency(labels, cuts, class_type):
+    global efficiencies
+    def get_eff(labels, cuts, class_type):
         class_cut = labels!=0 if class_type=='bkg' else labels==class_type
         return np.sum(np.logical_and(class_cut, cuts))/np.sum(class_cut)
-    def classes_eff(labels, probs, fracs, multi):
-        if multi: cuts = probs[:,0] >= np.max(probs[:,1:]*(fracs/(1-fracs)), axis=1)
-        else    : cuts = probs[:,0] >= probs@fracs #>= (probs[:,1:]@fracs[1:])*(fracs[0]/(1-fracs[0]))
-        return [efficiency(labels, cuts, class_type) for class_type in list(range(probs.shape[1]))+['bkg']]
-    def efficiencies(labels, probs, cut_tuples, multi, idx):
-        return [classes_eff(labels, probs, cut_tuples[n], multi) for n in np.arange(idx[0],idx[1])]
+    def classes_eff(labels, probs, fracs):
+        cuts = probs[:,0] >= np.max(probs[:,1:]*(fracs/(1-fracs)), axis=1)
+        return [get_eff(labels, cuts, class_type) for class_type in list(range(probs.shape[1]))+['bkg']]
     def apply_filter(ROC_values, index):
         pos_rates=[]; min_eff=1
         for n in np.arange(len(ROC_values)):
@@ -747,31 +741,69 @@ def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.1, ind
                 min_eff = ROC_values[n][index]
                 pos_rates.append(ROC_values[n])
         return np.array(pos_rates)
-    def ROC_curves(sample, labels, probs, bkg, ROC_values, output_dir):
-        sample, labels, _ = discriminant(sample, labels, probs, sig_list=[0], bkg=bkg, printing=False)
-        output_dir += '/'+'class_0_vs_'+str(bkg)
-        plot_ROC_curves(sample, labels, None, output_dir, ROC_type=2, ECIDS=bkg==1, ROC_values=ROC_values)
-    #input_file = 'pos_rates_step-0.2.pkl'
+    def get_pr(labels, disc):
+        fpr, tpr, _  = metrics.roc_curve(labels, disc, pos_label=0)
+        return fpr, tpr
+    def get_auc(labels, disc, bkg, wps=[0.7,0.8,0.9]):
+        cut = np.logical_or(labels==0, labels==bkg) if bkg != 'bkg' else np.full(len(labels), True)
+        fpr, tpr = get_pr(labels[cut], disc[cut])
+        bkg_rej  = [1/fpr[np.argmin(abs(tpr-wp))] for wp in wps]
+        return [metrics.auc(fpr,tpr)] + bkg_rej
+    def classes_auc(labels, probs, fracs):
+        disc = probs[:,0]/(probs[:,0]+(probs[:,1:]@fracs))
+        bkg_list = ['bkg'] #+ list(range(1,probs.shape[1]))
+        return np.ravel([get_auc(labels, disc, bkg) for bkg in bkg_list])
+    def efficiencies(labels, probs, cut_tuples, multi, idx):
+        func = classes_eff if multi else classes_auc
+        return [list(func(labels, probs, cut_tuples[n]))+[cut_tuples[n]] for n in np.arange(idx[0],idx[1])]
+    def ROC_curves(sample, labels, disc_list, bkg, output_dir):
+        cut    = np.logical_or(labels==0, labels==bkg) if bkg != 'bkg' else np.full(len(labels), True)
+        sample = {key:sample[key][cut] for key in sample}; labels = labels[cut]
+        ROC_values  = [get_pr(labels, disc[cut]) for disc in disc_list]
+        output_dir += '/'+'class_0_vs_'+str(bkg); ROC_type = 2; ECIDS = bkg==1
+        plot_ROC_curves(sample, labels, None, output_dir, ROC_type, ECIDS, ROC_values)
+    input_file = 'pos_rates_step-0.05_mono2.pkl'
     if input_file == None:
         start_time = time.time()
-        repeat     = probs.shape[1]-1 if multi else probs.shape[1]
         cut_list   = np.arange(0, 1, step)
-        cut_tuples = np.array(list(itertools.product(cut_list,repeat=repeat)))
+        cut_tuples = np.array(list(itertools.product(cut_list,repeat=probs.shape[1]-1)))
         idx_tuples = get_idx(len(cut_tuples), n_sets=mp.cpu_count()); print(len(cut_tuples),'cuts')
         ROC_values = mp.Pool().map(partial(efficiencies, labels, probs, cut_tuples, multi), idx_tuples)
         ROC_values = np.concatenate(ROC_values)
-        ROC_values = ROC_values[ROC_values[:,0].argsort()[::-1]]
-        pickle.dump(ROC_values, open(output_dir+'/'+'pos_rates.pkl','wb'))
+        if multi:
+            ROC_values = ROC_values[ROC_values[:,0].argsort()[::-1]]
+        else:
+            ROC_values = [ROC_values[np.argmax(ROC_values[:,n])] for n in range(ROC_values.shape[1]-1)]
+            ROC_values = np.array([np.take(ROC_values[n], [n,-1]) for n in range(len(ROC_values))])
+        pickle.dump(ROC_values, open(output_dir+'/'+'pos_rates_test.pkl','wb'))
         print('Run time:', format(time.time()-start_time, '2.2f'), '\b'+' s\n')
     else:
         ROC_values = pickle.load(open(output_dir+'/'+input_file,'rb'))
-    #for row in apply_filter(ROC_values, index):
-    #    print(format(100*row[0],'5.1f')+' % -->', [int(1/row[n]) for n in range(1,ROC_values.shape[1])])
-    ROC_values = (ROC_values[::int(np.ceil(ROC_values.shape[0]/10e6))], apply_filter(ROC_values, index))
-    processes  = [mp.Process(target=ROC_curves, args=(sample, labels, probs, bkg, ROC_values, output_dir))
-                  for bkg in list(range(1,ROC_values[0].shape[1]-1))+['bkg']]
+
+    if multi:
+        for row in apply_filter(ROC_values, index):
+            print(format(str(row[-1]),'30s')+' -->', format(100*row[0],'5.1f')+' % -->',
+                  format(str([int(1/row[n]) for n in range(1,len(row)-1)]),'30s'))
+    else:
+        print(ROC_values)
+        keys       = ['bkg']#list(range(1,probs.shape[1]))+['bkg']
+        ROC_values = dict(zip(keys, ROC_values[:,1].reshape(len(keys),-1)))
+    #sys.exit()
+
+    weigths_list = [np.array(class_ratios(labels)[1:])] + [n for n in ROC_values['bkg']]
+    disc_list    = [probs[:,0]/(probs[:,0]+(probs[:,1:]@weights)) for weights in weigths_list]
+    processes    = [mp.Process(target=ROC_curves, args=(sample, labels, disc_list, bkg, output_dir))
+                    for bkg in list(range(1,6))+['bkg']]
     for job in processes: job.start()
     for job in processes: job.join()
+    sys.exit()
+
+    #ROC_values = (ROC_values[::int(np.ceil(ROC_values.shape[0]/10e6))], apply_filter(ROC_values, index))
+    #ROC_values = (ROC_values[0][:,:-1], ROC_values[1][:,:-1])
+    #processes  = [mp.Process(target=ROC_curves, args=(sample, labels, probs, bkg, ROC_values, output_dir))
+    #              for bkg in list(range(1,ROC_values[0].shape[1]-1))+['bkg']]
+    #for job in processes: job.start()
+    #for job in processes: job.join()
 
 
 def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_files, n_valid,
@@ -811,38 +843,37 @@ def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_f
     return valid_sprobs
 
 
-def discriminant(sample, labels, probs, sig_list, bkg, printing=True):
+def discriminant(sample, labels, probs, sig_list, bkg):
     from functools import reduce
     def class_weights(sig_list, optimal_bkg=None):
         weights = np.ones(probs.shape[1])
         if optimal_bkg != None:
             for n in np.arange(probs.shape[1]):
                 if n not in sig_list and n != optimal_bkg: weights[n] = 0
-        if optimal_bkg == 'bkg': weights = class_ratios(labels)
+        if optimal_bkg == 'bkg':
+            weights = class_ratios(labels)
         return weights
-    bkg_list = set(np.arange(probs.shape[1]))-set(sig_list)
-    bkg      = bkg_list if bkg=='bkg' else [bkg]
-    if printing:
-        print_dict[1] += 'BINARIZATION: SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
-    #for n in [None]+list(np.arange(1, probs.shape[1]))+['bkg']: print(class_weights(sig_list, n))
-    weights = class_weights(sig_list, 'bkg')
-    labels = np.array([0 if label in sig_list else 1 if label in bkg else -1 for label in labels])
-    sig_probs = reduce(np.add, [weights[n]*probs[:,n] for n in sig_list])[labels!=-1]
-    bkg_probs = reduce(np.add, [weights[n]*probs[:,n] for n in bkg_list])[labels!=-1]
-    sample    = {key:sample[key][labels!=-1] for key in sample}
-    labels    = labels[labels!=-1]
-    sig_probs = np.where(sig_probs!=bkg_probs, sig_probs, 0.5)
-    bkg_probs = np.where(sig_probs!=bkg_probs, bkg_probs, 0.5)
-    probs = sig_probs/(sig_probs+bkg_probs)
+    if probs.shape[1] > 2: #multi-class discriminant
+        bkg_list  = set(np.arange(probs.shape[1]))-set(sig_list)
+        bkg       = bkg_list if bkg=='bkg' else [bkg]
+        print_dict[1] += 'SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
+        #for n in [None]+list(np.arange(1, probs.shape[1]))+['bkg']: print(class_weights(sig_list, n))
+        weights   = class_weights(sig_list, 'bkg')
+        labels    = np.array([0 if label in sig_list else 1 if label in bkg else -1 for label in labels])
+        sig_probs = reduce(np.add, [weights[n]*probs[:,n] for n in sig_list])[labels!=-1]
+        bkg_probs = reduce(np.add, [weights[n]*probs[:,n] for n in bkg_list])[labels!=-1]
+        sample    = {key:sample[key][labels!=-1] for key in sample}
+        labels    = labels[labels!=-1]
+        sig_probs = np.where(sig_probs!=bkg_probs, sig_probs, 0.5)
+        bkg_probs = np.where(sig_probs!=bkg_probs, bkg_probs, 0.5)
+        probs     = (np.vstack([sig_probs, bkg_probs])/(sig_probs+bkg_probs)).T
+    else: #background separation for binary classification
+        if bkg == 'bkg': return sample, labels, probs[:,0]
+        print_dict[1] += 'SIGNAL = {0} VS BACKGROUND = {'+str(bkg)+'}\n'
+        multi_labels = make_labels(sample, n_classes=6)
+        cuts = np.logical_or(multi_labels==0, multi_labels==bkg)
+        sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     return sample, labels, probs
-
-
-def bkg_separation(sample, labels, probs, bkg):
-    if bkg == 'bkg': return sample, labels, probs
-    print_dict[1] += 'BACKGROUND SEPARATION: SIGNAL = {0} VS BACKGROUND = {'+str(bkg)+'}\n'
-    multi_labels = make_labels(sample, n_classes=6)
-    cuts = np.logical_or(multi_labels==0, multi_labels==bkg)
-    return {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
 
 
 def print_performance(labels, probs, sig_eff=[90, 80, 70]):
@@ -854,20 +885,20 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
 
 def print_results(sample, labels, probs, plotting, output_dir, sig_list, bkg,
                   return_dict, separation=True, ECIDS=True):
-    if probs.shape[1] > 2: sample, labels, probs = discriminant  (sample, labels, probs, sig_list, bkg)
-    else                 : sample, labels, probs = bkg_separation(sample, labels, probs[:,0], bkg)
+    sample, labels, probs = discriminant(sample, labels, probs, sig_list, bkg)
     if False: pickle.dump((sample,labels,probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
     if plotting == 'ON':
         folder = output_dir+'/'+'class_0_vs_'+str(bkg)
         if not os.path.isdir(folder): os.mkdir(folder)
-        arguments  = (sample, labels, probs, folder, separation and bkg=='bkg', bkg)
+        arguments  = (sample, labels, probs[:,0], folder, separation and bkg=='bkg', bkg)
         processes  = [mp.Process(target=plot_distributions_DG, args=arguments)]
-        arguments  = [(sample, labels, probs, folder, ROC_type, ECIDS and bkg==1) for ROC_type in [1,2,3]]
+        arguments  = [(sample, labels, probs[:,0], folder, ROC_type, ECIDS and bkg==1) for ROC_type in [1,2,3]]
         processes += [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
-        compo_matrix(labels, [], probs); print_performance(labels, probs)
+        compo_matrix(labels, [], probs)
+        print_performance(labels, probs)
     return_dict[bkg] = print_dict
 
 
@@ -876,7 +907,7 @@ def valid_results(sample, labels, probs, train_labels, training, output_dir, plo
     print(); compo_matrix(labels, train_labels, probs); print(print_dict[2])
     sig_list = [0]
     bkg_list = ['bkg'] + list(set(np.arange(6))-set(sig_list)) if sep_bkg =='ON' else ['bkg']
-    manager = mp.Manager(); return_dict = manager.dict()
+    manager   = mp.Manager(); return_dict = manager.dict()
     arguments = [(sample, labels, probs, plotting, output_dir, sig_list, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
