@@ -1,21 +1,20 @@
-# FEATURE REMOVAL IMPORTANCE RANKING (array jobs)
-python classifier.py  --n_train=13275418 --n_valid=13275418 --batch_size=5e3 --n_epochs=100 --n_classes=2      \
-                      --weight_type=none --plotting=OFF --feature_removal=ON --sep_bkg=ON  --generator=ON      \
-                      --results_out=results.pkl   --output_dir=outputs/feature_removal                         \
-                      --sbatch_var=${SBATCH_VAR}  --host_name=${HOST_NAME}   --node_dir=${NODE_DIR}
+# SINGLE TRAINING
+python classifier.py  --n_train=180e6 --n_valid=20e6 --batch_size=1e4 --n_epochs=100 \
+                      --n_classes=5 --eta_region=0.0-2.5 --weight_type=match2class   \
+                      --model_in='' --scaler_in=scaler.pkl --host_name=${HOST_NAME}  \
+                      --output_dir=outputs/test --results_out=valid_results.pkl      \
+                      --scalars=ON --images=ON --plotting=ON --generator=ON
 exit
 
 
-
-
 ################################################################################################################
-#### PICK A SHELL SCRIPT FROM BELOW ############################################################################
+#### PICK A SCRIPT TEMPLATE FROM BELOW #########################################################################
 ################################################################################################################
 
 
 # SINGLE TRAINING
 python classifier.py  --n_train=10e6  --n_valid=1e6  --batch_size=5e3  --n_epochs=100  --n_classes=2           \
-                      --n_tracks=5    --l2=1e-7      --dropout=0.1     --verbose=2     --weight_type=None      \
+                      --n_tracks=5    --l2=1e-7      --dropout=0.1     --verbose=2     --weight_type=none      \
                       --bkg_ratio=2   --output_dir=outputs  --generator=OFF  --host_name=${HOST_NAME}
 
 
@@ -63,11 +62,11 @@ python classifier.py  --n_train=0           --n_valid=$n_e        --n_epochs=0  
 
 # USING VALIDATION RESULTS FOR PLOTTING
 python classifier.py  --n_train=0  --n_valid=15e6  --output_dir=outputs  --results_in=valid_results.pkl        \
-                      --eta_region=0.0-1.3  --plotting=OFF
+                      --eta_region=0.0-1.3  --plotting=ON --sep_bkg=ON
 
 
 # FEATURE REMOVAL IMPORTANCE RANKING (array jobs)
 python classifier.py  --n_train=10e6 --n_valid=1e6 --batch_size=5e3 --n_epochs=100 --n_classes=2 --verbose=1   \
                       --weight_type=none --plotting=OFF --feature_removal=ON --sep_bkg=ON  --generator=ON      \
-                      --results_out=results.pkl  --output_dir=outputs/feature_removal                          \
-                      --sbatch_var=${SBATCH_VAR}  --host_name=${HOST_NAME}
+                      --results_out=results.pkl   --output_dir=outputs/feature_removal                          \
+                      --sbatch_var=${SBATCH_VAR}  --host_name=${HOST_NAME} --node_dir=${NODE_DIR}

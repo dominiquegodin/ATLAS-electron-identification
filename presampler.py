@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 # PRESAMPLES MIXING
 if args.mixing == 'ON':
-    #mix_datafiles()
+    #mix_datafiles() #run before mix_presamples
     mix_presamples(n_files=20, n_tasks=5, output_dir='/nvme1/atlas/godin/e-ID_data/0.0-2.5')
     sys.exit()
 
@@ -38,8 +38,8 @@ data_files = sorted(data_files)[0:max(1,args.n_files) if args.n_files != None el
 
 
 # MERGING FILES / NO PRESAMPLING
-if args.sampling == 'OFF':
-    if args.merging == 'ON': print(); merge_presamples(output_dir, args.output_file)
+if args.sampling == 'OFF' and args.merging == 'ON':
+    print(); merge_presamples(output_dir, args.output_file)
     sys.exit()
 
 
@@ -77,6 +77,14 @@ h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file]
 for h5_file in h5_files: os.remove(output_dir+'/'+h5_file)
 
 
+# MODYFING FILE STRUCTURE
+for h5_file in data_files:
+    with h5py.File(h5_file,"a") as data:
+        if 'train' not in data.keys():
+            data.create_group('train')
+            for key in data: data.move(key, 'train'+'/'+key)
+
+
 # STARTING SAMPLING AND COLLECTING DATA
 n_tasks = min(mp.cpu_count(), args.n_tasks)
 max_e   = [len(h5py.File(h5_file,'r')[key]['eventNumber'])
@@ -92,8 +100,7 @@ for h5_file in data_files:
         print('Collecting', format(str(n_e[index]),'>7s'), 'e from:', h5_file.split('/')[-1], end=' ')
         print(format('['+file_key+']','7s'), end=' ... ', flush=True)
         func_args = (h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key)
-        sample = pool.map(partial(presample, *func_args), np.arange(n_tasks))
-        #pool.map(partial(presample, *func_args), np.arange(n_tasks))
+        pool.map(partial(presample, *func_args), np.arange(n_tasks))
         sum_e += batch_size; index += 1
         print('(', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
 pool.close(); pool.join(); print()
