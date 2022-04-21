@@ -113,7 +113,7 @@ def var_histogram(sample, labels, weights, bins, output_dir, prefix, var,
         plt.xticks(np.arange(0, 2.6, 0.5))
         #plt.xticks(bins, [str(n) for n in bins]); plt.xticks(bins, [format(n,'.1f') for n in bins])
         pylab.xlim(0, 2.5)
-        if log:
+        if False:
             separate_norm = False
             pylab.ylim(1e-1, 1e2)
             plt.yscale('log')
@@ -122,7 +122,7 @@ def var_histogram(sample, labels, weights, bins, output_dir, prefix, var,
             pylab.ylim(0, 90)
             plt.yticks(np.arange(0, 100, 10))
             axes.yaxis.set_minor_locator(AutoMinorLocator(5))
-    bins[-1] = max(bins[-1], max(variable)+1e-3)
+    #bins[-1] = max(bins[-1], max(variable)+1e-3)
     #label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor (b/c)',
     #              4:'Light flavor (e$^\pm$/$\gamma$)', 5:'Light flavor (hadron)'}
     label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor',
@@ -143,9 +143,10 @@ def var_histogram(sample, labels, weights, bins, output_dir, prefix, var,
         h[:,n] = pylab.hist(class_values, bins, histtype='step', weights=class_weights, color=color_dict[n],
                             label=label_dict[n]+' ('+format(100*len(class_values)/len(variable),'.1f')+'%)', lw=2)[0]
     plt.ylabel('Distribution density (%)' if density else 'Distribution (%)', fontsize=25)
-    axes.tick_params(axis='both', which='major', labelsize=12)
-    plt.legend(loc='upper center' if var=='pt' else 'upper center', fontsize=16 if n_classes==2 else 14,
-               ncol=2, facecolor='ghostwhite', framealpha=1).set_zorder(10)
+    axes.tick_params(axis='both', which='major', labelsize=14)
+    loc, ncol = ('upper right',1) if var=='pt' else ('upper center',2)
+    plt.legend(loc=loc if var=='pt' else 'upper center', fontsize=16 if n_classes==2 else 14,
+               ncol=ncol, facecolor='ghostwhite', framealpha=1).set_zorder(10)
     file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
     print('Saving', prefix, 'sample', format(var,'3s'), 'distributions to:', file_name)
     plt.savefig(file_name)
@@ -366,7 +367,8 @@ def bin_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, col
     print('Saving test sample ratio meshgrid to:', file_name); plt.savefig(file_name)
 
 
-def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_values=None):
+def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
+                    ROC_values=None, combine_plots=True):
     LLH_fpr, LLH_tpr = LLH_rates(sample, y_true, ECIDS)
     if ROC_values != None: fpr, tpr = ROC_values[0]
     #if ROC_values != None:
@@ -378,7 +380,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
         #if ECIDS: y_prob = sample['p_ECIDSResult']
         #y_prob = y_prob + (sample['p_ECIDSResult']/2 +0.5)
         fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob, pos_label=0)
-        #pickle.dump({'fpr':fpr, 'tpr':tpr}, open(output_dir+'/'+'pos_rates.pkl','wb'), protocol=4)
+        pickle.dump({'fpr':fpr, 'tpr':tpr}, open(output_dir+'/'+'pos_rates.pkl','wb'), protocol=4)
     signal_ratio       = np.sum(y_true==0)/len(y_true)
     accuracy           = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
     best_tpr, best_fpr = tpr[np.argmax(accuracy)], fpr[np.argmax(accuracy)]
@@ -423,21 +425,22 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
         plt.xlabel(sig_eff+' (%)', fontsize=25)
         plt.ylabel('1/'+bkg_eff, fontsize=25)
         #label = '{$w_{\operatorname{bkg}}$} = {$f_{\operatorname{bkg}}$}'
-        P1, = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='#1f77b4', lw=2, zorder=10)
-        #file_path = 'outputs/6c_180m_match2class0/scalars_only/bkg_optimal_signal01/'+output_dir.split('/')[-1]+'/pos_rates.pkl'
-        #fpr_1, tpr_1 = pickle.load(open(file_path, 'rb')).values()
-        #len_0 = np.sum(fpr_1==0)
-        #P2, = plt.plot(100*tpr_1[len_0:], 1/fpr_1[len_0:], color='tab:gray', lw=2, ls='--', zorder=10)
-        #file_path = 'outputs/2c_180m_match2class0/scalars+images/'+output_dir.split('/')[-1]+'/pos_rates.pkl'
-        #fpr_1, tpr_1 = pickle.load(open(file_path, 'rb')).values()
-        #len_0 = np.sum(fpr_1==0)
-        #P3, = plt.plot(100*tpr_1[len_0:], 1/fpr_1[len_0:], color='tab:gray', lw=2, ls=':', zorder=10)
-        #L = plt.legend([P1,P3,P2],
-        #               ['HLV+tracks+images (multiclass)', 'HLV+tracks+images (binary)', 'HLV only (multiclass)'],
-        #               loc='upper left', bbox_to_anchor=(0,1), fontsize=14, facecolor='ghostwhite', framealpha=1)
-        #L = plt.legend([P1,P2], ['HLV+tracks+images', 'HLV only'],
-        #               loc='upper left', bbox_to_anchor=(0,1), fontsize=14, facecolor='ghostwhite', framealpha=1)
-        #L.set_zorder(10)
+        P, = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='#1f77b4', lw=2, zorder=10)
+        if combine_plots:
+            def get_legends(n_zip, output_dir):
+                file_path, ls = n_zip
+                file_path += '/' + output_dir.split('/')[-1] + '/pos_rates.pkl'
+                fpr, tpr = pickle.load(open(file_path, 'rb')).values()
+                len_0 = np.sum(fpr==0)
+                P, = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='tab:gray', lw=2, ls=ls, zorder=10)
+                return P
+            file_paths = ['outputs/6c_180m_match2class0/scalars_only/bkg_optimal',
+                          'outputs/2c_180m_match2class0/scalars+images']
+            linestyles = ['--', ':']
+            leg_labels = ['HLV+images (6-class)', 'HLV only (6-class)', 'HLV+images (2-class)']
+            Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,linestyles)]
+            L = plt.legend(Ps, leg_labels, loc='upper left', bbox_to_anchor=(0,1), fontsize=14,
+                           facecolor='ghostwhite', framealpha=1); L.set_zorder(10)
         if ROC_values != None:
             tag = 'combined bkg'
             extra_labels = {1:'{$w_{\operatorname{bkg}}$} for best AUC',
@@ -465,7 +468,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
         axes.tick_params(axis='both', which='major', labelsize=12)
         plt.legend(loc='upper right', fontsize=13 if ECIDS else 14, numpoints=3,
                    facecolor='ghostwhite', framealpha=1).set_zorder(10)
-        #plt.gca().add_artist(L)
+        if combine_plots: plt.gca().add_artist(L)
     if ROC_type == 2:
         plt.xlim([0.6, 1]); plt.ylim([0.9, 1-1e-4])
         plt.xticks([0.6, 0.7, 0.8, 0.9, 1], [60, 70, 80, 90, 100])

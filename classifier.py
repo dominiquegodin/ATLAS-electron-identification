@@ -20,11 +20,12 @@ parser.add_argument( '--n_eval'         , default =    0,  type = float )
 parser.add_argument( '--n_valid'        , default =  1e6,  type = float )
 parser.add_argument( '--batch_size'     , default =  5e3,  type = float )
 parser.add_argument( '--n_epochs'       , default =  100,  type = int   )
-parser.add_argument( '--n_classes'      , default =    2,  type = int   )
+parser.add_argument( '--n_classes'      , default =    6,  type = int   )
+#parser.add_argument( '--n_labels'       , default =    6,  type = int   )
 parser.add_argument( '--n_tracks'       , default =    5,  type = int   )
 parser.add_argument( '--bkg_ratio'      , default =    4,  type = float )
 parser.add_argument( '--n_folds'        , default =    1,  type = int   )
-parser.add_argument( '--n_gpus'         , default =    2,  type = int   )
+parser.add_argument( '--n_gpus'         , default =    1,  type = int   )
 parser.add_argument( '--verbose'        , default =    1,  type = int   )
 parser.add_argument( '--patience'       , default =   10,  type = int   )
 parser.add_argument( '--sbatch_var'     , default =    0,  type = int   )
@@ -45,7 +46,7 @@ parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
 parser.add_argument( '--sep_bkg'        , default = 'ON'                )
 parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
-#parser.add_argument( '--metrics'        , default = 'val_accuracy_1'      )
+#parser.add_argument( '--metrics'        , default = 'accuracy_1'      )
 parser.add_argument( '--eta_region'     , default = '0.0-2.5'           )
 parser.add_argument( '--output_dir'     , default = 'outputs'           )
 parser.add_argument( '--model_in'       , default = ''                  )
@@ -60,6 +61,7 @@ parser.add_argument( '--runDiffPlots'   , default = 0, type = int       )
 parser.add_argument( '--feature_removal', default = 'OFF'               )
 parser.add_argument( '--correlations'   , default = 'OFF'               )
 args = parser.parse_args()
+#args.n_classes = args.n_labels if args.multiclass=='ON' else 2
 
 
 # VERIFYING ARGUMENTS
@@ -142,7 +144,7 @@ if   args.results_in != '': sys.exit()
 # MODEL CREATION AND MULTI-GPU DISTRIBUTION
 n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
 train_batch_size = max(1,n_gpus) * args.batch_size
-valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(5e3))
+valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(2e4))
 sample = make_sample(data_files[0], [0,1], input_data, args.n_tracks, args.n_classes)[0]
 model  = create_model(args.n_classes, sample, args.NN_type, args.FCN_neurons, CNN,
                       args.l2, args.dropout, train_data, n_gpus)
@@ -199,8 +201,6 @@ if args.n_epochs > 0:
     for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
-    #print(  'Train sample:'   , format(np.diff(args.n_train)[0], '9.0f'), 'e')
-    #print(  'Valid sample:'   , format(np.diff(args.n_valid)[0], '9.0f'), 'e')
     print('\nUsing TensorFlow', tf.__version__                               )
     print(  'Using'           , n_gpus, 'GPU(s)'                             )
     print(  'Using'           , args.NN_type, 'architecture with', end=' '   )
@@ -218,7 +218,7 @@ if args.n_epochs > 0:
             t_scaler = fit_t_scaler(train_sample, args.t_scaler_out)
             if args.generator != 'ON': valid_sample = apply_t_scaler(valid_sample, t_scaler, verbose='OFF')
         if args.generator != 'ON': train_sample = apply_t_scaler(train_sample, t_scaler, verbose='ON')
-    sample_composition(train_sample); compo_matrix(valid_labels, train_labels=train_labels); print()
+    sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, train_weights, bins, args.output_dir)
     callbacks = callback(args.model_out, args.patience, args.metrics)

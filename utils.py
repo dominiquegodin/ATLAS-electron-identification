@@ -344,15 +344,17 @@ def match_distributions(sample, labels, target_sample, target_labels):
 def get_dataset(host_name='lps', node_dir='', eta_region=''):
     if 'lps'    in host_name                   : node_dir = '/opt/tmp/godin/e-ID_data/presamples'
     if 'beluga' in host_name and node_dir == '': node_dir = '/project/def-arguinj/shared/e-ID_data'
-    if eta_region in ['0.0-1.3', '0.0-1.3_old', '1.3-1.6', '1.6-2.5', '0.0-2.5']:
+    if eta_region in ['0.0-1.3', '1.3-1.6', '1.6-2.5', '0.0-2.5', '0.0-2.5_data']:
         folder = node_dir+'/'+eta_region
         data_files = sorted([folder+'/'+h5_file for h5_file in os.listdir(folder) if 'e-ID_' in h5_file])
     else:
         barrel_dir, midgap_dir, endcap_dir = [node_dir+'/'+folder for folder in ['0.0-1.3', '1.3-1.6', '1.6-2.5']]
+        #barrel_dir, midgap_dir, endcap_dir = [folder+'/outputs' for folder in [barrel_dir, midgap_dir, endcap_dir]]
         barrel_files = sorted([barrel_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
         midgap_files = sorted([midgap_dir+'/'+h5_file for h5_file in os.listdir(midgap_dir) if 'e-ID_' in h5_file])
-        endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
-        data_files = [h5_file for group in zip(barrel_files, midgap_files, endcap_files) for h5_file in group]
+        endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(endcap_dir) if 'e-ID_' in h5_file])
+        #data_files = [h5_file for group in zip(barrel_files, midgap_files, endcap_files) for h5_file in group]
+        data_files = barrel_files + midgap_files + endcap_files
     return data_files
 
 
@@ -594,7 +596,7 @@ def sample_composition(sample):
     IFF_sum, MC_sum = 100*np.sum(ratios, axis=0)/len(MC_type), 100*np.sum(ratios, axis=1)/len(MC_type)
     ratios = np.round(1e4*ratios/len(MC_type))/100
     MC_empty, IFF_empty = np.where(np.sum(ratios, axis=0)==0)[0], np.where(np.sum(ratios, axis=1)==0)[0]
-    MC_list,  IFF_list  = list(set(MC_list)-set(MC_empty))      , list(set(IFF_list)-set(IFF_empty))
+    MC_list,  IFF_list  = sorted(list(set(MC_list)-set(MC_empty))), sorted(list(set(IFF_list)-set(IFF_empty)))
     print('IFF AND MC TRUTH CLASSIFIERS TRAINING SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
     dash = (26+7*len(MC_list))*'-'
     print(dash, format('\n| IFF \ MC |','10s'), end='')
@@ -613,18 +615,16 @@ def sample_composition(sample):
 
 def class_ratios(labels):
     def get_ratios(labels, n, return_dict): return_dict[n] = 100*np.sum(labels==n)/len(labels)
-    manager   =  mp.Manager(); return_dict = manager.dict(); n_classes = max(labels) + 1
-    processes = [mp.Process(target=get_ratios, args=(labels, n, return_dict)) for n in np.arange(n_classes)]
+    manager   =  mp.Manager(); return_dict = manager.dict(); n_classes = max(labels) +1
+    processes = [mp.Process(target=get_ratios, args=(labels, n, return_dict)) for n in range(n_classes)]
     for job in processes: job.start()
     for job in processes: job.join()
-    return [return_dict[n] for n in np.arange(n_classes)]
+    return [return_dict[n] for n in range(n_classes)]
 
 
 def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
-    valid_pred   = np.argmax(valid_probs, axis=1) if valid_probs != [] else valid_labels
-    matrix       = metrics.confusion_matrix(valid_labels, valid_pred)
-    matrix       = 100*matrix.T/matrix.sum(axis=1); n_classes = len(matrix)
-    classes      = ['CLASS '+str(n) for n in np.arange(n_classes)]
+    n_classes    = np.max(valid_labels) +1
+    classes      = ['CLASS '+str(n) for n in range(n_classes)]
     valid_ratios = class_ratios(valid_labels)
     train_ratios = class_ratios(train_labels) if train_labels != [] else n_classes*['n/a']
     if valid_probs == []:
@@ -633,6 +633,10 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         table   = zip(classes, train_ratios, valid_ratios)
         print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
     else:
+        valid_pred = np.argmax(valid_probs, axis=1) if valid_probs != [] else valid_labels
+        matrix     = metrics.confusion_matrix(valid_labels, valid_pred)
+        matrix     = 100*matrix.T/matrix.sum(axis=1)
+        classes    = ['CLASS '+str(n) for n in range(n_classes)]
         if n_classes > 2:
             headers = ['CLASS #', 'TRAIN', 'VALID'] + classes
             table   = [classes] + [train_ratios] + [valid_ratios] + matrix.T.tolist()
@@ -1203,7 +1207,10 @@ def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
 
 def mix_datafiles():
     data_files = get_dataset()
-    arguments  = [(data_files[index], index) for index in np.arange(30,60)]
+    #for path in data_files:
+    #    print(path)
+    #sys.exit()
+    arguments  = [(data_files[index], index) for index in range(len(data_files))]
     processes  = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
     for job in processes: job.start()
     for job in processes: job.join()
@@ -1211,12 +1218,26 @@ def file_mixing(h5_file, index):
     output_dir = h5_file[0:h5_file.rfind('/')] + '/outputs'
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     features = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
+    sample_data = h5py.File(h5_file,'r')
+    iffTruth    = sample_data['p_iffTruth' ][:]
+    TruthType   = sample_data['p_TruthType'][:]
+    # Light flavor criteria for data
+    LF_criteria = np.logical_and(iffTruth==0, TruthType==0)
+    # Light flavor indices for MC
+    criteria = np.logical_or.reduce([TruthType==4, TruthType==8, TruthType==16, TruthType==17])
+    criteria = np.logical_and(criteria, iffTruth==10)
+    LF_idx   = np.where(criteria)[0]
     for key in features:
         attribute = 'w' if key==features[0] else 'a'
-        data   = h5py.File(output_dir+'/'+h5_file.split('/')[-1], attribute)
-        sample = h5py.File(h5_file,'r')[key]
-        dtype  = np.int32 if sample.dtype=='int32' else np.float16
-        chunks = (2000,)+sample.shape[1:]
-        data.create_dataset(key, sample.shape, dtype=dtype, compression='lzf', chunks=chunks)
+        data_out  = h5py.File(output_dir+'/'+h5_file.split('/')[-1], attribute)
+        data_in   = sample_data[key]
+        # Labelling light flavor data
+        if key == 'p_iffTruth' : data_in = np.where(LF_criteria, 10, data_in )
+        if key == 'p_TruthType': data_in = np.where(LF_criteria,  4, data_in )
+        # Removing light flavor MC
+        data_in = np.delete(data_in, LF_idx, axis=0)
+        dtype   = np.int32 if data_in.dtype=='int32' else np.float16
+        chunks  = (2000,) + data_in.shape[1:]
+        data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
         print( 'Mixing file', h5_file.split('/')[-1], 'with feature', key )
-        data[key][:] = utils.shuffle(sample[:], random_state=index)
+        data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
