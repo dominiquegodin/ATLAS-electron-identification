@@ -51,7 +51,7 @@ def plot_history(history, output_dir, key='accuracy'):
     plt.yticks( np.arange(max(80,min_acc), max_acc+1, step=1) )
     plt.ylabel(key.title()+' (%)',fontsize=25)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
-    file_name = output_dir+'/'+'history.png'
+    file_name = output_dir+'/'+'train_history.png'
     print('Saving training accuracy history to:', file_name, '\n'); plt.savefig(file_name)
 
 
@@ -76,7 +76,7 @@ def plot_heatmaps(sample, labels, output_dir):
     plt.savefig(file_name); sys.exit()
 
 
-def var_histogram(sample, labels, weights, bins, output_dir, prefix, var,
+def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, var,
                   density=True, separate_norm=False, log=True):
     n_classes = max(labels)+1
     plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
@@ -123,10 +123,12 @@ def var_histogram(sample, labels, weights, bins, output_dir, prefix, var,
             plt.yticks(np.arange(0, 100, 10))
             axes.yaxis.set_minor_locator(AutoMinorLocator(5))
     #bins[-1] = max(bins[-1], max(variable)+1e-3)
-    #label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor (b/c)',
-    #              4:'Light flavor (e$^\pm$/$\gamma$)', 5:'Light flavor (hadron)'}
-    label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor',
-                  4:'Light flavor'}
+    if n_etypes == 5:
+        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor',
+                      4:'Light flavor'}
+    if n_etypes == 6:
+        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor (b/c)',
+                      4:'Light flavor (e$^\pm$/$\gamma$)', 5:'Light flavor (hadron)'}
     color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            , 3  :'tab:red'   ,
                   4:'tab:purple'                     , 5:'tab:brown'            }
     if n_classes == 2: label_dict[1] = 'Background'
@@ -152,13 +154,15 @@ def var_histogram(sample, labels, weights, bins, output_dir, prefix, var,
     plt.savefig(file_name)
 
 
-def plot_distributions_DG(sample, y_true, y_prob, output_dir, separation=False, bkg='bkg'):
-    #label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    ,   3  :'Heavy flavor',
-    #              4:'Light flavor (e$^\pm$/$\gamma$)', 5:'Light flavor (hadron)', 'bkg':'Background'}
-    #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
-    #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
-    label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    ,   3  :'Heavy flavor',
-                  4:'Light flavor', 'bkg':'Background'}
+def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separation=False, bkg='bkg'):
+    if n_etypes == 5:
+        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    ,   3  :'Heavy flavor',
+                      4:'Light flavor', 'bkg':'Background'}
+    if n_etypes == 6:
+        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    ,   3  :'Heavy flavor',
+                      4:'Light flavor (e$^\pm$/$\gamma$)', 5:'Light flavor (hadron)', 'bkg':'Background'}
+        #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
+        #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
     color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            ,   3  :'tab:red'   ,
                   4:'tab:purple'                     , 5:'tab:brown'            , 'bkg':'tab:orange'}
     if separation:
@@ -368,7 +372,7 @@ def bin_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, col
 
 
 def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
-                    ROC_values=None, combine_plots=True):
+                    ROC_values=None, combine_plots=False):
     LLH_fpr, LLH_tpr = LLH_rates(sample, y_true, ECIDS)
     if ROC_values != None: fpr, tpr = ROC_values[0]
     #if ROC_values != None:

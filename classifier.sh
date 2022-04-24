@@ -1,7 +1,7 @@
 # SINGLE TRAINING
 python classifier.py  --n_train=20e6 --n_eval=10e6 --n_valid=20e6 --batch_size=1e4 --n_epochs=100  \
-                      --n_classes=5 --eta_region=0.0-2.5 --weight_type=match2class --bkg_ratio=4   \
-                      --model_in='' --scaler_in='' --host_name=${HOST_NAME}                        \
+                      --n_etypes=5 --eta_region=0.0-2.5 --weight_type=match2class --bkg_ratio=4    \
+                      --multiclass=ON --model_in='' --scaler_in='' --host_name=${HOST_NAME}        \
                       --output_dir=outputs/test --results_out=valid_results.pkl                    \
                       --scalars=ON --images=ON --plotting=ON --generator=ON
 exit

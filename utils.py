@@ -206,10 +206,10 @@ def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='output
 #################################################################################
 
 
-def sample_histograms(valid_sample, valid_labels, train_sample, train_labels, weights, bins, output_dir):
-    arguments = [(valid_sample, valid_labels, None, bins, output_dir, 'valid')]
+def sample_histograms(valid_sample, valid_labels, train_sample, train_labels, n_etypes, weights, bins, output_dir):
+    arguments = [(valid_sample, valid_labels, n_etypes, None, bins, output_dir, 'valid')]
     if np.any(train_labels) != None:
-        arguments += [(train_sample, train_labels, weights, bins, output_dir, 'train')]
+        arguments += [(train_sample, train_labels, n_etypes, weights, bins, output_dir, 'train')]
     processes = [mp.Process(target=var_histogram, args=arg+(var,)) for arg in arguments for var in ['pt','eta']]
     for job in processes: job.start()
     for job in processes: job.join()
@@ -353,8 +353,7 @@ def get_dataset(host_name='lps', node_dir='', eta_region=''):
         barrel_files = sorted([barrel_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
         midgap_files = sorted([midgap_dir+'/'+h5_file for h5_file in os.listdir(midgap_dir) if 'e-ID_' in h5_file])
         endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(endcap_dir) if 'e-ID_' in h5_file])
-        #data_files = [h5_file for group in zip(barrel_files, midgap_files, endcap_files) for h5_file in group]
-        data_files = barrel_files + midgap_files + endcap_files
+        data_files = [h5_file for group in zip(barrel_files, midgap_files, endcap_files) for h5_file in group]
     return data_files
 
 
@@ -402,8 +401,8 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     labels[ sample[iffTruth] ==  3                                                   ] = 1
     labels[ sample[iffTruth] ==  5                                                   ] = 2
     labels[(sample[iffTruth] ==  8) | (sample[iffTruth ] ==  9)                      ] = 3
+    labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  0)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 4
-    labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  8)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
     if n_classes == 2:
@@ -597,7 +596,7 @@ def sample_composition(sample):
     ratios = np.round(1e4*ratios/len(MC_type))/100
     MC_empty, IFF_empty = np.where(np.sum(ratios, axis=0)==0)[0], np.where(np.sum(ratios, axis=1)==0)[0]
     MC_list,  IFF_list  = sorted(list(set(MC_list)-set(MC_empty))), sorted(list(set(IFF_list)-set(IFF_empty)))
-    print('IFF AND MC TRUTH CLASSIFIERS TRAINING SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
+    print('IFFTRUTH AND TRUTHTYPE SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
     dash = (26+7*len(MC_list))*'-'
     print(dash, format('\n| IFF \ MC |','10s'), end='')
     for col in MC_list:
@@ -653,7 +652,8 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
 
 
-def validation(output_dir, results_in, plotting, n_valid, data_files, inputs, valid_cuts, sep_bkg, diff_plots):
+def validation(output_dir, results_in, plotting, n_valid, n_etypes, data_files,
+               inputs, valid_cuts, sep_bkg, diff_plots):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
@@ -683,7 +683,7 @@ def validation(output_dir, results_in, plotting, n_valid, data_files, inputs, va
     if len(labels) == n_e: print('')
     else: print('('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
     #multi_cuts(sample, labels, probs, output_dir); sys.exit()
-    valid_results(sample, labels, probs, [], None, output_dir, plotting, sep_bkg, diff_plots); print()
+    valid_results(sample, labels, probs, [], n_etypes, None, output_dir, plotting, sep_bkg, diff_plots); print()
     #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
 
 
@@ -805,23 +805,23 @@ def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_f
     return valid_sprobs
 
 
-def make_discriminant(sample, labels, probs, sig_list, bkg):
-    n_labels = probs.shape[1]
+def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg):
+    n_classes = probs.shape[1]
     from functools import reduce
     def class_weights(sig_list, optimal_bkg=None):
-        weights = np.ones(n_labels)
+        weights = np.ones(n_classes)
         if optimal_bkg != None:
-            for n in np.arange(n_labels):
+            for n in np.arange(n_classes):
                 if n not in sig_list and n != optimal_bkg: weights[n] = 0
         if optimal_bkg == 'bkg':
             weights = class_ratios(labels)
         return weights
-    if n_labels > 2:
+    if n_classes > 2:
         """ Multi-class discriminant """
-        bkg_list  = set(np.arange(n_labels))-set(sig_list)
+        bkg_list  = set(np.arange(n_classes))-set(sig_list)
         bkg       = bkg_list if bkg=='bkg' else [bkg]
         print_dict[1] += 'SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
-        #for n in [None]+list(np.arange(1, n_labels))+['bkg']: print(class_weights(sig_list, n))
+        #for n in [None]+list(np.arange(1, n_classes))+['bkg']: print(class_weights(sig_list, n))
         weights   = class_weights(sig_list, 'bkg')
         #weights   = class_weights(sig_list, 'bkg' if bkg==bkg_list else bkg[0])
         labels    = np.array([0 if label in sig_list else 1 if label in bkg else -1 for label in labels])
@@ -836,7 +836,7 @@ def make_discriminant(sample, labels, probs, sig_list, bkg):
         """ Background separation for binary classification """
         if bkg == 'bkg': return sample, labels, probs
         print_dict[1] += 'SIGNAL = {0} VS BACKGROUND = {'+str(bkg)+'}\n'
-        multi_labels = make_labels(sample, n_classes=5)
+        multi_labels = make_labels(sample, n_classes=n_etypes)
         cuts = np.logical_or(multi_labels==0, multi_labels==bkg)
         sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     return sample, labels, probs
@@ -849,9 +849,9 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
         print_dict[3] += format(np.nan_to_num(1/fpr[np.argwhere(tpr>=val/100)[0]][0]),'>6.0f')+'\n'
 
 
-def print_results(sample, labels, probs, plotting, output_dir, sig_list, bkg,
-                  return_dict, separation=True, ECIDS=True):
-    sample, labels, probs = make_discriminant(sample, labels, probs, sig_list, bkg)
+def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
+                  sig_list, bkg, return_dict, separation=True, ECIDS=True):
+    sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg)
     if False: pickle.dump((sample,labels,probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
     if plotting == 'ON':
         ECIDS = ECIDS and bkg==1
@@ -860,7 +860,7 @@ def print_results(sample, labels, probs, plotting, output_dir, sig_list, bkg,
         #performance_ratio(sample, labels, probs[:,0], bkg, output_dir)
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        arguments  = (sample, labels, probs[:,0], output_dir, separation and bkg=='bkg', bkg)
+        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
         processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
@@ -870,14 +870,16 @@ def print_results(sample, labels, probs, plotting, output_dir, sig_list, bkg,
     return_dict[bkg] = print_dict
 
 
-def valid_results(sample, labels, probs, train_labels, training, output_dir, plotting, sep_bkg, diff_plots):
+def valid_results(sample, labels, probs, train_labels, n_etypes, training,
+                  output_dir, plotting, sep_bkg, diff_plots):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}
     """ Plotting efficiciency ratios mesh grid """
     print(); compo_matrix(labels, train_labels, probs); print(print_dict[2])
     sig_list = [0]
-    bkg_list = ['bkg'] + list(set(np.arange(5))-set(sig_list)) if sep_bkg=='ON' else ['bkg']
+    bkg_list = ['bkg'] + list(set(np.arange(n_etypes))-set(sig_list)) if sep_bkg=='ON' else ['bkg']
     manager   = mp.Manager(); return_dict = manager.dict()
-    arguments = [(sample, labels, probs, plotting, output_dir, sig_list, bkg, return_dict) for bkg in bkg_list]
+    arguments = [(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg, return_dict)
+                 for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
     for job in processes: job.start()
@@ -1170,6 +1172,8 @@ def get_idx(size, start_value=0, n_sets=5):
 
 def mix_presamples(n_files, n_tasks, output_dir):
     data_files = get_dataset()
+    #for path in data_files: print(path)
+    #sys.exit()
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     n_e      = [len(h5py.File(h5_file,'r')['eventNumber']) for h5_file in data_files]
     idx_list = [get_idx(n, n_sets=n_files) for n in n_e]
@@ -1207,35 +1211,43 @@ def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
 
 def mix_datafiles():
     data_files = get_dataset()
-    #for path in data_files:
-    #    print(path)
-    #sys.exit()
-    arguments  = [(data_files[index], index) for index in range(len(data_files))]
+    #for path in data_files: print(path)
+    #print()
+    LF_path  = '/opt/tmp/godin/e-ID_data/presamples/LF_data'
+    LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
+    arguments  = [(data_files[index], LF_files[index], index) for index in range(len(data_files))]
     processes  = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
     for job in processes: job.start()
     for job in processes: job.join()
-def file_mixing(h5_file, index):
+def file_mixing(h5_file, LF_file, index, replace_data=False):
     output_dir = h5_file[0:h5_file.rfind('/')] + '/outputs'
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
-    features = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
-    sample_data = h5py.File(h5_file,'r')
-    iffTruth    = sample_data['p_iffTruth' ][:]
-    TruthType   = sample_data['p_TruthType'][:]
-    # Light flavor criteria for data
-    LF_criteria = np.logical_and(iffTruth==0, TruthType==0)
-    # Light flavor indices for MC
-    criteria = np.logical_or.reduce([TruthType==4, TruthType==8, TruthType==16, TruthType==17])
-    criteria = np.logical_and(criteria, iffTruth==10)
-    LF_idx   = np.where(criteria)[0]
+    features  = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
+    MC_data   = h5py.File(h5_file,'r')
+    if replace_data:
+        # Light flavor indices in MC file
+        iffTruth  = MC_data['p_iffTruth' ][:]
+        TruthType = MC_data['p_TruthType'][:]
+        MC_criteria = np.logical_or.reduce([TruthType==4, TruthType==16, TruthType==17])
+        MC_criteria = np.logical_and(MC_criteria, iffTruth==10)
+        MC_idx  = np.where(MC_criteria)[0]
+        LF_data = h5py.File(LF_file,'r')
+        source_size = len(list(LF_data.values())[0])
+        target_size = np.sum(MC_criteria)
+        # Light flavor indices from data file
+        LF_idx = np.random.choice(source_size, target_size, replace=source_size<target_size)
     for key in features:
         attribute = 'w' if key==features[0] else 'a'
-        data_out  = h5py.File(output_dir+'/'+h5_file.split('/')[-1], attribute)
-        data_in   = sample_data[key]
-        # Labelling light flavor data
-        if key == 'p_iffTruth' : data_in = np.where(LF_criteria, 10, data_in )
-        if key == 'p_TruthType': data_in = np.where(LF_criteria,  4, data_in )
-        # Removing light flavor MC
-        data_in = np.delete(data_in, LF_idx, axis=0)
+        data_in  = MC_data[key][:]
+        data_out = h5py.File(output_dir+'/'+h5_file.split('/')[-1], attribute)
+        if replace_data:
+            # Removing light flavor MC
+            #data_in = np.delete(data_in, MC_criteria, axis=0)
+            # Replacing light flavor MC
+            np.put(data_in, MC_idx, np.take(LF_data[key], LF_idx, axis=0))
+            # Labelling light flavor data
+            if key == 'p_iffTruth' : data_in = np.where(MC_criteria, 10, data_in )
+            if key == 'p_TruthType': data_in = np.where(MC_criteria,  1, data_in )
         dtype   = np.int32 if data_in.dtype=='int32' else np.float16
         chunks  = (2000,) + data_in.shape[1:]
         data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
