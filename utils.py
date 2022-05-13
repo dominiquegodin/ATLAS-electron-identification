@@ -11,196 +11,6 @@ from   plots_DG import performance_ratio
 from   plots_KM import plot_distributions_KM, differential_plots
 
 
-def find_bin(array,binning):
-
-    binarized_bin_indices=list()
-    for i in range(len(binning)-1):
-        binarized_bin_indices.append( ((binning[i]<array) & (array<=binning[i+1])).astype(float) )
-        #tmp_array = (binning[i]<array) & (array<binning[i+1])
-        #print(tmp_array)
-        pass
-
-    #print(np.shape(binarized_bin_indices[0]))
-
-    return binarized_bin_indices
-#def find_bin(element,binning):
-#
-#    binNum=-1 # underflow and overflow
-#    for i in range(len(binning)-1):
-#        if binning[i]<element and element<binning[i+1]: binNum=i
-#        pass
-#
-#    return binNum
-
-def get_bin_indices(p_var,boundaries):
-    bin_indices=list()
-    #print("hi=",boundaries[0],np.where( p_var<boundaries[0] )[0])
-    bin_indices.append (np.where( p_var<=boundaries[0] )[0])
-    for idx in range(len(boundaries)-1):
-        #print("lo, hi=",boundaries[idx],":",boundaries[idx+1])
-        bin_indices.append (np.where( (boundaries[idx]<p_var) & (p_var<=boundaries[idx+1]) )[0])
-        #bin_indices.append (np.where( (boundaries[idx]<=p_var) & (p_var<boundaries[idx+1]) & (isnan(p_var)) )[0])
-        pass
-    #print("lo=",boundaries[len(boundaries)-1],np.where( boundaries[len(boundaries)-1]<p_var )[0])
-    bin_indices.append (np.where( boundaries[len(boundaries)-1]<p_var )[0])
-    #print(len(bin_indices),len(boundaries))
-
-    tmp_idx=0
-    total=0
-    #total=len(bin_indices[0])
-    #print("hi=",boundaries[0],bin_indices[0],len(bin_indices[0]),total)
-
-    debug=False
-    for bin_idx in bin_indices:
-        total+=len(bin_idx)
-
-        if debug:
-            if tmp_idx==0:
-                print("hi=",boundaries[tmp_idx],bin_idx,len(bin_idx),total)
-            elif tmp_idx==len(bin_indices)-1:
-                print("lo=",boundaries[tmp_idx-1],bin_idx,len(bin_idx),total)
-            else:
-                print("lo,hi=[",boundaries[tmp_idx-1],",",boundaries[tmp_idx],"]",bin_idx,len(bin_idx),total)
-                pass
-            pass
-
-        tmp_idx+=1
-        pass
-    total+=len(bin_indices[-1])
-    #print("lo=",boundaries[-1],bin_indices[-1],len(bin_indices[-1]),total)
-
-    return bin_indices
-
-def getMaxContents(binContents):
-
-    maxContents = np.full(len(binContents[0]),-1.)
-    for i_bin in range(len(binContents[0])):
-        for i in range(len(binContents)):
-            if binContents[i][i_bin] > maxContents[i_bin]: maxContents[i_bin] = binContents[i][i_bin]
-            pass
-        pass
-    #print("maxContens=",maxContents)
-
-    return maxContents
-
-#def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
-def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='outputs/',ref_var='pt'):
-    if weight_type=="none": return None
-
-    print("-------------------------------")
-    print("generate_weights: sample weight mode \"",weight_type,"\" designated. Generating weights.",)
-    print("-------------------------------\n")
-
-    binning=[0,10,20,30,40,60,80,100,130,180,250,500]
-    labels=['sig','bkg']
-    colors=['blue','red']
-    binContents=[0,0]
-    if nClass==6:
-        #below 2b implemented
-        labels=['sig','chf','conv','hf','eg','lf']
-        colors=['blue','orange','green','red','purple','brown']
-        binContents=[0,0,0,0,0,0]
-        pass
-
-    variable=list()                          #only for specific label
-    variable_array = train_data['p_et_calo'] #entire set
-    if   ref_var=='eta'  : variable_array = train_data['p_eta']
-    #elif ref_var=='pteta': variable_array = train_data['p_eta']
-
-    for i_class in range(nClass):
-        variable.append( variable_array[ train_labels==i_class ] )
-        (binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(variable[i_class])),label=labels[i_class],histtype='step',facecolor=colors[i_class])
-        #(binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(train_labels)),label=labels[i_class],histtype='step',facecolor=colors[i_class])
-        pass
-
-        if nClass>2: plt.yscale("log")
-        plt.savefig(output_dir+'/'+ref_var+"_bfrReweighting.png")
-    plt.clf() #clear figure
-
-    weights=list() #KM: currently implemented for the 2-class case only
-    if weight_type=="flattening":
-        for i in range(nClass): weights.append(np.average(binContents[i])/binContents[i] )
-    elif weight_type=="match2max": #shaping to whichever that has max in the corresponding bin
-        #for i in range(nClass): print("bincontens[",i,"]=",binContents[i])
-        maxContents = getMaxContents(binContents)#print(maxContents)
-        for i in range(nClass): weights.append( maxContents/binContents[i] )
-    elif weight_type=="match2b": #shaping sig to match the bkg, using pt,or any other designated variable
-        for i in range(nClass-1): weights.append(binContents[nClass-1]/binContents[i])
-        weights.append(np.ones(len(binContents[5])))
-    elif weight_type=="match2s": #shaping bkg to match the sig, using pt,or any other designated variable
-        weights.append(np.ones(len(binContents[0])))
-        for i in range (1, nClass): weights.append(binContents[0]/binContents[i])
-        pass
-
-    #KM: to replce inf with 0
-    for i in range(nClass): weights[i]=np.where(weights[i]==np.inf,0,weights[i]) #np.where(array1==0, 1, array1)
-
-    debug=0
-    if debug:
-        tmp_i=0
-        for weight in weights:
-            print("weights[",labels[tmp_i],"]=",weight)
-            tmp_i+=1
-        #print(weights[0])
-        #print(weights[1])
-        pass
-
-    #KM: Generates weights for all events
-    #    This is not very efficient, to be improved
-
-    #final_weights*=weights[train_labels][1]
-
-    class_weight=list()
-    for i in range(nClass): class_weight.append( np.full(len(variable_array),0,dtype=float) )
-    final_weights= np.full(len(variable_array),0,dtype=float)
-    #sig_weight=np.full(len(variable_array),0,dtype=float)
-    #bkg_weight=np.full(len(variable_array),0,dtype=float)
-
-    #To produce vectors of 0 or 1 for given pt ranges
-    bin_indices0or1=find_bin(variable_array,binning)
-    tmp_i=0 # pt bin index
-    for vec01 in bin_indices0or1:
-        #KM: this line is the most important to calculate the weights for al events
-        for i in range(nClass): class_weight[i] += (vec01 * (train_labels==i) )* weights[i][tmp_i]
-        #sig_weight += (vec01 * (train_labels==0) )* weights[0][tmp_i]
-        #bkg_weight += (vec01 * (train_labels==1) )* weights[1][tmp_i]
-        tmp_i+=1
-        pass
-
-    if debug:
-        print()
-        #print(sig_weight,"\n", bkg_weight)
-        tmp_i=0
-        for i in range(nClass):
-            print("class_weight[",tmp_i,"]=",class_weight[i])
-            tmp_i+=1
-            pass
-        #print("final_weights=",final_weights) #print(final_weights,final_weights.all()==1) # w
-        print("train_labels=",train_labels)
-        pass
-
-    for i in range(nClass): final_weights+=class_weight[i]
-
-    if debug:
-        print("variable_array=",variable_array)
-        print(final_weights, len(final_weights), "any element is zero?",final_weights.any()==0)
-        pass
-
-    #KM: below only for plotting
-    for i_class in range(nClass):
-        plt.hist(variable[i_class],bins=binning,weights=final_weights[ train_labels==i_class ],label=labels[i_class],histtype='step',facecolor=colors[i_class])
-        #weights = final_weights[ train_labels==i_class ]/len(train_labels)
-        #plt.hist(variable[i_class],bins=binning, weights=weights, label=labels[i_class],histtype='step',facecolor=colors[i_class])
-        pass
-    if nClass>2: plt.yscale("log")
-    plt.savefig(output_dir+'/'+ref_var+"_aftReweighting.png")
-    plt.clf() #clear plot
-
-    return final_weights
-
-
-
-
 #################################################################################
 ##### classifier.py functions ###################################################
 #################################################################################
@@ -632,22 +442,25 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         table   = zip(classes, train_ratios, valid_ratios)
         print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
     else:
-        valid_pred = np.argmax(valid_probs, axis=1) if valid_probs != [] else valid_labels
-        matrix     = metrics.confusion_matrix(valid_labels, valid_pred)
-        matrix     = 100*matrix.T/matrix.sum(axis=1)
-        classes    = ['CLASS '+str(n) for n in range(n_classes)]
+        valid_pred  = np.argmax(valid_probs, axis=1) if valid_probs != [] else valid_labels
+        matrix      = metrics.confusion_matrix(valid_labels, valid_pred)
+        matrix      = 100 * matrix.T / matrix.sum(axis=1)
+        pred_ratios = matrix @ valid_ratios / 100
+        #pred_ratios = [100*np.sum(valid_pred==n)/len(valid_pred) for n in range(n_classes)]
+        classes = ['CLASS '+str(n) for n in range(n_classes)]
         if n_classes > 2:
-            headers = ['CLASS #', 'TRAIN', 'VALID'] + classes
-            table   = [classes] + [train_ratios] + [valid_ratios] + matrix.T.tolist()
+            headers = ['CLASS #', 'TRAIN', 'VALID'] + classes + ['       VALID']
+            table   = [classes] + [train_ratios] + [valid_ratios] + matrix.tolist() + [pred_ratios]
             table   = list(map(list, zip(*table)))
-            print_dict[2]  = '+'+31*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+'+\n| CLASS DISTRIBUTIONS (%)'
-            print_dict[2] += '       | VALID SAMPLE PREDICTIONS (%)      '+12*(n_classes-3)*' '+ '|\n'
+            print_dict[2]  = '+'+31*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+ '+'+16*'-'+  '+\n'
+            print_dict[2] += '| CLASS DISTRIBUTIONS (%)       | VALID SAMPLE PREDICTIONS (%)      '
+            print_dict[2] += 12*(n_classes-3)*' ' + '| PREDICTIONS (%)|\n'
         else:
             headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)', 'ACC. (%)']
             table   = zip(classes, train_ratios, valid_ratios, matrix.diagonal())
             print_dict[2]  = '+----------------------------------------------------+\n'
             print_dict[2] += '| CLASS DISTRIBUTIONS AND VALID SAMPLE ACCURACIES    |\n'
-        valid_accuracy = np.array(valid_ratios) @ np.array(matrix.diagonal())/100
+        valid_accuracy = valid_ratios @ matrix.diagonal() /100
         print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
 
@@ -811,7 +624,7 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg):
     def class_weights(sig_list, optimal_bkg=None):
         weights = np.ones(n_classes)
         if optimal_bkg != None:
-            for n in np.arange(n_classes):
+            for n in range(n_classes):
                 if n not in sig_list and n != optimal_bkg: weights[n] = 0
         if optimal_bkg == 'bkg':
             weights = class_ratios(labels)
@@ -980,11 +793,11 @@ def print_channels(sample, labels, col=2, reverse=True):
 
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #for key in sample: print(key, sample[key].shape); sys.exit()
-    #verify_sample(sample); sys.exit()
-    #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
+    verify_sample(sample); sys.exit()
+    sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
-    #from utils import print_channels
-    #print_channels(sample, labels)
+    from utils import print_channels
+    print_channels(sample, labels)
     # DISTRIBUTION HEATMAPS
     from plots_DG import plot_heatmaps
     plot_heatmaps(sample, labels, output_dir); sys.exit()
@@ -996,17 +809,6 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
                #'lar_endcap_Lr0',  'lar_endcap_Lr1',  'lar_endcap_Lr2',  'lar_endcap_Lr3',
                                  'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
     cal_images(sample, labels, layers, output_dir, mode='mean', soft=True)
-    # TRACKS DISTRIBUTIONS
-    #from plots_DG import plot_tracks
-    #arguments = [(sample['tracks'], labels, key,) for key in ['efrac','deta','dphi','d0','z0']]
-    #processes = [mp.Process(target=plot_tracks, args=arg) for arg in arguments]
-    #for job in processes: job.start()
-    #for job in processes: job.join()
-    # SCALARS DISTRIBUTIONS
-    #from plots_DG import plot_scalars
-    #sample_trans = sample.copy()
-    #sample_trans = apply_scaler(sample_trans, scalars, scaler_file)#[0]
-    #for key in ['p_qd0Sig', 'p_sct_weight_charge']: plot_scalars(sample, sample_trans, key)
 
 
 def feature_removal(scalars, images, groups, index):
@@ -1253,3 +1055,198 @@ def file_mixing(h5_file, LF_file, index, replace_data=False):
         data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
         print( 'Mixing file', h5_file.split('/')[-1], 'with feature', key )
         data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
+
+
+
+
+#################################################################################
+#####    Kazuya functions    ####################################################
+#################################################################################
+
+
+def find_bin(array,binning):
+
+    binarized_bin_indices=list()
+    for i in range(len(binning)-1):
+        binarized_bin_indices.append( ((binning[i]<array) & (array<=binning[i+1])).astype(float) )
+        #tmp_array = (binning[i]<array) & (array<binning[i+1])
+        #print(tmp_array)
+        pass
+
+    #print(np.shape(binarized_bin_indices[0]))
+
+    return binarized_bin_indices
+#def find_bin(element,binning):
+#
+#    binNum=-1 # underflow and overflow
+#    for i in range(len(binning)-1):
+#        if binning[i]<element and element<binning[i+1]: binNum=i
+#        pass
+#
+#    return binNum
+
+def get_bin_indices(p_var,boundaries):
+    bin_indices=list()
+    #print("hi=",boundaries[0],np.where( p_var<boundaries[0] )[0])
+    bin_indices.append (np.where( p_var<=boundaries[0] )[0])
+    for idx in range(len(boundaries)-1):
+        #print("lo, hi=",boundaries[idx],":",boundaries[idx+1])
+        bin_indices.append (np.where( (boundaries[idx]<p_var) & (p_var<=boundaries[idx+1]) )[0])
+        #bin_indices.append (np.where( (boundaries[idx]<=p_var) & (p_var<boundaries[idx+1]) & (isnan(p_var)) )[0])
+        pass
+    #print("lo=",boundaries[len(boundaries)-1],np.where( boundaries[len(boundaries)-1]<p_var )[0])
+    bin_indices.append (np.where( boundaries[len(boundaries)-1]<p_var )[0])
+    #print(len(bin_indices),len(boundaries))
+
+    tmp_idx=0
+    total=0
+    #total=len(bin_indices[0])
+    #print("hi=",boundaries[0],bin_indices[0],len(bin_indices[0]),total)
+
+    debug=False
+    for bin_idx in bin_indices:
+        total+=len(bin_idx)
+
+        if debug:
+            if tmp_idx==0:
+                print("hi=",boundaries[tmp_idx],bin_idx,len(bin_idx),total)
+            elif tmp_idx==len(bin_indices)-1:
+                print("lo=",boundaries[tmp_idx-1],bin_idx,len(bin_idx),total)
+            else:
+                print("lo,hi=[",boundaries[tmp_idx-1],",",boundaries[tmp_idx],"]",bin_idx,len(bin_idx),total)
+                pass
+            pass
+
+        tmp_idx+=1
+        pass
+    total+=len(bin_indices[-1])
+    #print("lo=",boundaries[-1],bin_indices[-1],len(bin_indices[-1]),total)
+
+    return bin_indices
+
+def getMaxContents(binContents):
+
+    maxContents = np.full(len(binContents[0]),-1.)
+    for i_bin in range(len(binContents[0])):
+        for i in range(len(binContents)):
+            if binContents[i][i_bin] > maxContents[i_bin]: maxContents[i_bin] = binContents[i][i_bin]
+            pass
+        pass
+    #print("maxContens=",maxContents)
+
+    return maxContents
+
+#def generate_weights(train_data,train_labels,nClass,weight_type='none',ref_var='pt',output_dir='outputs/'):
+def sample_weights(train_data,train_labels,nClass,weight_type,output_dir='outputs/',ref_var='pt'):
+    if weight_type=="none": return None
+
+    print("-------------------------------")
+    print("generate_weights: sample weight mode \"",weight_type,"\" designated. Generating weights.",)
+    print("-------------------------------\n")
+
+    binning=[0,10,20,30,40,60,80,100,130,180,250,500]
+    labels=['sig','bkg']
+    colors=['blue','red']
+    binContents=[0,0]
+    if nClass==6:
+        #below 2b implemented
+        labels=['sig','chf','conv','hf','eg','lf']
+        colors=['blue','orange','green','red','purple','brown']
+        binContents=[0,0,0,0,0,0]
+        pass
+
+    variable=list()                          #only for specific label
+    variable_array = train_data['p_et_calo'] #entire set
+    if   ref_var=='eta'  : variable_array = train_data['p_eta']
+    #elif ref_var=='pteta': variable_array = train_data['p_eta']
+
+    for i_class in range(nClass):
+        variable.append( variable_array[ train_labels==i_class ] )
+        (binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(variable[i_class])),label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        #(binContents[i_class],bins,patches)=plt.hist(variable[i_class],bins=binning,weights=np.full(len(variable[i_class]),1/len(train_labels)),label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        pass
+
+        if nClass>2: plt.yscale("log")
+        plt.savefig(output_dir+'/'+ref_var+"_bfrReweighting.png")
+    plt.clf() #clear figure
+
+    weights=list() #KM: currently implemented for the 2-class case only
+    if weight_type=="flattening":
+        for i in range(nClass): weights.append(np.average(binContents[i])/binContents[i] )
+    elif weight_type=="match2max": #shaping to whichever that has max in the corresponding bin
+        #for i in range(nClass): print("bincontens[",i,"]=",binContents[i])
+        maxContents = getMaxContents(binContents)#print(maxContents)
+        for i in range(nClass): weights.append( maxContents/binContents[i] )
+    elif weight_type=="match2b": #shaping sig to match the bkg, using pt,or any other designated variable
+        for i in range(nClass-1): weights.append(binContents[nClass-1]/binContents[i])
+        weights.append(np.ones(len(binContents[5])))
+    elif weight_type=="match2s": #shaping bkg to match the sig, using pt,or any other designated variable
+        weights.append(np.ones(len(binContents[0])))
+        for i in range (1, nClass): weights.append(binContents[0]/binContents[i])
+        pass
+
+    #KM: to replce inf with 0
+    for i in range(nClass): weights[i]=np.where(weights[i]==np.inf,0,weights[i]) #np.where(array1==0, 1, array1)
+
+    debug=0
+    if debug:
+        tmp_i=0
+        for weight in weights:
+            print("weights[",labels[tmp_i],"]=",weight)
+            tmp_i+=1
+        #print(weights[0])
+        #print(weights[1])
+        pass
+
+    #KM: Generates weights for all events
+    #    This is not very efficient, to be improved
+
+    #final_weights*=weights[train_labels][1]
+
+    class_weight=list()
+    for i in range(nClass): class_weight.append( np.full(len(variable_array),0,dtype=float) )
+    final_weights= np.full(len(variable_array),0,dtype=float)
+    #sig_weight=np.full(len(variable_array),0,dtype=float)
+    #bkg_weight=np.full(len(variable_array),0,dtype=float)
+
+    #To produce vectors of 0 or 1 for given pt ranges
+    bin_indices0or1=find_bin(variable_array,binning)
+    tmp_i=0 # pt bin index
+    for vec01 in bin_indices0or1:
+        #KM: this line is the most important to calculate the weights for al events
+        for i in range(nClass): class_weight[i] += (vec01 * (train_labels==i) )* weights[i][tmp_i]
+        #sig_weight += (vec01 * (train_labels==0) )* weights[0][tmp_i]
+        #bkg_weight += (vec01 * (train_labels==1) )* weights[1][tmp_i]
+        tmp_i+=1
+        pass
+
+    if debug:
+        print()
+        #print(sig_weight,"\n", bkg_weight)
+        tmp_i=0
+        for i in range(nClass):
+            print("class_weight[",tmp_i,"]=",class_weight[i])
+            tmp_i+=1
+            pass
+        #print("final_weights=",final_weights) #print(final_weights,final_weights.all()==1) # w
+        print("train_labels=",train_labels)
+        pass
+
+    for i in range(nClass): final_weights+=class_weight[i]
+
+    if debug:
+        print("variable_array=",variable_array)
+        print(final_weights, len(final_weights), "any element is zero?",final_weights.any()==0)
+        pass
+
+    #KM: below only for plotting
+    for i_class in range(nClass):
+        plt.hist(variable[i_class],bins=binning,weights=final_weights[ train_labels==i_class ],label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        #weights = final_weights[ train_labels==i_class ]/len(train_labels)
+        #plt.hist(variable[i_class],bins=binning, weights=weights, label=labels[i_class],histtype='step',facecolor=colors[i_class])
+        pass
+    if nClass>2: plt.yscale("log")
+    plt.savefig(output_dir+'/'+ref_var+"_aftReweighting.png")
+    plt.clf() #clear plot
+
+    return final_weights
