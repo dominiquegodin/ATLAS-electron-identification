@@ -6,9 +6,9 @@ from   argparse  import ArgumentParser
 from   tabulate  import tabulate
 from   itertools import accumulate
 from   utils     import get_dataset, validation, make_sample, merge_samples, sample_composition
-from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_weights, sample_weights
-from   utils     import cross_valid, valid_results, sample_analysis, sample_histograms, Batch_Generator
-from   utils     import feature_removal, feature_ranking, fit_scaler, apply_scaler, fit_t_scaler, apply_t_scaler
+from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_weights, Batch_Generator
+from   utils     import cross_valid, valid_results, sample_analysis, feature_removal, feature_ranking
+from   utils     import sample_histograms, fit_scaler, apply_scaler, fit_t_scaler, apply_t_scaler
 from   models    import callback, create_model
 #os.system('nvidia-modprobe -u -c=0') # for atlas15
 

@@ -46,14 +46,16 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
             outputs = Dropout(dropout)                                                             (outputs)
         output_list += [outputs]
     #SCALARS
+    #for key in set(scalars)-{'tracks'}: output_list += [Flatten()(input_dict[key])]
     outputs = [Flatten()(input_dict[key]) for key in scalars if key!='tracks']
-    outputs = concatenate(outputs)
-    for n_neurons in []:#[200, 200]:
-        outputs = Dense(n_neurons, kernel_regularizer=regularizer)                                 (outputs)
-        if batchNorm: outputs = BatchNormalization()                                               (outputs)
-        outputs = LeakyReLU(alpha=0)                                                               (outputs)
-        outputs = Dropout(dropout)                                                                 (outputs)
-    output_list += [outputs]
+    if len(outputs) != 0:
+        outputs = concatenate(outputs)
+        for n_neurons in []:#[200, 200]:
+            outputs = Dense(n_neurons, kernel_regularizer=regularizer)                             (outputs)
+            if batchNorm: outputs = BatchNormalization()                                           (outputs)
+            outputs = LeakyReLU(alpha=0)                                                           (outputs)
+            outputs = Dropout(dropout)                                                             (outputs)
+        output_list += [outputs]
     #CONCATENATION TO FCN
     outputs = concatenate(output_list) if len(output_list)>1 else output_list[0]
     for n_neurons in FCN_neurons:
