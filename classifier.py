@@ -134,7 +134,7 @@ if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.ou
         if args.valid_cuts == '': args.valid_cuts  = valid_cuts
         else                    : args.valid_cuts  = valid_cuts + '& ('+args.valid_cuts+')'
     inputs = {'scalars':scalars, 'images':[], 'others':others}
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, args.n_etypes,
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
                data_files, inputs, args.valid_cuts, args.sep_bkg, args.runDiffPlots)
 elif args.results_in != '': print('\nOption --results_in not matching any file --> aborting\n')
 if   args.results_in != '': sys.exit()
@@ -253,7 +253,8 @@ else:
         valid_gen   = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, n_classes,
                                       valid_batch_size, args.valid_cuts, scaler, t_scaler, shuffle='OFF')
         valid_probs = model.predict(valid_gen, verbose=args.verbose)
-    else: valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
+    else:
+        valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
 bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, args.n_etypes, training,
                         args.output_dir, args.plotting, args.sep_bkg, args.runDiffPlots)
 if '.pkl' in args.results_out:
@@ -264,7 +265,9 @@ if '.pkl' in args.results_out:
         except IOError: print('FILE ACCESS CONFLICT FOR', removed_feature, '--> SKIPPING FILE ACCESS\n')
         feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[])
     else:
-        if args.n_folds > 1 and False: valid_data = (np.float16(valid_probs),)
-        else: valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
+        if args.n_folds > 1 and False:
+            valid_data = (np.float16(valid_probs),)
+        else:
+            valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
         pickle.dump(valid_data, open(args.results_out,'wb'), protocol=4)
     print('\nValidation results saved to:', args.results_out, '\n')

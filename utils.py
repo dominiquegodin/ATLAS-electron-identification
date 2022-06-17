@@ -211,7 +211,7 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     labels[ sample[iffTruth] ==  3                                                   ] = 1
     labels[ sample[iffTruth] ==  5                                                   ] = 2
     labels[(sample[iffTruth] ==  8) | (sample[iffTruth ] ==  9)                      ] = 3
-    labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  0)                      ] = 4
+    labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  1)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
@@ -445,6 +445,7 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         valid_pred  = np.argmax(valid_probs, axis=1) if valid_probs != [] else valid_labels
         matrix      = metrics.confusion_matrix(valid_labels, valid_pred)
         matrix      = 100 * matrix.T / matrix.sum(axis=1)
+        """ Predictions ratios """
         pred_ratios = matrix @ valid_ratios / 100
         #pred_ratios = [100*np.sum(valid_pred==n)/len(valid_pred) for n in range(n_classes)]
         classes = ['CLASS '+str(n) for n in range(n_classes)]
@@ -465,7 +466,7 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
 
 
-def validation(output_dir, results_in, plotting, n_valid, n_etypes, data_files,
+def validation(output_dir, results_in, plotting, n_valid, data_files,
                inputs, valid_cuts, sep_bkg, diff_plots):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
@@ -496,6 +497,7 @@ def validation(output_dir, results_in, plotting, n_valid, n_etypes, data_files,
     if len(labels) == n_e: print('')
     else: print('('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
     #multi_cuts(sample, labels, probs, output_dir); sys.exit()
+    n_etypes = len(np.unique(labels))
     valid_results(sample, labels, probs, [], n_etypes, None, output_dir, plotting, sep_bkg, diff_plots); print()
     #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
 
@@ -563,7 +565,6 @@ def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, in
         print(ROC_values)
         keys       = ['bkg']#list(range(1,probs.shape[1]))+['bkg']
         ROC_values = dict(zip(keys, ROC_values[:,1].reshape(len(keys),-1)))
-    #sys.exit()
 
     weigths_list = [np.array(class_ratios(labels)[1:])] + [n for n in ROC_values['bkg']]
     disc_list    = [probs[:,0]/(probs[:,0]+(probs[:,1:]@weights)) for weights in weigths_list]
@@ -902,7 +903,7 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
 
 def resize_images(images_array, target_shape=(7,11)):
     if images_array.shape[1:] == target_shape: return images_array
-    else: return transform.resize(images_array, ( (len(images_array),) + target_shape))
+    else: return transform.resize(images_array, ((len(images_array),)+target_shape))
 
 
 def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
@@ -916,7 +917,6 @@ def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
     tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
     p_tracks    = ['p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof',
                    'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0']
-    #if p == 'p_': tracks += [sample[key][idx] for key in p_tracks]
     if p == 'p_':
         for key in p_tracks:
             try: tracks += [sample[key][idx]]
@@ -947,7 +947,8 @@ def get_truth_m(sample, new=True, m_e=0.511, max_eta=4.9):
 
 
 def merge_presamples(output_dir, output_file):
-    h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file and '.h5' in h5_file]
+    #h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file and '.h5' in h5_file]
+    h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'myTag' in h5_file and '.h5' in h5_file]
     if len(h5_files) == 0: sys.exit()
     np.random.seed(0); np.random.shuffle(h5_files)
     idx = np.cumsum([len(h5py.File(output_dir+'/'+h5_file, 'r')['eventNumber']) for h5_file in h5_files])
@@ -960,7 +961,9 @@ def merge_presamples(output_dir, output_file):
     for h5_file in h5_files[1:]:
         data  = h5py.File(output_dir+'/'+h5_file, 'r')
         index = h5_files.index(h5_file)
-        for key in dataset: dataset[key][idx[index-1]:idx[index]] = data[key]
+        for key in dataset:
+            if dataset[key].dtype != 'object':
+                dataset[key][idx[index-1]:idx[index]] = data[key]
         data.close(); os.remove(output_dir+'/'+h5_file)
         print('.', end='', flush=True)
     print(' (', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s) -->', idx[-1], 'ELECTRONS COLLECTED\n')
@@ -974,7 +977,8 @@ def get_idx(size, start_value=0, n_sets=5):
 
 def mix_presamples(n_files, n_tasks, output_dir):
     data_files = get_dataset()
-    #for path in data_files: print(path)
+    #for key,val in h5py.File(data_files[0],'r').items():
+    #    print(key, val.shape)
     #sys.exit()
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     n_e      = [len(h5py.File(h5_file,'r')['eventNumber']) for h5_file in data_files]
@@ -1013,15 +1017,17 @@ def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
 
 def mix_datafiles():
     data_files = get_dataset()
-    #for path in data_files: print(path)
-    #print()
     LF_path  = '/opt/tmp/godin/e-ID_data/presamples/LF_data'
     LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
-    arguments  = [(data_files[index], LF_files[index], index) for index in range(len(data_files))]
+    #for index in range(len(data_files))[:30]:
+    #    print(data_files[index])
+    #    print(LF_files[index])
+    #sys.exit()
+    arguments  = [(data_files[index], LF_files[index], index) for index in range(len(data_files))[30:]]
     processes  = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
     for job in processes: job.start()
     for job in processes: job.join()
-def file_mixing(h5_file, LF_file, index, replace_data=False):
+def file_mixing(h5_file, LF_file, index, replace_data=True):
     output_dir = h5_file[0:h5_file.rfind('/')] + '/outputs'
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     features  = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
@@ -1046,14 +1052,14 @@ def file_mixing(h5_file, LF_file, index, replace_data=False):
             # Removing light flavor MC
             #data_in = np.delete(data_in, MC_criteria, axis=0)
             # Replacing light flavor MC
-            np.put(data_in, MC_idx, np.take(LF_data[key], LF_idx, axis=0))
+            data_in[MC_idx] = np.take(LF_data[key], LF_idx, axis=0)
             # Labelling light flavor data
             if key == 'p_iffTruth' : data_in = np.where(MC_criteria, 10, data_in )
             if key == 'p_TruthType': data_in = np.where(MC_criteria,  1, data_in )
         dtype   = np.int32 if data_in.dtype=='int32' else np.float16
         chunks  = (2000,) + data_in.shape[1:]
         data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
-        print( 'Mixing file', h5_file.split('/')[-1], 'with feature', key )
+        print( 'Mixing file', h5_file.split('/')[-2]+'/'+h5_file.split('/')[-1], 'with feature', key )
         data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
 
 
