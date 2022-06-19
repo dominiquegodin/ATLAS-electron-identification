@@ -258,7 +258,7 @@ def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, scaler
         for n in samples: n.pop(key)
     indices = np.where( np.logical_and(labels!=-1, eval(cuts) if cuts!='' else True) )[0]
     sample, labels, _ = sample_cuts(sample, labels, cuts=cuts, verbose='ON')
-    if scaler != None: sample = apply_scaler(sample, input_data['scalars'], scaler, verbose='ON')
+    if   scaler != None: sample = apply_scaler(sample, input_data['scalars'], scaler, verbose='ON')
     if t_scaler != None: sample = apply_t_scaler(sample, t_scaler, verbose='ON')
     else: print()
     return sample, labels, indices
@@ -616,7 +616,7 @@ def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_f
         #for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
         for n in np.arange(n_classes): np.put(valid_probs[:,n], indices, probs[:,n])
     print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
-    return valid_sprobs
+    return valid_probs
 
 
 def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg):

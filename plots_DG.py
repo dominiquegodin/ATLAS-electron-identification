@@ -246,8 +246,8 @@ def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separati
 def performance_ratio(sample, y_true, y_prob, bkg, output_dir, ECIDS=False, output_tag='CNN2LLH'):
     #eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
     #pt_bins  = [4, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 80, 150, 250]
-    #eta_bins = [0, 0.6, 1.15, 1.37, 1.52, 2.01, 2.47]
-    eta_bins = [0, 2.47]
+    eta_bins = [0, 0.6, 1.15, 1.37, 1.52, 2.01, 2.47]
+    #eta_bins = [0, 2.47]
     pt_bins  = [4.5, 10, 20, 30, 40, 60, 80, 5000]
     ratios = {wp:ratio_meshgrid(sample, y_true, y_prob, wp, output_dir, eta_bins, pt_bins)
               for wp in ['loose','medium','tight']}
@@ -348,7 +348,7 @@ def bin_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, col
     plt.xticks(np.arange(len(eta_bins)), eta_bins)
     plt.yticks(np.arange(len( pt_bins)), (pt_bins[:-1]+[r'$\infty$']) if pt_bins[-1]>=1e3 else pt_bins)
     for x in range(len(eta_bins)-1):
-        for y in range(len( pt_bins)-1):
+        for y in range(len(pt_bins)-1):
             text = 'Ind' if ratios[y,x]==0 else format(ratios[y,x],'.1f')
             plt.text(x+0.5, y+0.5, text, {'color':color, 'fontsize':18}, ha='center', va='center')
     plt.grid(True, color="grey", lw=1, alpha=1)

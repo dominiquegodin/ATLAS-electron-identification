@@ -147,7 +147,7 @@ n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU'
 model  = create_model(n_classes, sample, args.NN_type, args.FCN_neurons, CNN,
                       args.l2, args.dropout, train_data, n_gpus)
 train_batch_size = max(1,n_gpus) * args.batch_size
-valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(2e4))
+valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(20e3))
 
 
 # ARGUMENTS AND VARIABLES SUMMARY
@@ -176,15 +176,17 @@ if os.path.isfile(args.model_in):
 if args.scaling and os.path.isfile(args.scaler_in):
     print('Loading quantile transform from', args.scaler_in, '\n')
     scaler = pickle.load(open(args.scaler_in, 'rb'))
-else: scaler = None
+else:
+    scaler = None
 if args.t_scaling and os.path.isfile(args.t_scaler_in):
     print('Loading tracks scaler from ', args.t_scaler_in, '\n')
     t_scaler = pickle.load(open(args.t_scaler_in, 'rb'))
-else: t_scaler = None
+else:
+    t_scaler = None
 print('LOADING', np.diff(args.n_valid)[0], 'VALIDATION SAMPLES')
 inputs = {'scalars':scalars, 'images':[], 'others':others} if args.generator == 'ON' else input_data
-valid_scaler   = None if args.generator=='ON' and args.n_epochs>0 else scaler
-valid_t_scaler = None if args.generator=='ON' and args.n_epochs>0 else t_scaler
+valid_scaler   = None if args.generator=='ON' else scaler
+valid_t_scaler = None if args.generator=='ON' else t_scaler
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks,
                                               n_classes, args.valid_cuts, valid_scaler, valid_t_scaler)
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.output_dir); sys.exit()

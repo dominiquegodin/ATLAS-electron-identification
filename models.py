@@ -68,9 +68,8 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
 
 
 def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, train_var, n_gpus):
-    devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3','/gpu:4', '/gpu:5', '/gpu:6', '/gpu:7']
     tf.debugging.set_log_device_placement(False)
-    strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
+    strategy = tf.distribute.MirroredStrategy(devices=['/gpu:'+str(n) for n in range(n_gpus)])
     with strategy.scope():
         if tf.__version__ >= '2.1.0':
             mixed_precision.experimental.set_policy('mixed_float16')

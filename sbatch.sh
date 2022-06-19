@@ -45,4 +45,4 @@ else
 fi
 
 mkdir -p outputs/log_files
-mv *.out log_files 2>/dev/null
+mv *.out outputs/log_files 2>/dev/null
