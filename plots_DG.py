@@ -185,7 +185,7 @@ def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separati
         h = np.full((len(bins)-1,n_classes), 0.)
         from utils import make_labels
         class_labels = make_labels(sample, n_classes)
-        for n in label_dict:
+        for n in np.unique(class_labels):
             class_probs   = y_prob[class_labels==n]
             class_weights = len(class_probs)*[100/len(y_true)] #len(class_probs)*[100/len(class_probs)]
             h[:,n] = pylab.hist(class_probs, bins=bins, label=label_dict[n], histtype='step',
@@ -200,7 +200,7 @@ def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separati
                 sig_ratio = np.sum(y_true==0)/len(new_y_true)
                 max_index = np.argmax(sig_ratio*tpr + (1-fpr)*(1-sig_ratio))
                 axes.axvline(threshold[max_index], ymin=0, ymax=1, ls='--', lw=1, color=colors[n])
-        for n in set(label_dict)-set([0]):
+        for n in set(np.unique(class_labels))-set([0]):
             print_JSD(h[:,0], h[:,n], n, colors[n], str(n))
         if n_classes > 2:
             print_JSD(h[:,0], np.sum(h[:,1:], axis=1), n_classes, 'black', '\mathrm{bkg}')
@@ -540,7 +540,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         plt.scatter( 100*best_tpr, 100*max(accuracy), s=40, marker='o', c=val[0].get_color(),
                      label="{0:<10s} {1:>5.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
-    file_name = output_dir+'/ROC'+str(ROC_type)+'_curve.png'
+    file_name = output_dir+'/ROC_curve_'+str(ROC_type)+'.png'
     print('Saving test sample ROC'+str(ROC_type)+' curve to   :', file_name); plt.savefig(file_name)
 
 

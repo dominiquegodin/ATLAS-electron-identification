@@ -422,40 +422,41 @@ def sample_composition(sample):
     print('   |  100 %  |\n' + dash + '\n')
 
 
-def class_ratios(labels):
+def class_ratios(labels, n_etypes):
     def get_ratios(labels, n, return_dict): return_dict[n] = 100*np.sum(labels==n)/len(labels)
-    manager   =  mp.Manager(); return_dict = manager.dict(); n_classes = max(labels) +1
-    processes = [mp.Process(target=get_ratios, args=(labels, n, return_dict)) for n in range(n_classes)]
+    manager = mp.Manager(); return_dict = manager.dict()
+    processes = [mp.Process(target=get_ratios, args=(labels, n, return_dict)) for n in range(n_etypes)]
     for job in processes: job.start()
     for job in processes: job.join()
-    return [return_dict[n] for n in range(n_classes)]
+    return [return_dict[n] for n in range(n_etypes)]
 
 
-def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
-    n_classes    = np.max(valid_labels) +1
-    classes      = ['CLASS '+str(n) for n in range(n_classes)]
-    valid_ratios = class_ratios(valid_labels)
-    train_ratios = class_ratios(train_labels) if train_labels != [] else n_classes*['n/a']
-    if valid_probs == []:
+def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=None):
+    if n_etypes is None: n_etypes = len(np.unique(valid_labels))
+    classes      = ['CLASS '+str(n) for n in range(n_etypes)]
+    valid_ratios = class_ratios(valid_labels, n_etypes)
+    train_ratios = class_ratios(train_labels, n_etypes) if train_labels is not None else n_etypes*['n/a']
+    if valid_probs is None:
         print('+---------------------------------------+\n| CLASS DISTRIBUTIONS'+19*' '+'|')
         headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)']
         table   = zip(classes, train_ratios, valid_ratios)
         print(tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f"))
     else:
-        valid_pred  = np.argmax(valid_probs, axis=1) if valid_probs != [] else valid_labels
-        matrix      = metrics.confusion_matrix(valid_labels, valid_pred)
-        matrix      = 100 * matrix.T / matrix.sum(axis=1)
+        valid_preds = np.argmax(valid_probs, axis=1) if valid_probs is not None else valid_labels
+        #matrix = metrics.confusion_matrix(valid_labels, valid_preds)
+        #matrix = 100 * matrix.T / matrix.sum(axis=1)
+        matrix = 100*metrics.confusion_matrix(valid_labels, valid_preds, normalize='true').T
         """ Predictions ratios """
         pred_ratios = matrix @ valid_ratios / 100
-        #pred_ratios = [100*np.sum(valid_pred==n)/len(valid_pred) for n in range(n_classes)]
-        classes = ['CLASS '+str(n) for n in range(n_classes)]
-        if n_classes > 2:
+        #pred_ratios = [100*np.sum(valid_preds==n)/len(valid_preds) for n in range(n_etypes)]
+        classes = ['CLASS '+str(n) for n in range(n_etypes)]
+        if n_etypes > 2:
             headers = ['CLASS #', 'TRAIN', 'VALID'] + classes + ['       VALID']
             table   = [classes] + [train_ratios] + [valid_ratios] + matrix.tolist() + [pred_ratios]
             table   = list(map(list, zip(*table)))
-            print_dict[2]  = '+'+31*'-'+'+'+35*'-'+12*(n_classes-3)*'-'+ '+'+16*'-'+  '+\n'
+            print_dict[2]  = '+'+31*'-'+'+'+35*'-'+12*(n_etypes-3)*'-'+ '+'+16*'-'+  '+\n'
             print_dict[2] += '| CLASS DISTRIBUTIONS (%)       | VALID SAMPLE PREDICTIONS (%)      '
-            print_dict[2] += 12*(n_classes-3)*' ' + '| PREDICTIONS (%)|\n'
+            print_dict[2] += 12*(n_etypes-3)*' ' + '| PREDICTIONS (%)|\n'
         else:
             headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)', 'ACC. (%)']
             table   = zip(classes, train_ratios, valid_ratios, matrix.diagonal())
@@ -464,10 +465,11 @@ def compo_matrix(valid_labels, train_labels=[], valid_probs=[]):
         valid_accuracy = valid_ratios @ matrix.diagonal() /100
         print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
+        return valid_ratios
 
 
-def validation(output_dir, results_in, plotting, n_valid, data_files,
-               inputs, valid_cuts, sep_bkg, diff_plots):
+def validation(output_dir, results_in, plotting, n_valid, n_etypes,
+               data_files, inputs, valid_cuts, sep_bkg, diff_plots):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
@@ -497,8 +499,8 @@ def validation(output_dir, results_in, plotting, n_valid, data_files,
     if len(labels) == n_e: print('')
     else: print('('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
     #multi_cuts(sample, labels, probs, output_dir); sys.exit()
-    n_etypes = len(np.unique(labels))
-    valid_results(sample, labels, probs, [], n_etypes, None, output_dir, plotting, sep_bkg, diff_plots); print()
+    valid_results(sample, labels, probs, None, n_etypes, None, output_dir, plotting, sep_bkg, diff_plots)
+    print()
     #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
 
 
@@ -582,43 +584,6 @@ def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, in
     #for job in processes: job.join()
 
 
-def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_files, n_valid,
-                input_data, n_tracks, valid_cuts, model, generator='OFF', verbose=1):
-    print('########################################################################'  )
-    print('##### STARTING '+str(n_folds)+'-FOLD CROSS-VALIDATION ################################'  )
-    print('########################################################################\n')
-    n_classes    = max(valid_labels)+1
-    valid_probs  = np.full(valid_labels.shape + (n_classes,), -1.)
-    event_number = valid_sample['eventNumber']
-    for fold_number in np.arange(1, n_folds+1):
-        print('FOLD '+str(fold_number)+'/'+str(n_folds), 'EVALUATION')
-        weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
-        scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
-        print('Loading pre-trained weights from', weight_file)
-        model.load_weights(weight_file); start_time = time.time()
-        indices =               np.where(event_number%n_folds==fold_number-1)[0]
-        labels  =           valid_labels[event_number%n_folds==fold_number-1]
-        sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
-        if scalars != [] and os.path.isfile(scaler_file):
-            print('Loading scalars scaler from', scaler_file)
-            scaler = pickle.load(open(scaler_file, 'rb'))
-            sample = apply_scaler(sample, scalars, scaler, verbose='ON')
-        print('\033[FCLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
-        if generator == 'ON':
-            valid_cuts = '(sample["eventNumber"]%'+str(n_folds)+'=='+str(fold_number-1)+')'
-            valid_gen  = Batch_Generator(data_files, n_valid, input_data, n_tracks, n_classes,
-                                         batch_size=20000, cuts=valid_cuts, scaler=scaler)
-            probs = model.predict(valid_gen, workers=4, verbose=verbose)
-        else: probs = model.predict(sample, batch_size=20000, verbose=verbose)
-        print('FOLD '+str(fold_number)+'/'+str(n_folds)+' ACCURACY: ', end='')
-        print(format(100*valid_accuracy(labels, probs), '.2f'), end='')
-        print(' % (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
-        #for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
-        for n in np.arange(n_classes): np.put(valid_probs[:,n], indices, probs[:,n])
-    print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
-    return valid_probs
-
-
 def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg):
     n_classes = probs.shape[1]
     from functools import reduce
@@ -628,7 +593,7 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg):
             for n in range(n_classes):
                 if n not in sig_list and n != optimal_bkg: weights[n] = 0
         if optimal_bkg == 'bkg':
-            weights = class_ratios(labels)
+            weights = class_ratios(labels, n_etypes)
         return weights
     if n_classes > 2:
         """ Multi-class discriminant """
@@ -666,7 +631,7 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
 def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
                   sig_list, bkg, return_dict, separation=True, ECIDS=True):
     sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg)
-    if False: pickle.dump((sample,labels,probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
+    #pickle.dump((sample, labels, probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
     if plotting == 'ON':
         ECIDS = ECIDS and bkg==1
         output_dir += '/'+'class_0_vs_'+str(bkg)
@@ -674,28 +639,28 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
         #performance_ratio(sample, labels, probs[:,0], bkg, output_dir)
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
-        processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
+        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
+        #processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
-        compo_matrix(labels, [], probs)
+        compo_matrix(labels, None, probs)
         print_performance(labels, probs)
     return_dict[bkg] = print_dict
 
 
-def valid_results(sample, labels, probs, train_labels, n_etypes, training,
-                  output_dir, plotting, sep_bkg, diff_plots):
-    global print_dict; print_dict = {n:'' for n in [1,2,3]}
+def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etypes,
+                  training, output_dir, plotting, sep_bkg, diff_plots):
+    global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
     """ Plotting efficiciency ratios mesh grid """
-    print(); compo_matrix(labels, train_labels, probs); print(print_dict[2])
-    sig_list = [0]
-    bkg_list = ['bkg'] + list(set(np.arange(n_etypes))-set(sig_list)) if sep_bkg=='ON' else ['bkg']
+    valid_ratios = compo_matrix(valid_labels, train_labels, valid_probs, n_etypes); print(print_dict[2])
+    sig_list  = [0]
+    bkg_list  = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg=='ON' else ['bkg']
     manager   = mp.Manager(); return_dict = manager.dict()
-    arguments = [(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg, return_dict)
-                 for bkg in bkg_list]
+    arguments = [(valid_sample, valid_labels, valid_probs, n_etypes, plotting,
+                  output_dir, sig_list, bkg, return_dict) for bkg in bkg_list]
     processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
-    if training != None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
+    if training is not None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
     for job in processes: job.start()
     for job in processes: job.join()
     """ Background rejection extraction for feature ranking """
@@ -706,22 +671,59 @@ def valid_results(sample, labels, probs, train_labels, n_etypes, training,
     if plotting == 'ON' and diff_plots:
         eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
         pt_boundaries   = [10, 20, 30, 40, 60, 100, 200, 500]
-        eta, pt         = sample['eta'], sample['pt']
+        eta, pt         = valid_sample['eta'], valid_sample['pt']
         eta_bin_indices = get_bin_indices(eta, eta_boundaries)
         pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
-        plot_distributions_KM(labels, eta, 'eta', output_dir=output_dir)
-        plot_distributions_KM(labels, pt , 'pt' , output_dir=output_dir)
-        tmp_llh      = sample['p_LHValue']
+        plot_distributions_KM(valid_labels, eta, 'eta', output_dir=output_dir)
+        plot_distributions_KM(valid_labels, pt , 'pt' , output_dir=output_dir)
+        tmp_llh      = valid_sample['p_LHValue']
         tmp_llh_pair = np.zeros(len(tmp_llh))
         prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
         print('\nEvaluating differential performance in eta')
-        differential_plots(sample, labels, probs, eta_boundaries,
+        differential_plots(valid_sample, valid_labels, valid_probs, eta_boundaries,
                            eta_bin_indices, varname='eta', output_dir=output_dir)
         print('\nEvaluating differential performance in pt')
-        differential_plots(sample, labels, probs, pt_boundaries,
+        differential_plots(valid_sample, valid_labels, valid_probs, pt_boundaries,
                            pt_bin_indices,  varname='pt',  output_dir=output_dir)
-        differential_plots(sample, labels, prob_LLH   , pt_boundaries,
+        differential_plots(valid_sample, valid_labels, prob_LLH   , pt_boundaries,
                            pt_bin_indices,  varname='pt',  output_dir=output_dir, evalLLH=True)
+
+
+def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_files, n_valid,
+                input_data, n_tracks, valid_cuts, model, generator='OFF', verbose=1):
+    print('########################################################################'  )
+    print('##### STARTING '+str(n_folds)+'-FOLD CROSS-VALIDATION ################################'  )
+    print('########################################################################\n')
+    n_classes    = max(valid_labels)+1
+    valid_probs  = np.full(valid_labels.shape + (n_classes,), -1.)
+    event_number = valid_sample['eventNumber']
+    for fold_number in np.arange(1, n_folds+1):
+        print('FOLD '+str(fold_number)+'/'+str(n_folds), 'EVALUATION')
+        weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
+        scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
+        print('Loading pre-trained weights from', weight_file)
+        model.load_weights(weight_file); start_time = time.time()
+        indices =               np.where(event_number%n_folds==fold_number-1)[0]
+        labels  =           valid_labels[event_number%n_folds==fold_number-1]
+        sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
+        if scalars != [] and os.path.isfile(scaler_file):
+            print('Loading scalars scaler from', scaler_file)
+            scaler = pickle.load(open(scaler_file, 'rb'))
+            sample = apply_scaler(sample, scalars, scaler, verbose='ON')
+        print('\033[FCLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
+        if generator == 'ON':
+            valid_cuts = '(sample["eventNumber"]%'+str(n_folds)+'=='+str(fold_number-1)+')'
+            valid_gen  = Batch_Generator(data_files, n_valid, input_data, n_tracks, n_classes,
+                                         batch_size=20000, cuts=valid_cuts, scaler=scaler)
+            probs = model.predict(valid_gen, workers=4, verbose=verbose)
+        else: probs = model.predict(sample, batch_size=20000, verbose=verbose)
+        print('FOLD '+str(fold_number)+'/'+str(n_folds)+' ACCURACY: ', end='')
+        print(format(100*valid_accuracy(labels, probs), '.2f'), end='')
+        print(' % (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
+        #for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
+        for n in np.arange(n_classes): np.put(valid_probs[:,n], indices, probs[:,n])
+    print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
+    return valid_probs
 
 
 def verify_sample(sample):
@@ -786,7 +788,7 @@ def print_channels(sample, labels, col=2, reverse=True):
                    423202:'direct:Jpsie3e13'   , 423211:'np:bb --> Jpsie3e8', 423212:'np:bb --> Jpsie3e13',
                    423300:'JF17'               , 423301:'JF23'              , 423302:'JF35', 423303:'JF50'}
     channels = sample['mcChannelNumber']; headers = ['Channel', 'Process', 'Number']
-    #channels = channels[labels==1]
+    #channels = channels[labels==4]
     channel_dict.update({n:'unknown' for n in set(channels)-set(channel_dict.keys())})
     channels = sorted([[n, channel_dict[n], int(np.sum(channels==n))] for n in set(channels)], key=getkey)
     print(tabulate(channels[::-1] if reverse else channels, headers=headers, tablefmt='psql')); sys.exit()
@@ -797,7 +799,6 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     verify_sample(sample); sys.exit()
     sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
-    from utils import print_channels
     print_channels(sample, labels)
     # DISTRIBUTION HEATMAPS
     from plots_DG import plot_heatmaps
@@ -813,8 +814,10 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
 
 
 def feature_removal(scalars, images, groups, index):
-    if   index <= 0: return scalars, images, 'none'
-    elif index  > len(scalars+images+groups): sys.exit()
+    if   index <= 0:
+        return scalars, images, 'none'
+    elif index >  len(scalars+images+groups):
+        sys.exit()
     elif index <= len(scalars+images):
         #removed_feature = (scalars+images)[index-1]
         removed_feature = dict(zip(np.arange(1, len(scalars+images)+1), scalars+images))[index]

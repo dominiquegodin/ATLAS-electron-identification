@@ -119,7 +119,7 @@ args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
 if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 if args.n_eval != 0: args.n_eval = [args.n_valid[0], min(args.n_valid[1],args.n_valid[0]+args.n_eval)]
-else               : args.n_eval = args.n_valid
+else               : args.n_eval =  args.n_valid
 #args.train_cuts = '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
 #args.valid_cuts = '(sample["pt"] > 4.5) & (sample["pt"] < 20)'
 #args.train_cuts = '((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)'
@@ -134,7 +134,7 @@ if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.ou
         if args.valid_cuts == '': args.valid_cuts  = valid_cuts
         else                    : args.valid_cuts  = valid_cuts + '& ('+args.valid_cuts+')'
     inputs = {'scalars':scalars, 'images':[], 'others':others}
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, args.n_etypes,
                data_files, inputs, args.valid_cuts, args.sep_bkg, args.runDiffPlots)
 elif args.results_in != '': print('\nOption --results_in not matching any file --> aborting\n')
 if   args.results_in != '': sys.exit()
@@ -203,11 +203,11 @@ if args.n_epochs > 0:
     for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
-    print('\nUsing TensorFlow', tf.__version__                               )
-    print(  'Using'           , n_gpus, 'GPU(s)'                             )
-    print(  'Using'           , args.NN_type, 'architecture with', end=' '   )
-    print([key for key in train_data if train_data[key] != []], '\n'         )
-    print('LOADING', np.diff(args.n_train)[0], 'TRAINING SAMPLES'            )
+    print('\nUsing TensorFlow', tf.__version__                            )
+    print(  'Using'           , n_gpus, 'GPU(s)'                          )
+    print(  'Using'           , args.NN_type, 'architecture with', end=' ')
+    print([key for key in train_data if train_data[key] != []], '\n'      )
+    print('LOADING', np.diff(args.n_train)[0], 'TRAINING SAMPLES'         )
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
                                                            n_classes, args.train_cuts)
     if args.scaling:
@@ -238,11 +238,12 @@ if args.n_epochs > 0:
     else:
         eval_sample = {key:valid_sample[key][:args.n_eval[1]-args.n_valid[0]] for key in valid_sample}
         eval_labels =      valid_labels     [:args.n_eval[1]-args.n_valid[0]]
-        training    = model.fit( train_sample, train_labels, validation_data=(eval_sample,eval_labels),
-                                 callbacks=callbacks, sample_weight=train_weights, batch_size=train_batch_size,
-                                 epochs=args.n_epochs, verbose=args.verbose )
+        training = model.fit( train_sample, train_labels, validation_data=(eval_sample,eval_labels),
+                              callbacks=callbacks, sample_weight=train_weights, batch_size=train_batch_size,
+                              epochs=args.n_epochs, verbose=args.verbose )
     model.load_weights(args.model_out); print()
-else: train_labels = []; training = None
+else:
+    train_labels = None; training = None
 
 
 # RESULTS AND PLOTTING SECTION
