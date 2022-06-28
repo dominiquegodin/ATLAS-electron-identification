@@ -393,7 +393,18 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                'tight+ECIDS', 'medium+ECIDS', 'loose+ECIDS']
     markers = 3*['o'] + 3*['D']
     sig_eff, bkg_eff = '$\epsilon_{\operatorname{sig}}$', '$\epsilon_{\operatorname{bkg}}$'
-    plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+    fig = plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+
+    axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(axis="both", pad=8, labelsize=15)
+    #axes.tick_params(axis="both", labelsize=15)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        axes.spines[axis].set_linewidth(1.5)
+        axes.spines[axis].set_color('black')
+
     if ROC_type == 1:
         pylab.grid(False)
         len_0 = np.sum(fpr==0)
@@ -426,8 +437,8 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         yticks = plt.yticks()[0]
         axes.yaxis.set_ticks( np.append([1], yticks[1:]) )
         axes.yaxis.set_minor_locator(FixedLocator(np.arange(yticks[1]/5, yticks[-1], yticks[1]/5 )))
-        plt.xlabel(sig_eff+' (%)', fontsize=25)
-        plt.ylabel('1/'+bkg_eff, fontsize=25)
+        plt.xlabel(sig_eff+' (%)', fontsize=25, loc='right')
+        plt.ylabel('1/'+bkg_eff  , fontsize=25, loc='top')
         #label = '{$w_{\operatorname{bkg}}$} = {$f_{\operatorname{bkg}}$}'
         P, = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='#1f77b4', lw=2, zorder=10)
         if combine_plots:
@@ -469,7 +480,6 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                          +'$\epsilon_{\operatorname{bkg}}^{\operatorname{NN}}$='
                          +format(LLH_fpr[n]*LLH_scores[n], '>.1f')
                          +' ('+labels[n]+')' )
-        axes.tick_params(axis='both', which='major', labelsize=12)
         plt.legend(loc='upper right', fontsize=13 if ECIDS else 14, numpoints=3,
                    facecolor='ghostwhite', framealpha=1).set_zorder(10)
         if combine_plots: plt.gca().add_artist(L)
@@ -541,6 +551,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                      label="{0:<10s} {1:>5.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC_curve_'+str(ROC_type)+'.png'
+    plt.tight_layout()
     print('Saving test sample ROC'+str(ROC_type)+' curve to   :', file_name); plt.savefig(file_name)
 
 
