@@ -381,9 +381,9 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
     #    fpr_full, tpr_full = ROC_values[0][:,index], ROC_values[0][:,0]
     #    fpr     , tpr      = ROC_values[1][:,index], ROC_values[1][:,0]
     else:
-        #if ECIDS: y_prob = sample['p_ECIDSResult']
-        #y_prob = y_prob + (sample['p_ECIDSResult']/2 +0.5)
-        fpr, tpr, threshold = metrics.roc_curve(y_true, y_prob, pos_label=0)
+        fpr, tpr, thresholds = metrics.roc_curve(y_true, y_prob, pos_label=0)
+        fpr_0 = np.sum(fpr==0)
+        fpr, tpr, thresholds = fpr[fpr_0:], tpr[fpr_0:], thresholds[fpr_0:]
         pickle.dump({'fpr':fpr, 'tpr':tpr}, open(output_dir+'/'+'pos_rates.pkl','wb'), protocol=4)
     signal_ratio       = np.sum(y_true==0)/len(y_true)
     accuracy           = tpr*signal_ratio + (1-fpr)*(1-signal_ratio)
@@ -394,25 +394,22 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
     markers = 3*['o'] + 3*['D']
     sig_eff, bkg_eff = '$\epsilon_{\operatorname{sig}}$', '$\epsilon_{\operatorname{bkg}}$'
     fig = plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
-
     axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
                      bottom=True, top=True, left=True, right=True)
     axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
                      bottom=True, top=True, left=True, right=True)
     axes.tick_params(axis="both", pad=8, labelsize=15)
-    #axes.tick_params(axis="both", labelsize=15)
     for axis in ['top', 'bottom', 'left', 'right']:
         axes.spines[axis].set_linewidth(1.5)
         axes.spines[axis].set_color('black')
-
     if ROC_type == 1:
         pylab.grid(False)
-        len_0 = np.sum(fpr==0)
         x_min = min(80, 10*np.floor(10*min(LLH_tpr)))
         if fpr[np.argwhere(tpr >= x_min/100)[0]] != 0:
             y_max = 10*np.ceil( 1/min(np.append(fpr[tpr >= x_min/100], min(LLH_fpr)))/10 )
             if y_max > 200: y_max = 100*(np.ceil(y_max/100))
-        else: y_max = 1000*np.ceil(max(1/fpr[len_0:])/1000)
+        else:
+            y_max = 1000*np.ceil(max(1/fpr)/1000)
         plt.xlim([x_min, 100]); plt.ylim([1, y_max])
         #LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]][0] for value in LLH_tpr]
         #LLH_scores = [1/fpr[np.argmin(abs(tpr-value))] for value in LLH_tpr]
@@ -440,20 +437,31 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         plt.xlabel(sig_eff+' (%)', fontsize=25, loc='right')
         plt.ylabel('1/'+bkg_eff  , fontsize=25, loc='top')
         #label = '{$w_{\operatorname{bkg}}$} = {$f_{\operatorname{bkg}}$}'
-        P, = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='#1f77b4', lw=2, zorder=10)
+        P, = plt.plot(100*tpr, 1/fpr, color='#1f77b4', lw=2, zorder=10)
+        n_sig, n_bkg = np.sum(y_true==0), np.sum(y_true==1)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            lim_inf = 1/(fpr + np.sqrt(fpr/n_bkg) )
+            lim_sup = 1/(fpr - np.sqrt(fpr/n_bkg) )
+        plt.fill_between(100*tpr, lim_inf, lim_sup, alpha=0.2)
         if combine_plots:
             def get_legends(n_zip, output_dir):
-                file_path, ls = n_zip
+                file_path, color, ls = n_zip
                 file_path += '/' + output_dir.split('/')[-1] + '/pos_rates.pkl'
                 fpr, tpr = pickle.load(open(file_path, 'rb')).values()
-                len_0 = np.sum(fpr==0)
-                P, = plt.plot(100*tpr[len_0:], 1/fpr[len_0:], color='tab:gray', lw=2, ls=ls, zorder=10)
+                fpr_0 = np.sum(fpr==0)
+                fpr, tpr = fpr[fpr_0:], tpr[fpr_0:]
+                P, = plt.plot(100*tpr, 1/fpr, color=color, lw=2, ls=ls, zorder=10)
+                lim_inf = 1/( fpr + np.sqrt(fpr/n_bkg) )
+                lim_sup = 1/( fpr - np.sqrt(fpr/n_bkg) )
+                plt.fill_between(100*tpr, lim_inf, lim_sup, alpha=0.2)
                 return P
             file_paths = ['outputs/6c_180m_match2class0/scalars_only/bkg_optimal',
                           'outputs/2c_180m_match2class0/scalars+images']
-            linestyles = ['--', ':']
+            linestyles = ['-', '-']
+            color_list = ['tab:orange', 'tab:green']
             leg_labels = ['HLV+images (6-class)', 'HLV only (6-class)', 'HLV+images (2-class)']
-            Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,linestyles)]
+            Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,color_list,linestyles)]
             L = plt.legend(Ps, leg_labels, loc='upper left', bbox_to_anchor=(0,1), fontsize=14,
                            facecolor='ghostwhite', framealpha=1); L.set_zorder(10)
         if ROC_values != None:
@@ -480,6 +488,12 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                          +'$\epsilon_{\operatorname{bkg}}^{\operatorname{NN}}$='
                          +format(LLH_fpr[n]*LLH_scores[n], '>.1f')
                          +' ('+labels[n]+')' )
+            lim_inf =  1/LLH_fpr[n] - 1/( LLH_fpr[n] + np.sqrt(LLH_fpr[n]/n_bkg) )
+            lim_sup = -1/LLH_fpr[n] + 1/( LLH_fpr[n] - np.sqrt(LLH_fpr[n]/n_bkg) )
+            plt.errorbar( 100*LLH_tpr[n], 1/LLH_fpr[n], yerr=[[lim_inf],[lim_sup]], ecolor=colors[n] )
+            lim_inf = np.sqrt(LLH_tpr[n]/n_sig)
+            lim_sup = np.sqrt(LLH_tpr[n]/n_sig)
+            plt.errorbar( 100*LLH_tpr[n], 1/LLH_fpr[n], xerr=[[lim_inf],[lim_sup]], ecolor=colors[n] )
         plt.legend(loc='upper right', fontsize=13 if ECIDS else 14, numpoints=3,
                    facecolor='ghostwhite', framealpha=1).set_zorder(10)
         if combine_plots: plt.gca().add_artist(L)
@@ -506,13 +520,13 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
     if ROC_type == 3:
         def make_plot(location):
             plt.xlabel('Signal probability threshold (%)', fontsize=25); plt.ylabel('(%)',fontsize=25)
-            val_1 = plt.plot(threshold[1:],   tpr[1:], color='tab:blue'  , label='Signal Efficiency'   , lw=2)
-            val_2 = plt.plot(threshold[1:], 1-fpr[1:], color='tab:orange', label='Background Rejection', lw=2)
-            val_3 = plt.plot(threshold[1:], accuracy[1:], color='black'  , label='Accuracy', zorder=10 , lw=2)
+            val_1 = plt.plot(thresholds[1:],   tpr[1:], color='tab:blue'  , label='Signal Efficiency'   , lw=2)
+            val_2 = plt.plot(thresholds[1:], 1-fpr[1:], color='tab:orange', label='Background Rejection', lw=2)
+            val_3 = plt.plot(thresholds[1:], accuracy[1:], color='black'  , label='Accuracy', zorder=10 , lw=2)
             for LLH in zip(LLH_tpr, LLH_fpr):
-                p1 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], LLH[0],
+                p1 = plt.scatter(thresholds[np.argwhere(tpr>=LLH[0])[0]], LLH[0],
                                  s=40, marker='o', c=val_1[0].get_color())
-                p2 = plt.scatter(threshold[np.argwhere(tpr>=LLH[0])[0]], 1-LLH[1],
+                p2 = plt.scatter(thresholds[np.argwhere(tpr>=LLH[0])[0]], 1-LLH[1],
                                  s=40, marker='o', c=val_2[0].get_color())
             l1 = plt.legend([p1, p2], ['LLH '+sig_eff, 'LLH $1\!-\!$'+bkg_eff], loc='lower left', fontsize=13)
             plt.scatter( best_threshold, max(accuracy), s=40, marker='o', c=val_3[0].get_color(),
@@ -654,13 +668,17 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
                 vmax = np.max(image_dict[(e_class,key)])
             plot_image(100*image_dict[(e_class,key)], n_classes, e_class, layers, key, 100*vmax, soft)
     wspace = -0.1 if n_classes == 2 else 0.2
+    wspace = -0.4
     fig.subplots_adjust(left=0.05, top=0.95, bottom=0.05, right=0.95, hspace=0.6, wspace=wspace)
+    plt.tight_layout()
     fig.savefig(file_name); sys.exit()
 
 
 def plot_image(image, n_classes, e_class, layers, key, vmax, soft=True):
+    #class_dict = {0:'iso electron',  1:'charge flip' , 2:'photon conversion', 3:'b/c hadron',
+    #              4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
     class_dict = {0:'iso electron',  1:'charge flip' , 2:'photon conversion', 3:'b/c hadron',
-                  4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
+                  4:'light flavor'}
     layer_dict = {'em_barrel_Lr0'     :'presampler'            , 'em_barrel_Lr1'  :'EM cal $1^{st}$ layer' ,
                   'em_barrel_Lr1_fine':'EM cal $1^{st}$ layer' , 'em_barrel_Lr2'  :'EM cal $2^{nd}$ layer' ,
                   'em_barrel_Lr3'     :'EM cal $3^{rd}$ layer' , 'tile_barrel_Lr1':'had cal $1^{st}$ layer',
@@ -672,7 +690,8 @@ def plot_image(image, n_classes, e_class, layers, key, vmax, soft=True):
     plt.subplot(n_layers, n_classes, plot_idx)
     #title   = class_dict[e_class]+'\n('+layer_dict[key]+')'
     #title   = layer_dict[key]+'\n('+class_dict[e_class]+')'
-    title   = class_dict[e_class]+'\n('+str(key)+')'
+    #title   = class_dict[e_class]+'\n('+str(key)+')'
+    title   = key
     limits  = [-0.13499031, 0.1349903, -0.088, 0.088]
     x_label = '$\phi$'                             if e_layer == n_layers-1 else ''
     x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer == n_layers-1 else []
