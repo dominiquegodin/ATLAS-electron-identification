@@ -93,7 +93,8 @@ images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_
 others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
            'p_vertexIndex'  , 'p_charge'   , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin' ,
-           'correctedAverageMu', 'p_firstEgMotherPdgId'                                                   ]
+           'p_firstEgMotherPdgId'          , 'p_numberOfSCTHits'           , 'p_numberOfPixelHits'        ,
+           'p_ambiguityType'               , 'averageInteractionsPerCrossing'                             ]
 
 
 # DATASET AND TRAINING DICTIONARY
@@ -123,7 +124,16 @@ else               : args.n_eval =  args.n_valid
 #args.train_cuts = '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
 #args.valid_cuts = '(sample["pt"] > 4.5) & (sample["pt"] < 20)'
 #args.train_cuts = '((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)'
-#args.valid_cuts = '((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)'
+gen_cuts  =    '(sample["mcChannelNumber"]!=423107) & (sample["mcChannelNumber"]!=423108)'
+gen_cuts += ' & (sample["mcChannelNumber"]!=423109) & (sample["mcChannelNumber"]!=423110)'
+gen_cuts += ' & (sample["mcChannelNumber"]!=423111) & (sample["mcChannelNumber"]!=423112)'
+if args.train_cuts == '': args.train_cuts  = gen_cuts
+else                    : args.train_cuts += '& ' + gen_cuts
+if args.valid_cuts == '': args.valid_cuts  = gen_cuts
+else                    : args.valid_cuts += '& ' + gen_cuts
+args.valid_cuts += ' & (sample["p_numberOfSCTHits"]+sample["p_numberOfPixelHits"]>=7)'
+args.valid_cuts += ' & (sample["p_numberOfPixelHits"]>=2)'
+args.valid_cuts += ' & (sample["p_ambiguityType"]<=4)'
 
 
 # OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
@@ -151,13 +161,23 @@ valid_batch_size = max(1,n_gpus) * max(args.batch_size, int(20e3))
 
 
 # ARGUMENTS AND VARIABLES SUMMARY
-args.scaling = args.scaling == 'ON' and list(set(scalars)-{'tracks'}) != []
+args.scaling   = args.scaling   == 'ON' and list(set(scalars)-{'tracks'}) != []
 args.t_scaling = args.t_scaling == 'ON' and 'tracks' in scalars+images
 if args.NN_type == 'CNN':
     print('\nCNN ARCHITECTURE:')
     for shape in [shape for shape in CNN if shape in [sample[key].shape[1:] for key in sample]]:
         print(format(str(shape),'>8s')+':', str(CNN[shape]))
-print('\nPROGRAM ARGUMENTS:'); print(tabulate(vars(args).items(), tablefmt='psql'))
+print('\nPROGRAM ARGUMENTS:')
+args_dict = vars(args).copy()
+train_cuts = args_dict['train_cuts'].split('&')
+if len(train_cuts) > 1:
+    for n in range(len(train_cuts)): args_dict['train_cuts ('+str(n+1)+')'] = train_cuts[n]
+    args_dict.pop('train_cuts')
+valid_cuts = args_dict['valid_cuts'].split('&')
+if len(valid_cuts) > 1:
+    for n in range(len(valid_cuts)): args_dict['valid_cuts ('+str(n+1)+')'] = valid_cuts[n]
+    args_dict.pop('valid_cuts')
+print(tabulate(args_dict.items(), tablefmt='psql'))
 print('\nTRAINING VARIABLES:')
 headers = [           key  for key in train_data if train_data[key]!=[]]
 table   = [train_data[key] for key in train_data if train_data[key]!=[]]
@@ -203,11 +223,11 @@ if args.n_epochs > 0:
     for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
-    print('\nUsing TensorFlow', tf.__version__                            )
-    print(  'Using'           , n_gpus, 'GPU(s)'                          )
-    print(  'Using'           , args.NN_type, 'architecture with', end=' ')
-    print([key for key in train_data if train_data[key] != []], '\n'      )
-    print('LOADING', np.diff(args.n_train)[0], 'TRAINING SAMPLES'         )
+    print('Using TensorFlow', tf.__version__                            )
+    print('Using'           , n_gpus, 'GPU(s)'                          )
+    print('Using'           , args.NN_type, 'architecture with', end=' ')
+    print([key for key in train_data if train_data[key] != []], '\n'    )
+    print('LOADING', np.diff(args.n_train)[0], 'TRAINING SAMPLES'       )
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
                                                            n_classes, args.train_cuts)
     if args.scaling:
@@ -271,6 +291,7 @@ if '.pkl' in args.results_out:
         if args.n_folds > 1 and False:
             valid_data = (np.float16(valid_probs),)
         else:
-            valid_data = ({key:valid_sample[key] for key in others+['eta','pt']}, valid_labels, valid_probs)
+            valid_keys = (set(valid_sample)-set(scalars)-set(images)) | set(others)
+            valid_data = ({key:valid_sample[key] for key in valid_keys}, valid_labels, valid_probs)
         pickle.dump(valid_data, open(args.results_out,'wb'), protocol=4)
     print('\nValidation results saved to:', args.results_out, '\n')

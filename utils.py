@@ -2,7 +2,7 @@ import tensorflow        as tf
 import numpy             as np
 import multiprocessing   as mp
 import matplotlib.pyplot as plt
-import os, sys, h5py, pickle, time
+import os, sys, h5py, pickle, time, itertools
 from   sklearn  import metrics, utils, preprocessing
 from   tabulate import tabulate
 from   skimage  import transform
@@ -154,12 +154,11 @@ def match_distributions(sample, labels, target_sample, target_labels):
 def get_dataset(host_name='lps', node_dir='', eta_region=''):
     if 'lps'    in host_name                   : node_dir = '/opt/tmp/godin/e-ID_data/presamples'
     if 'beluga' in host_name and node_dir == '': node_dir = '/project/def-arguinj/shared/e-ID_data'
-    if eta_region in ['0.0-1.3', '1.3-1.6', '1.6-2.5', '0.0-2.5', '0.0-2.5_data']:
+    if eta_region in ['0.0-1.3', '1.3-1.6', '1.6-2.5', '0.0-2.5', '0.0-2.5_mc', '0.0-2.5_data']:
         folder = node_dir+'/'+eta_region
         data_files = sorted([folder+'/'+h5_file for h5_file in os.listdir(folder) if 'e-ID_' in h5_file])
     else:
         barrel_dir, midgap_dir, endcap_dir = [node_dir+'/'+folder for folder in ['0.0-1.3', '1.3-1.6', '1.6-2.5']]
-        #barrel_dir, midgap_dir, endcap_dir = [folder+'/outputs' for folder in [barrel_dir, midgap_dir, endcap_dir]]
         barrel_files = sorted([barrel_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
         midgap_files = sorted([midgap_dir+'/'+h5_file for h5_file in os.listdir(midgap_dir) if 'e-ID_' in h5_file])
         endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(endcap_dir) if 'e-ID_' in h5_file])
@@ -167,8 +166,7 @@ def get_dataset(host_name='lps', node_dir='', eta_region=''):
     return data_files
 
 
-def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', prefix='p_'):
-    upsize_images = False; preprocess_images = False
+def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', prefix='p_', preprocess=False):
     scalars, images, others = input_data.values()
     if verbose == 'ON':
         print('Loading sample [', format(str(idx[0]),'>8s')+', '+format(str(idx[1]),'>8s'), end='] ')
@@ -176,7 +174,9 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
         start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in set(scalars+others)-{'tracks'}}
-        sample.update({'eta':sample['p_eta'], 'pt':sample['p_et_calo']})
+        sample.update({'eta'      :sample['p_eta']            , 'pt'       :sample['p_et_calo'],
+                       'SCTHits'  :sample['p_numberOfSCTHits'], 'pixelHits':sample['p_numberOfPixelHits'],
+                       'ambiguity':sample['p_ambiguityType']  , 'mu'       :sample['averageInteractionsPerCrossing']})
         for key in set(images)-{'tracks'}:
             try: sample[key] = data[key][idx[0]:idx[1]]
             except KeyError:
@@ -191,11 +191,9 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
     if tf.__version__ < '2.1.0':
         for key in set(sample)-set(others): sample[key] = np.float32(sample[key])
     if images == ['tracks']: sample['tracks'] = np.float32(sample['tracks'])
-    if upsize_images:
-        for key in images: sample[key] = resize_images(np.float32(sample[key]),target_shape=(56,11))
     labels = make_labels(sample, n_classes)
     if verbose == 'ON': print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    if preprocess_images and images != []: sample = process_images(sample, images, verbose)
+    if preprocess and images != []: sample = process_images(sample, images, verbose)
     return sample, labels
 
 
@@ -218,8 +216,8 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     if n_classes == 2:
         labels[labels >= 2] = 1
     if n_classes == 5:
-        #labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
-        labels[labels == 5] = 4                      #light flavor = egamma + hadrons
+        labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
+        #labels[labels == 5] = 4                      #light flavor = egamma + hadrons
     if match_to_vertex: labels[sample[vertexIndex] == -999] = -1
     return np.int8(labels)
 
@@ -300,12 +298,13 @@ def sample_cuts(sample, labels, weights=None, cuts='', verbose='OFF'):
             print('(' + format(100*len(labels)/length, '.2f') + ' %)')
     if cuts != '':
         length = len(labels)
-        labels = labels[eval(cuts)]
-        if np.all(weights) != None: weights = weights[eval(cuts)];
-        sample = {key:sample[key][eval(cuts)] for key in sample}
+        eval_cuts = eval(cuts)
+        labels = labels[eval_cuts]
+        if np.all(weights) != None: weights = weights[eval_cuts]
+        sample = {key:sample[key][eval_cuts] for key in sample}
         if verbose == 'ON':
             print('Applying features cuts -->', format(len(labels),'8d') ,'e conserved', end=' ')
-            print('(' + format(100*len(labels)/length,'.2f')+' %)\napplied cuts:', cuts)
+            print('(' + format(100*len(labels)/length,'.2f')+' %)\napplied cuts:', cuts.split('&')[0]+'& ...')
     return sample, labels, weights
 
 
@@ -406,7 +405,7 @@ def sample_composition(sample):
     ratios = np.round(1e4*ratios/len(MC_type))/100
     MC_empty, IFF_empty = np.where(np.sum(ratios, axis=0)==0)[0], np.where(np.sum(ratios, axis=1)==0)[0]
     MC_list,  IFF_list  = sorted(list(set(MC_list)-set(MC_empty))), sorted(list(set(IFF_list)-set(IFF_empty)))
-    print('IFFTRUTH AND TRUTHTYPE SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
+    print('IFFTRUTH AND TRUTHTYPE VALID SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
     dash = (26+7*len(MC_list))*'-'
     print(dash, format('\n| IFF \ MC |','10s'), end='')
     for col in MC_list:
@@ -633,14 +632,14 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
     sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg)
     #pickle.dump((sample, labels, probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
     if plotting == 'ON':
-        ECIDS = ECIDS and bkg==1
-        output_dir += '/'+'class_0_vs_'+str(bkg)
+        output_dir += '/'+'class_0vs'+str(bkg).title()
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
-        #performance_ratio(sample, labels, probs[:,0], bkg, output_dir)
+        #for iter_tuple in itertools.product( [False,True], ['CNN2LLH','CNN2CNN'] ):
+        #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
-        #processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
+        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
+        processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -763,7 +762,7 @@ def order_kernels(image_shape, n_maps, FCN_neurons, n_classes):
     return sorted(par_tuple)[::-1]
 
 
-def print_channels(sample, labels, col=2, reverse=True):
+def print_channels(sample, labels, col=0, reverse=False):
     def getkey(item): return item[col]
     channel_dict= {301000:'dyee 120-180'       , 301003:'dyee 400-600'      , 301004:'dyee 600-800'       ,
                    301009:'dyee 1750-2000'     , 301010:'dyee 2000-2250'    , 301012:'dyee 2500-2750'     ,
@@ -776,41 +775,41 @@ def print_channels(sample, labels, col=2, reverse=True):
                    361027:'dijet JZ7W'         , 361028:'dijet JZ8W'        , 361029:'dijet JZ9W'         ,
                    361100:'W+ --> ev'          , 361101:'W+ --> muv'        , 361102:'W+ --> tauv'        ,
                    361103:'W- --> ev'          , 361104:'W- --> muv'        , 361105:'W- --> tauv'        ,
-                   361106:'Z --> ee'           , 361108:'Z --> tautau'      , 361665:'dyee 10-60'         ,
+                   361106:'Z  --> ee'          , 361108:'Z  --> tautau'     , 361665:'dyee 10-60'         ,
                    410470:'ttbar nonhad'       , 410471:'ttbar allhad'      , 410644:'s top s-chan.'      ,
                    410645:'s top s-chan.'      , 410646:'s top Wt-chan.'    , 410647:'s top Wt-chan.'     ,
                    410658:'s top t-chan.'      , 410659:'s top t-chan.'     , 423099:'y+jets 8-17'        ,
                    423100:'y+jets 17-35'       , 423101:'y+jets 35-50'      , 423102:'y+jets 50-70'       ,
                    423103:'y+jets 70-140'      , 423104:'y+jets 140-280'    , 423105:'y+jets 280-500'     ,
                    423106:'y+jets 500-800'     , 423107:'y+jets 800-1000'   , 423108:'y+jets 1000-1500'   ,
-                   423109:'y+jets 1500-200'    , 423110:'y+jets 200-2500'   , 423111:'y+jets 2500-3000'   ,
+                   423109:'y+jets 1500-2000'   , 423110:'y+jets 2000-2500'  , 423111:'y+jets 2500-3000'   ,
                    423112:'y+jets 3000'        , 423200:'direct:Jpsie3e3'   , 423201:'direct:Jpsie3e8'    ,
                    423202:'direct:Jpsie3e13'   , 423211:'np:bb --> Jpsie3e8', 423212:'np:bb --> Jpsie3e13',
                    423300:'JF17'               , 423301:'JF23'              , 423302:'JF35', 423303:'JF50'}
-    channels = sample['mcChannelNumber']; headers = ['Channel', 'Process', 'Number']
+    channels = sample['mcChannelNumber']; headers = ['Sample ', 'Process', 'Number e']
     #channels = channels[labels==4]
     channel_dict.update({n:'unknown' for n in set(channels)-set(channel_dict.keys())})
-    channels = sorted([[n, channel_dict[n], int(np.sum(channels==n))] for n in set(channels)], key=getkey)
+    channels = sorted([[str(n)+' ', channel_dict[n], int(np.sum(channels==n))] for n in set(channels)], key=getkey)
     print(tabulate(channels[::-1] if reverse else channels, headers=headers, tablefmt='psql')); sys.exit()
 
 
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #for key in sample: print(key, sample[key].shape); sys.exit()
-    verify_sample(sample); sys.exit()
-    sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
+    #verify_sample(sample); sys.exit()
+    #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
-    print_channels(sample, labels)
+    #print_channels(sample, labels)
     # DISTRIBUTION HEATMAPS
-    from plots_DG import plot_heatmaps
-    plot_heatmaps(sample, labels, output_dir); sys.exit()
+    #from plots_DG import plot_heatmaps
+    #plot_heatmaps(sample, labels, output_dir); sys.exit()
     # CALORIMETER IMAGES
     from plots_DG import cal_images
-    layers  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3',
+    layers  = [ 'em_barrel_Lr0',   'em_barrel_Lr1_fine',   'em_barrel_Lr2',   'em_barrel_Lr3',
                #                    'tile_gap_Lr1'                                      ,
-               #'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3',
+               # 'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3',
                #'lar_endcap_Lr0',  'lar_endcap_Lr1',  'lar_endcap_Lr2',  'lar_endcap_Lr3',
                                  'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    cal_images(sample, labels, layers, output_dir, mode='mean', soft=True)
+    cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
 
 
 def feature_removal(scalars, images, groups, index):
@@ -928,8 +927,8 @@ def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
     tracks      = tracks[np.isfinite(np.sum(abs(tracks), axis=1))][:max_tracks,:]
     #tracks      = np.float16(np.clip(np.vstack(tracks).T,-5e4,5e4))[:max_tracks,:]
     if p == 'p_' and make_scalars:
-        tracks_means       = np.mean(tracks,axis=0) if len(tracks)!=0 else tracks.shape[1]*[0]
-        qd0Sig             = sample['p_charge'][idx] * sample['p_d0'][idx] / sample['p_sigmad0'][idx]
+        tracks_means = np.mean(tracks,axis=0) if len(tracks)!=0 else tracks.shape[1]*[0]
+        qd0Sig       = sample['p_charge'][idx] * sample['p_d0'][idx] / sample['p_sigmad0'][idx]
         if np.any(sample['p_tracks_scthits'][idx]!=0):
             sct_weight_charge  = sample['p_tracks_charge'][idx] @     sample['p_tracks_scthits'][idx]
             sct_weight_charge *= sample['p_charge'       ][idx] / sum(sample['p_tracks_scthits'][idx])
@@ -950,8 +949,8 @@ def get_truth_m(sample, new=True, m_e=0.511, max_eta=4.9):
 
 
 def merge_presamples(output_dir, output_file):
-    #h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file and '.h5' in h5_file]
-    h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'myTag' in h5_file and '.h5' in h5_file]
+    h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file and '.h5' in h5_file]
+    #h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'myTag' in h5_file and '.h5' in h5_file]
     if len(h5_files) == 0: sys.exit()
     np.random.seed(0); np.random.shuffle(h5_files)
     idx = np.cumsum([len(h5py.File(output_dir+'/'+h5_file, 'r')['eventNumber']) for h5_file in h5_files])
@@ -978,10 +977,57 @@ def get_idx(size, start_value=0, n_sets=5):
     return list(zip(idx_list[:-1], idx_list[1:]))
 
 
+def mix_datafiles():
+    data_files = get_dataset()
+    LF_path  = '/opt/tmp/godin/e-ID_data/presamples/LF_data'
+    LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
+    #for index in range(len(data_files)):
+    #    print(data_files[index])
+    #    print(LF_files[index])
+    #sys.exit()
+    arguments  = [(data_files[index], LF_files[index], index) for index in range(len(data_files))[:30]]
+    processes  = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
+    for job in processes: job.start()
+    for job in processes: job.join()
+def file_mixing(h5_file, LF_file, index, replace_data=False):
+    output_dir = h5_file[0:h5_file.rfind('/')] + '/outputs'
+    if not os.path.isdir(output_dir): os.mkdir(output_dir)
+    features  = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
+    MC_data   = h5py.File(h5_file,'r')
+    if replace_data:
+        # Light flavor indices in MC file
+        iffTruth  = MC_data['p_iffTruth' ][:]
+        TruthType = MC_data['p_TruthType'][:]
+        MC_criteria = np.logical_or.reduce([TruthType==4, TruthType==16, TruthType==17])
+        MC_criteria = np.logical_and(MC_criteria, iffTruth==10)
+        MC_idx  = np.where(MC_criteria)[0]
+        LF_data = h5py.File(LF_file,'r')
+        source_size = len(list(LF_data.values())[0])
+        target_size = np.sum(MC_criteria)
+        # Light flavor indices from data file
+        LF_idx = np.random.choice(source_size, target_size, replace=source_size<target_size)
+    for key in features:
+        attribute = 'w' if key==features[0] else 'a'
+        data_in  = MC_data[key][:]
+        data_out = h5py.File(output_dir+'/'+h5_file.split('/')[-1], attribute)
+        if replace_data:
+            # Removing light flavor MC
+            #data_in = np.delete(data_in, MC_criteria, axis=0)
+            # Replacing light flavor MC
+            data_in[MC_idx] = np.take(LF_data[key], LF_idx, axis=0)
+            # Labelling light flavor data
+            if key == 'p_iffTruth' : data_in = np.where(MC_criteria, 10, data_in )
+            if key == 'p_TruthType': data_in = np.where(MC_criteria,  1, data_in )
+        dtype   = np.int32 if data_in.dtype=='int32' else np.float16
+        chunks  = (2000,) + data_in.shape[1:]
+        data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
+        print( 'Mixing file', h5_file.split('/')[-2]+'/'+h5_file.split('/')[-1], 'with feature', key )
+        data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
+
+
 def mix_presamples(n_files, n_tasks, output_dir):
     data_files = get_dataset()
-    #for key,val in h5py.File(data_files[0],'r').items():
-    #    print(key, val.shape)
+    #for data_file in data_files: print(data_file)
     #sys.exit()
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     n_e      = [len(h5py.File(h5_file,'r')['eventNumber']) for h5_file in data_files]
@@ -1016,54 +1062,6 @@ def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
         data.create_dataset(key, shape, maxshape=maxshape, dtype=dtype, compression='lzf', chunks=chunks)
         data[key][:] = utils.shuffle(sample, random_state=0)
         print( file_idx.index(out_idx), key)
-
-
-def mix_datafiles():
-    data_files = get_dataset()
-    LF_path  = '/opt/tmp/godin/e-ID_data/presamples/LF_data'
-    LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
-    #for index in range(len(data_files))[:30]:
-    #    print(data_files[index])
-    #    print(LF_files[index])
-    #sys.exit()
-    arguments  = [(data_files[index], LF_files[index], index) for index in range(len(data_files))[30:]]
-    processes  = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
-    for job in processes: job.start()
-    for job in processes: job.join()
-def file_mixing(h5_file, LF_file, index, replace_data=True):
-    output_dir = h5_file[0:h5_file.rfind('/')] + '/outputs'
-    if not os.path.isdir(output_dir): os.mkdir(output_dir)
-    features  = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
-    MC_data   = h5py.File(h5_file,'r')
-    if replace_data:
-        # Light flavor indices in MC file
-        iffTruth  = MC_data['p_iffTruth' ][:]
-        TruthType = MC_data['p_TruthType'][:]
-        MC_criteria = np.logical_or.reduce([TruthType==4, TruthType==16, TruthType==17])
-        MC_criteria = np.logical_and(MC_criteria, iffTruth==10)
-        MC_idx  = np.where(MC_criteria)[0]
-        LF_data = h5py.File(LF_file,'r')
-        source_size = len(list(LF_data.values())[0])
-        target_size = np.sum(MC_criteria)
-        # Light flavor indices from data file
-        LF_idx = np.random.choice(source_size, target_size, replace=source_size<target_size)
-    for key in features:
-        attribute = 'w' if key==features[0] else 'a'
-        data_in  = MC_data[key][:]
-        data_out = h5py.File(output_dir+'/'+h5_file.split('/')[-1], attribute)
-        if replace_data:
-            # Removing light flavor MC
-            #data_in = np.delete(data_in, MC_criteria, axis=0)
-            # Replacing light flavor MC
-            data_in[MC_idx] = np.take(LF_data[key], LF_idx, axis=0)
-            # Labelling light flavor data
-            if key == 'p_iffTruth' : data_in = np.where(MC_criteria, 10, data_in )
-            if key == 'p_TruthType': data_in = np.where(MC_criteria,  1, data_in )
-        dtype   = np.int32 if data_in.dtype=='int32' else np.float16
-        chunks  = (2000,) + data_in.shape[1:]
-        data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
-        print( 'Mixing file', h5_file.split('/')[-2]+'/'+h5_file.split('/')[-1], 'with feature', key )
-        data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
 
 
 

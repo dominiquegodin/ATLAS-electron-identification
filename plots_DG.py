@@ -7,6 +7,7 @@ from   scipy.spatial     import distance
 from   matplotlib        import pylab
 from   matplotlib.ticker import MultipleLocator, FormatStrFormatter, AutoMinorLocator, FixedLocator
 import matplotlib; matplotlib.use('Agg')
+#matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
@@ -243,19 +244,22 @@ def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separati
     print('Saving test sample distributions to:', file_name); plt.savefig(file_name)
 
 
-def performance_ratio(sample, y_true, y_prob, bkg, output_dir, ECIDS=False, output_tag='CNN2LLH'):
-    #eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
+def performance_ratio(sample, y_true, y_prob, bkg, output_dir, inclusive, output_tag='CNN2LLH'):
     #pt_bins  = [4, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 80, 150, 250]
-    eta_bins = [0, 0.6, 1.15, 1.37, 1.52, 2.01, 2.47]
-    #eta_bins = [0, 2.47]
     pt_bins  = [4.5, 10, 20, 30, 40, 60, 80, 5000]
+    if inclusive:
+        eta_bins = [0, 2.47]
+    else:
+        #eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
+        eta_bins = [0, 0.6, 1.15, 1.37, 1.52, 2.01, 2.47]
     ratios = {wp:ratio_meshgrid(sample, y_true, y_prob, wp, output_dir, eta_bins, pt_bins)
               for wp in ['loose','medium','tight']}
     pickle_file = 'CNN2LLH_inclusive.pkl' if len(eta_bins)==2 else 'CNN2LLH.pkl'
     if output_tag == 'CNN2CNN':
-        input_dir = '6c_180m_match2class0/scalars_only'
+        input_dir = '6c_180m/scalars/0-5000GeV'
         input_dir = output_dir.split('outputs')[0]+'outputs'+'/'+input_dir
-        input_ratios = pickle.load(open(input_dir+'/'+'class_0_vs_'+str(bkg)+'/'+pickle_file,'rb'))
+        try: input_ratios = pickle.load(open(input_dir+'/'+'class_0vs'+str(bkg).title()+'/'+pickle_file,'rb'))
+        except FileNotFoundError: return
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             for wp in ratios:
@@ -265,12 +269,12 @@ def performance_ratio(sample, y_true, y_prob, bkg, output_dir, ECIDS=False, outp
     vmin = min([np.min(n[n!=0]) for n in ratios.values()])
     vmax = max([np.max(n[n!=0]) for n in ratios.values()])
     if len(eta_bins) == 2:
-        file_name = output_dir+'/'+output_tag+'.png'
+        file_name = output_dir+'/'+output_tag+'_inclusive.png'
         inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, output_tag, vmin, vmax)
     else:
         for wp in ratios:
             file_name = output_dir+'/'+output_tag+'_'+wp+'.png'
-            bin_meshgrid(eta_bins, pt_bins, ratios[wp], file_name, vmin, vmax)
+            binned_meshgrid(eta_bins, pt_bins, ratios[wp], file_name, vmin=None, vmax=None)
 def ratio_meshgrid(sample, y_true, y_prob, wp, output_dir, eta_bins, pt_bins, ECIDS=False):
     bin_tuples = list(itertools.product(zip(eta_bins[:-1], eta_bins[1:]), zip(pt_bins[:-1], pt_bins[1:])))
     manager   = mp.Manager(); return_dict = manager.dict()
@@ -300,11 +304,9 @@ def bkg_eff_ratio(sample, y_true, y_prob, wp, bin, ECIDS, return_dict):
 def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vmax=None, color='black'):
     eta = np.arange(0, len(eta_bins))
     pt  = np.arange(0, len( pt_bins))
-    if vmin is None: vmin = np.min(ratios[ratios!=0])
-    if vmax is None: vmax = np.max(ratios[ratios!=0])
     plt.figure(figsize=(6 if tag=='CNN2LLH' else 5.2,7.5))
     def make_plot(wp, ratios, idx=None):
-        if idx is None: idx = list(ratios.keys()).index(wp)+1
+        if idx is None: idx = list(ratios.keys()).index(wp) + 1
         ratios = ratios[wp]
         plt.subplot(1,3,idx); ax = plt.gca()
         plt.pcolormesh(eta, pt, ratios, cmap="Blues", vmin=vmin, vmax=vmax)
@@ -312,7 +314,7 @@ def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vma
         plt.xlabel(wp.title(), fontsize=18)
         if idx == 1 and tag == 'CNN2LLH':
             plt.yticks(np.arange(len( pt_bins)), (pt_bins[:-1]+[r'$\infty$']) if pt_bins[-1]>=1e3 else pt_bins)
-            plt.ylabel('$p_t$ (GeV)', fontsize=25)
+            plt.ylabel('$E_t$ (GeV)', fontsize=30, loc='top')
         for x in range(len(eta_bins)-1):
             for y in range(len( pt_bins)-1):
                 text = 'Ind' if ratios[y,x]==0 else format(ratios[y,x],'.1f')
@@ -320,12 +322,12 @@ def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vma
         plt.grid(True, color="grey", lw=1, alpha=1)
         left_axis = True if (idx==1 and tag=='CNN2LLH') else False
         plt.tick_params(axis='both', which='major', labelbottom=False, bottom=False,
-                        labelleft=left_axis, left=left_axis, labelsize=14,)
+                        labelleft=left_axis, left=left_axis, labelsize=18)
         if pt_bins[-1] >= 1e3 and idx ==1:
-            font_sizes = (len(pt_bins)-1)*[14]+[25]
+            font_sizes = (len(pt_bins)-1)*[18]+[30]
             for tick, size in zip(plt.yticks()[-1], font_sizes): tick.set_fontsize(size)
         if idx ==2:
-            plt.title('CNN / LLH' if tag=='CNN2LLH' else 'CNN / FCN', fontsize=25)
+            plt.title('CNN$\,/\,$LLH' if tag=='CNN2LLH' else 'CNN$\,/\,$FCN', fontsize=25)
     for wp in ratios: make_plot(wp, ratios)
     cbar = plt.colorbar(fraction=0.05, pad=0.06, aspect=100, shrink=1)
     ticks = [val for val in cbar.get_ticks() if min(abs(val-vmin),abs(val-vmax))>0.02*(vmax-vmin)
@@ -333,12 +335,11 @@ def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vma
     ticks = [vmin] + ticks + [vmax]
     cbar.set_ticks(ticks)
     cbar.set_ticklabels([format(n,'.1f') for n in ticks])
-    cbar.ax.tick_params(labelsize=12)
+    cbar.ax.tick_params(labelsize=14)
     plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=color)
-    plt.tight_layout()
-    plt.subplots_adjust(wspace=0.06)
+    plt.subplots_adjust(left=0.03 if tag=='CNN2CNN' else 0.17, top=0.95, bottom=0.05, wspace=0.06)
     print('Saving test sample ratio meshgrid to:', file_name); plt.savefig(file_name)
-def bin_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, color='black'):
+def binned_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, color='black'):
     eta = np.arange(0, len(eta_bins))
     pt  = np.arange(0, len( pt_bins))
     plt.figure(figsize=(11,7.5)); ax = plt.gca()
@@ -352,20 +353,20 @@ def bin_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, col
             text = 'Ind' if ratios[y,x]==0 else format(ratios[y,x],'.1f')
             plt.text(x+0.5, y+0.5, text, {'color':color, 'fontsize':18}, ha='center', va='center')
     plt.grid(True, color="grey", lw=1, alpha=1)
-    plt.tick_params(axis='both', which='major', labelsize=14)
+    plt.tick_params(axis='both', which='major', labelsize=18)
     if pt_bins[-1] >= 1e3:
-        font_sizes = (len(pt_bins)-1)*[14]+[25]
+        font_sizes = (len(pt_bins)-1)*[18]+[30]
         for tick, size in zip(plt.yticks()[-1], font_sizes):
             tick.set_fontsize(size)
-    plt.xlabel('abs('+'$\eta$'+')', fontsize=25)
-    plt.ylabel('$p_t$ (GeV)', fontsize=25)
+    plt.xlabel('abs('+'$\eta$'+')', fontsize=30, loc='right')
+    plt.ylabel('$E_t$ (GeV)'      , fontsize=30, loc='top'  )
     cbar = plt.colorbar(fraction=0.04, pad=0.02)
     ticks = [val for val in cbar.get_ticks() if min(abs(val-vmin),abs(val-vmax))>0.02*(vmax-vmin)
              and round(val,1)!=round(vmin,1) and round(val,1)!=round(vmax,1)]
     ticks = [vmin] + ticks + [vmax]
     cbar.set_ticks(ticks)
     cbar.set_ticklabels([format(n,'.1f') for n in ticks])
-    cbar.ax.tick_params(labelsize=12)
+    cbar.ax.tick_params(labelsize=14)
     plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=color)
     plt.tight_layout()
     print('Saving test sample ratio meshgrid to:', file_name); plt.savefig(file_name)
@@ -398,7 +399,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                      bottom=True, top=True, left=True, right=True)
     axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
                      bottom=True, top=True, left=True, right=True)
-    axes.tick_params(axis="both", pad=8, labelsize=15)
+    axes.tick_params(axis="both", pad=8, labelsize=18)
     for axis in ['top', 'bottom', 'left', 'right']:
         axes.spines[axis].set_linewidth(1.5)
         axes.spines[axis].set_color('black')
@@ -434,10 +435,10 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         yticks = plt.yticks()[0]
         axes.yaxis.set_ticks( np.append([1], yticks[1:]) )
         axes.yaxis.set_minor_locator(FixedLocator(np.arange(yticks[1]/5, yticks[-1], yticks[1]/5 )))
-        plt.xlabel(sig_eff+' (%)', fontsize=25, loc='right')
-        plt.ylabel('1/'+bkg_eff  , fontsize=25, loc='top')
+        plt.xlabel(sig_eff+' (%)', fontsize=30, loc='right')
+        plt.ylabel('1/'+bkg_eff  , fontsize=30, loc='top')
         #label = '{$w_{\operatorname{bkg}}$} = {$f_{\operatorname{bkg}}$}'
-        P, = plt.plot(100*tpr, 1/fpr, color='#1f77b4', lw=2, zorder=10)
+        P, = plt.plot(100*tpr, 1/fpr, color='blue', lw=2, zorder=10)
         n_sig, n_bkg = np.sum(y_true==0), np.sum(y_true==1)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
@@ -452,18 +453,24 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                 fpr_0 = np.sum(fpr==0)
                 fpr, tpr = fpr[fpr_0:], tpr[fpr_0:]
                 P, = plt.plot(100*tpr, 1/fpr, color=color, lw=2, ls=ls, zorder=10)
-                lim_inf = 1/( fpr + np.sqrt(fpr/n_bkg) )
-                lim_sup = 1/( fpr - np.sqrt(fpr/n_bkg) )
-                plt.fill_between(100*tpr, lim_inf, lim_sup, alpha=0.2)
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore')
+                    lim_inf = 1/( fpr + np.sqrt(fpr/n_bkg) )
+                    lim_sup = 1/( fpr - np.sqrt(fpr/n_bkg) )
+                plt.fill_between(100*tpr, lim_inf, lim_sup, color=color, alpha=0.2, edgecolor=None)
                 return P
-            file_paths = ['outputs/6c_180m_match2class0/scalars_only/bkg_optimal',
-                          'outputs/2c_180m_match2class0/scalars+images']
+            #file_paths = ['outputs/6c_180m_match2class0/scalars_only/bkg_optimal',
+            #              'outputs/6c_180m_match2class0/images_only',
+            #              'outputs/2c_180m_match2class0/scalars+images']
+            file_paths = ['outputs/6c_180m/scalars+images/0-5000GeV', 'outputs/6c_180m/scalars/0-5000GeV']
             linestyles = ['-', '-']
-            color_list = ['tab:orange', 'tab:green']
-            leg_labels = ['HLV+images (6-class)', 'HLV only (6-class)', 'HLV+images (2-class)']
+            color_list = ['cornflowerblue', 'lightsteelblue']
+            #leg_labels = ['HLV+images (6-class)', 'HLV only (6-class)',
+            #              'Images only (6-class)', 'HLV+images (2-class)']
+            leg_labels = ['HLV + images + tracks', 'HLV + images', 'HLV']
             Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,color_list,linestyles)]
-            L = plt.legend(Ps, leg_labels, loc='upper left', bbox_to_anchor=(0,1), fontsize=14,
-                           facecolor='ghostwhite', framealpha=1); L.set_zorder(10)
+            L = plt.legend(Ps, leg_labels, loc='upper right', bbox_to_anchor=(1,0.65), fontsize=14,
+                           facecolor=None, framealpha=1); L.set_zorder(10)
         if ROC_values != None:
             tag = 'combined bkg'
             extra_labels = {1:'{$w_{\operatorname{bkg}}$} for best AUC',
@@ -474,10 +481,9 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                 extra_len_0 = np.sum(extra_fpr==0)
                 plt.plot(100*extra_tpr[extra_len_0:], 1/extra_fpr[extra_len_0:],
                          label=extra_labels[n], color=extra_colors[n], lw=2, zorder=10)
-        #if ROC_values != None:
-        #    plt.rcParams['agg.path.chunksize'] = 1000
-        #    plt.scatter(100*tpr_full[len_0:], 1/fpr_full[len_0:], color='silver', marker='.')
-        if best_fpr != 0:
+            plt.rcParams['agg.path.chunksize'] = 1000
+            plt.scatter(100*tpr_full[len_0:], 1/fpr_full[len_0:], color='silver', marker='.')
+        if best_fpr != 0 and False:
             plt.scatter( 100*best_tpr, 1/best_fpr, s=40, marker='D', c='tab:blue',
                          label="{0:<15s} {1:>3.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
         for n in np.arange(len(LLH_fpr)):
@@ -494,8 +500,16 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
             lim_inf = np.sqrt(LLH_tpr[n]/n_sig)
             lim_sup = np.sqrt(LLH_tpr[n]/n_sig)
             plt.errorbar( 100*LLH_tpr[n], 1/LLH_fpr[n], xerr=[[lim_inf],[lim_sup]], ecolor=colors[n] )
+        plt.text(0.07, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
+                 {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+        #plt.text(0.07, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t\:\leqslant\:$15 GeV',
+        #plt.text(0.07, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t>$15 GeV',
+        plt.text(0.07, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t$ inclusive',
+                 {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+        #plt.text(0.07, 0.88, r'$E_t\:\leqslant\:$15 GeV $\:;\: 0 \leqslant\:|\eta|\:\leqslant 2.47$',
+        #         {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
         plt.legend(loc='upper right', fontsize=13 if ECIDS else 14, numpoints=3,
-                   facecolor='ghostwhite', framealpha=1).set_zorder(10)
+                   facecolor=None, framealpha=1).set_zorder(10)
         if combine_plots: plt.gca().add_artist(L)
     if ROC_type == 2:
         plt.xlim([0.6, 1]); plt.ylim([0.9, 1-1e-4])
@@ -565,8 +579,10 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                      label="{0:<10s} {1:>5.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC_curve_'+str(ROC_type)+'.png'
-    plt.tight_layout()
-    print('Saving test sample ROC'+str(ROC_type)+' curve to   :', file_name); plt.savefig(file_name)
+    #plt.tight_layout()
+    fig.subplots_adjust(left=0.12, top=0.97, bottom=0.12, right=0.95)
+    print('Saving test sample ROC curve      to:', file_name); plt.savefig(file_name)
+    if combine_plots: plt.savefig(output_dir+'/../ROC_'+output_dir.split('class_')[-1]+'.png')
 
 
 def combine_ROC_curves(output_dir, cuts=''):
@@ -656,7 +672,7 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
     for job in processes: job.join()
     file_name = output_dir+'/cal_images.png'
     print('SAVING IMAGES TO:', file_name, '\n')
-    fig = plt.figure(figsize=(7,14)) if n_classes == 2 else plt.figure(figsize=(18,14))
+    fig = plt.figure(figsize=(7,14)) if n_classes == 2 else plt.figure(figsize=(18,12))
     for e_class in np.arange(n_classes):
         if scale == 'class': vmax = max([np.max(image_dict[(e_class,key)]) for key in layers])
         for key in layers:
@@ -668,36 +684,41 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
                 vmax = np.max(image_dict[(e_class,key)])
             plot_image(100*image_dict[(e_class,key)], n_classes, e_class, layers, key, 100*vmax, soft)
     wspace = -0.1 if n_classes == 2 else 0.2
-    wspace = -0.4
-    fig.subplots_adjust(left=0.05, top=0.95, bottom=0.05, right=0.95, hspace=0.6, wspace=wspace)
-    plt.tight_layout()
+    wspace = -0.1; hspace = 0.4
+    fig.subplots_adjust(left=0.05, top=0.95, bottom=0.05, right=0.95, hspace=hspace, wspace=wspace)
+    #plt.tight_layout()
     fig.savefig(file_name); sys.exit()
 
 
 def plot_image(image, n_classes, e_class, layers, key, vmax, soft=True):
+    class_dict = {0:'Prompt Electron', 1:'Charge Flip'            , 2:'Photon Conversion',
+                  3:'Heavy Flavor'   , 4:'Light Flavor e/$\gamma$', 5:'Light Flavor Hadron'}
     #class_dict = {0:'iso electron',  1:'charge flip' , 2:'photon conversion', 3:'b/c hadron',
-    #              4:'light flavor ($\gamma$/e$^\pm$)', 5:'light flavor (hadron)'}
-    class_dict = {0:'iso electron',  1:'charge flip' , 2:'photon conversion', 3:'b/c hadron',
-                  4:'light flavor'}
-    layer_dict = {'em_barrel_Lr0'     :'presampler'            , 'em_barrel_Lr1'  :'EM cal $1^{st}$ layer' ,
-                  'em_barrel_Lr1_fine':'EM cal $1^{st}$ layer' , 'em_barrel_Lr2'  :'EM cal $2^{nd}$ layer' ,
-                  'em_barrel_Lr3'     :'EM cal $3^{rd}$ layer' , 'tile_barrel_Lr1':'had cal $1^{st}$ layer',
-                  'tile_barrel_Lr2'   :'had cal $2^{nd}$ layer', 'tile_barrel_Lr3':'had cal $3^{rd}$ layer'}
+    #              4:'light flavor'}
+    #layer_dict = {'em_barrel_Lr0'     :'presampler'            , 'em_barrel_Lr1'  :'EM cal $1^{st}$ layer' ,
+    #              'em_barrel_Lr1_fine':'EM cal $1^{st}$ layer' , 'em_barrel_Lr2'  :'EM cal $2^{nd}$ layer' ,
+    #              'em_barrel_Lr3'     :'EM cal $3^{rd}$ layer' , 'tile_barrel_Lr1':'had cal $1^{st}$ layer',
+    #              'tile_barrel_Lr2'   :'had cal $2^{nd}$ layer', 'tile_barrel_Lr3':'had cal $3^{rd}$ layer'}
+    layer_dict = {'em_barrel_Lr0'     :'Presampler'    , 'em_barrel_Lr1'  :'EM barrel L1'  ,
+                  'em_barrel_Lr1_fine':'EM barrel L1'  , 'em_barrel_Lr2'  :'EM barrel L2'  ,
+                  'em_barrel_Lr3'     :'EM barrel L3'  , 'tile_barrel_Lr1':'Tile barrel L1',
+                  'tile_barrel_Lr2'   :'Tile barrel L2', 'tile_barrel_Lr3':'Tile barrel L3'}
     if n_classes == 2: class_dict[1] = 'background'
     e_layer  = layers.index(key)
     n_layers = len(layers)
-    plot_idx = n_classes*e_layer + e_class+1
+    plot_idx = n_classes*e_layer + e_class + 1
     plt.subplot(n_layers, n_classes, plot_idx)
     #title   = class_dict[e_class]+'\n('+layer_dict[key]+')'
     #title   = layer_dict[key]+'\n('+class_dict[e_class]+')'
-    #title   = class_dict[e_class]+'\n('+str(key)+')'
-    title   = key
+    #if plot_idx-1 < n_classes: title = class_dict[plot_idx-1] +'\n' + layer_dict[key]
+    #else                     : title = layer_dict[key]
+    title = layer_dict[key]
     limits  = [-0.13499031, 0.1349903, -0.088, 0.088]
     x_label = '$\phi$'                             if e_layer == n_layers-1 else ''
     x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer == n_layers-1 else []
     y_label = '$\eta$'                             if e_class == 0          else ''
     y_ticks = [limits[2],-0.05,0.0,0.05,limits[3]] if e_class == 0          else []
-    plt.title(title,fontweight='normal', fontsize=12)
+    plt.title(title, fontweight='normal', fontsize=12)
     plt.xlabel(x_label,fontsize=15); plt.xticks(x_ticks)
     plt.ylabel(y_label,fontsize=15); plt.yticks(y_ticks)
     plt.imshow(np.float32(image), cmap='Reds', interpolation='bilinear' if soft else None,
@@ -720,6 +741,7 @@ def plot_vertex(sample):
     plt.savefig(file_name)
 
 
+
 def plot_scalars(sample, sample_trans, variable):
     bins = np.arange(-1,1,0.01)
     fig = plt.figure(figsize=(18,8))
@@ -729,7 +751,7 @@ def plot_scalars(sample, sample_trans, variable):
     plt.xlabel('Value')
     plt.ylabel('Number of Entries')
     #pylab.hist(sample_trans[variable], bins=bins, histtype='step', density=True)
-    pylab.hist(sample      [variable], bins=bins, histtype='step', density=False)
+    pylab.hist(variable, bins=bins, histtype='step', density=False)
     plt.subplot(1,2,2)
     plt.title('Histogram')
     plt.xlabel('Value')
