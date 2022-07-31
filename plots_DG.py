@@ -6,10 +6,12 @@ from   sklearn           import metrics
 from   scipy.spatial     import distance
 from   matplotlib        import pylab
 from   matplotlib.ticker import MultipleLocator, FormatStrFormatter, AutoMinorLocator, FixedLocator
+from   matplotlib.lines  import Line2D
 import matplotlib; matplotlib.use('Agg')
-#matplotlib.rcParams['text.usetex'] = True
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+#plt.rcParams['mathtext.fontset'] = 'cm'
+# Unicode characters in Linux: CTRL-SHIFT-u ($ϵ$, $ε$, $ϕ$, $φ$, $σ$, $ς$ $η$)
 
 
 def valid_accuracy(y_true, y_prob):
@@ -80,10 +82,19 @@ def plot_heatmaps(sample, labels, output_dir):
 def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, var,
                   density=True, separate_norm=False, log=True):
     n_classes = max(labels)+1
-    plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
+    plt.figure(figsize=(12,8)); pylab.grid(False); axes = plt.gca()
+    # Axes parameters
+    axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(axis="both", pad=8, labelsize=18)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        axes.spines[axis].set_linewidth(1.5)
+        axes.spines[axis].set_color('black')
     if var == 'pt':
         variable = sample[var]
-        tag=''; plt.xlabel(tag+'$p_t$ (GeV)', fontsize=25)
+        plt.xlabel('$E_t$ (GeV)', fontsize=30, loc='right')
         if bins == None or len(bins[var]) <= 2:
             #bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
             bins = np.arange(np.min(variable), 102)
@@ -92,8 +103,9 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
         if log:
             separate_norm=False
             if n_classes == 2: plt.xlim(4.5, 5000); plt.ylim(1e-5,1e2); plt.xscale('log'); plt.yscale('log')
-            else             : plt.xlim(4.5, 5000); plt.ylim(1e-5,1e1); plt.xscale('log'); plt.yscale('log')
-            plt.xticks( [4.5,10,100,1000,5000], [4.5,'$10^1$','$10^2$','$10^3$',r'$5\times10^3$'] )
+            else             : plt.xlim(4.5, 5000); plt.ylim(1e-8,1e0); plt.xscale('log'); plt.yscale('log')
+            plt.xticks( [4.5,10,100,1000,5000], [4.5,'$10^1$','$10^2$','$10^3$',r'$5\!\times\!10^3$'] )
+            #plt.yticks(np.logspace(-8,0,9))
         else:
             separate_norm=True
             axes.xaxis.set_minor_locator(FixedLocator(bins))
@@ -104,7 +116,7 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
             axes.yaxis.set_minor_locator(AutoMinorLocator(5))
     if var == 'eta':
         variable = abs(sample[var])
-        tag=''; plt.xlabel('abs($\eta$)', fontsize=25)
+        plt.xlabel('abs($\eta$)', fontsize=30, loc='right')
         if bins == None or len(bins[var]) <= 2:
             #bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
             step = 0.05; bins = np.arange(0, 2.5+step, step)
@@ -114,42 +126,51 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
         plt.xticks(np.arange(0, 2.6, 0.5))
         #plt.xticks(bins, [str(n) for n in bins]); plt.xticks(bins, [format(n,'.1f') for n in bins])
         pylab.xlim(0, 2.5)
-        if False:
-            separate_norm = False
-            pylab.ylim(1e-1, 1e2)
-            plt.yscale('log')
-        else:
-            separate_norm = True
+        if separate_norm:
             pylab.ylim(0, 90)
-            plt.yticks(np.arange(0, 100, 10))
+            #plt.yticks(np.arange(0, 100, 10))
             axes.yaxis.set_minor_locator(AutoMinorLocator(5))
+        else:
+            pylab.ylim(1e-4, 1e0)
+            plt.yscale('log')
     #bins[-1] = max(bins[-1], max(variable)+1e-3)
     if n_etypes == 5:
-        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor',
-                      4:'Light flavor'}
+        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavor',
+                      4:'Light Flavor', 'bkg':'Background'}
     if n_etypes == 6:
-        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    , 3  :'Heavy flavor (b/c)',
-                      4:'Light flavor (e$^\pm$/$\gamma$)', 5:'Light flavor (hadron)'}
-    color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            , 3  :'tab:red'   ,
-                  4:'tab:purple'                     , 5:'tab:brown'            }
+        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavor',
+                      4:'Light Flavor e$^\pm$/$\gamma$'   , 5:'Light Flavor Hadron', 'bkg':'Background'}
+    color_dict = {0:'tab:blue', 1:'tab:orange', 2:'tab:green', 3:'tab:red', 4:'tab:purple', 5:'tab:brown'}
     if n_classes == 2: label_dict[1] = 'Background'
-    #if n_classes != 2 and var == 'eta': separate_norm = True
     if np.all(weights) == None: weights = np.ones(len(variable))
     h = np.zeros((len(bins)-1,n_classes))
     for n in np.arange(n_classes):
-        class_values  = variable[labels==n]
-        class_weights =  weights[labels==n]
-        class_weights = 100*class_weights/(np.sum(class_weights) if separate_norm else len(variable))
+        class_values  =  variable[labels==n]
+        class_weights =   weights[labels==n]
+        class_weights =  class_weights/(np.sum(class_weights) if separate_norm else len(variable))
+        #class_weights =* 100
         if density:
             indices        = np.searchsorted(bins, class_values, side='right')
             class_weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
-        h[:,n] = pylab.hist(class_values, bins, histtype='step', weights=class_weights, color=color_dict[n],
-                            label=label_dict[n]+' ('+format(100*len(class_values)/len(variable),'.1f')+'%)', lw=2)[0]
-    plt.ylabel('Distribution density (%)' if density else 'Distribution (%)', fontsize=25)
-    axes.tick_params(axis='both', which='major', labelsize=14)
-    loc, ncol = ('upper right',1) if var=='pt' else ('upper center',2)
-    plt.legend(loc=loc if var=='pt' else 'upper center', fontsize=16 if n_classes==2 else 14,
-               ncol=ncol, facecolor='ghostwhite', framealpha=1).set_zorder(10)
+        #pylab.hist(class_values, bins, histtype='step', weights=class_weights, color=color_dict[n],
+        #           label=label_dict[n]+' ('+format(100*len(class_values)/len(variable),'.1f')+'%)', lw=2)[0]
+        pylab.hist(class_values, bins, histtype='step', weights=class_weights,
+                   color=color_dict[n], label=label_dict[n], lw=2)[0]
+    #plt.ylabel('Distribution density (%)' if density else 'Distribution (%)', fontsize=25)
+    plt.ylabel('Fraction of Candidates (GeV$^{-1}$)', fontsize=25, loc='top')
+    loc, ncol = ('upper right',2) if var=='pt' else ('upper right',2)
+    # Create new legend handles with existing colors
+    handles, labels = axes.get_legend_handles_labels()
+    new_handles = [Line2D([], [], lw=2, c=h.get_edgecolor()) for h in handles]
+    plt.legend(handles=new_handles, labels=labels, loc=loc, fontsize=16 if n_classes==2 else 14,
+               handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
+    # Adding ATLAS messaging
+    xpos, ha = (0.02, 'left') if var=='pt' else (0.02, 'left')
+    plt.text(xpos, 0.95, r'$\bf ATLAS$ Simulation Internal', {'color':'black', 'fontsize':18},
+             va='center', ha=ha, transform=axes.transAxes, zorder=20)
+    plt.text(xpos, 0.91, r'$\sqrt{s}=$13 TeV', {'color':'black', 'fontsize':18},
+             va='center', ha=ha, transform=axes.transAxes, zorder=20)
+    plt.subplots_adjust(left=0.1, top=0.97, bottom=0.12, right=0.95)
     file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
     print('Saving', prefix, 'sample', format(var,'3s'), 'distributions to:', file_name)
     plt.savefig(file_name)
@@ -157,11 +178,11 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
 
 def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separation=False, bkg='bkg'):
     if n_etypes == 5:
-        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    ,   3  :'Heavy flavor',
-                      4:'Light flavor', 'bkg':'Background'}
+        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavor',
+                      4:'Light Flavor', 'bkg':'Background'}
     if n_etypes == 6:
-        label_dict = {0:'Iso electron', 1:'Charge flip'  , 2:'Photon conversion'    ,   3  :'Heavy flavor',
-                      4:'Light flavor (e$^\pm$/$\gamma$)', 5:'Light flavor (hadron)', 'bkg':'Background'}
+        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavor',
+                      4:'Light Flavor e$^\pm$/$\gamma$'   , 5:'Light Flavor Hadron', 'bkg':'Background'}
         #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
         #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
     color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            ,   3  :'tab:red'   ,
@@ -188,7 +209,9 @@ def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separati
         class_labels = make_labels(sample, n_classes)
         for n in np.unique(class_labels):
             class_probs   = y_prob[class_labels==n]
-            class_weights = len(class_probs)*[100/len(y_true)] #len(class_probs)*[100/len(class_probs)]
+            #class_weights = len(class_probs)*[100/len(y_true)]
+            class_weights = len(class_probs)*[1/len(y_true)]
+            #class_weights = len(class_probs)*[100/len(class_probs)]
             h[:,n] = pylab.hist(class_probs, bins=bins, label=label_dict[n], histtype='step',
                                 weights=class_weights, log=True, color=colors[n], lw=2)[0]
         if n_classes == 2:
@@ -201,25 +224,43 @@ def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separati
                 sig_ratio = np.sum(y_true==0)/len(new_y_true)
                 max_index = np.argmax(sig_ratio*tpr + (1-fpr)*(1-sig_ratio))
                 axes.axvline(threshold[max_index], ymin=0, ymax=1, ls='--', lw=1, color=colors[n])
-        for n in set(np.unique(class_labels))-set([0]):
-            print_JSD(h[:,0], h[:,n], n, colors[n], str(n))
-        if n_classes > 2:
-            print_JSD(h[:,0], np.sum(h[:,1:], axis=1), n_classes, 'black', '\mathrm{bkg}')
+            for n in set(np.unique(class_labels))-set([0]):
+                print_JSD(h[:,0], h[:,n], n, colors[n], str(n))
+            if n_classes > 2:
+                print_JSD(h[:,0], np.sum(h[:,1:], axis=1), n_classes, 'black', '\mathrm{bkg}')
+        axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
+                         bottom=True, top=True, left=True, right=True)
+        axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
+                         bottom=True, top=True, left=True, right=True)
+        axes.tick_params(axis="both", pad=8, labelsize=18)
+        for axis in ['top', 'bottom', 'left', 'right']:
+            axes.spines[axis].set_linewidth(1.5)
+            axes.spines[axis].set_color('black')
+        #plt.xlabel('$p_{\operatorname{sig}}$ (%)', fontsize=30)
+        plt.xlabel('$d$ (%)'     , fontsize=30, loc='right')
+        plt.ylabel('Fraction of Candidates', fontsize=25, loc='top')
+        # Create new legend handles with existing colors
+        handles, labels = axes.get_legend_handles_labels()
+        new_handles = [Line2D([], [], lw=2, c=h.get_edgecolor()) for h in handles]
+        plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16 if n_classes==2 else 14,
+                   handlelength=2, ncol=2, facecolor=None, framealpha=1.).set_zorder(10)
+        # Adding ATLAS messaging
+        plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Internal',
+                 {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t\:\leqslant\:$15 GeV',
+        plt.text(0.02, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t>$15 GeV',
+        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t$ inclusive',
+                 {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
     plt.figure(figsize=(12,16))
-    plt.subplot(2, 1, 1); pylab.grid(True); axes = plt.gca()
-    pylab.xlim(0,100); pylab.ylim(1e-5 if n_classes>2 else 1e-5, 1e2)
+    plt.subplot(2, 1, 1); pylab.grid(False); axes = plt.gca()
+    pylab.xlim(0,100); pylab.ylim(1e-7 if n_classes>2 else 1e-6, 1e0)
     plt.xticks(np.arange(0,101,step=10))
     #pylab.xlim(0,10); pylab.ylim(1e-2 if n_classes>2 else 1e-2, 1e2)
     #plt.xticks(np.arange(0,11,step=1))
     bin_step = 0.5; bins = np.arange(0, 100+bin_step, bin_step)
     class_histo(y_true, 100*y_prob, bins, color_dict)
-    plt.xlabel('$p_{\operatorname{sig}}$ (%)', fontsize=25)
-    plt.ylabel('Distribution (%)', fontsize=25)
-    axes.tick_params(axis='both', which='major', labelsize=12)
-    plt.legend(loc='upper center', fontsize=16 if n_classes==2 else 14, numpoints=3,
-               ncol=2, facecolor='ghostwhite', framealpha=1).set_zorder(10)
-    plt.subplot(2, 1, 2); pylab.grid(True); axes = plt.gca()
-    x_min=-10; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-4 if n_classes>2 else 1e-3, 1e1)
+    plt.subplot(2, 1, 2); pylab.grid(False); axes = plt.gca()
+    x_min=-10; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-6 if n_classes>2 else 1e-5, 1e-1)
     pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     pos += [0.5]           + [1-10**float(n)      for n in np.arange(-1,-x_max-1,-1)]
     lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min+2,0)     ]
@@ -228,30 +269,20 @@ def plot_distributions_DG(sample, y_true, y_prob, n_etypes, output_dir, separati
     #pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     #lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min+2,0)     ] + [1,10]
     #lab += ['0.50   '] + ['$1\!-\!10^{'+str(n)+'}$' for n in np.arange(-1,-x_max-1,-1)]
-    plt.xticks(logit(np.array(pos)), lab, rotation=15)
+    plt.xticks(logit(np.array(pos)), lab, rotation=20)
     bin_step = 0.1; bins = np.arange(x_min-1, x_max+1, bin_step)
     y_prob = logit(y_prob)
     class_histo(y_true, y_prob, bins, color_dict)
-    #plt.xlabel('$p_{\operatorname{sig}}$ (%)', fontsize=25)
-    plt.xlabel('$d$ (%)', fontsize=25)
-    plt.ylabel('Distribution (%)', fontsize=25)
-    location = 'upper left' if n_classes==2 else 'upper center'
-    axes.tick_params(axis='both', which='major', labelsize=12)
-    plt.legend(loc=location, fontsize=16 if n_classes==2 else 14, numpoints=3,
-               ncol=2, facecolor='ghostwhite', framealpha=1).set_zorder(10)
-    plt.subplots_adjust(top=0.95, bottom=0.1, hspace=0.2)
-    file_name = output_dir+'/distributions.png'
-    print('Saving test sample distributions to:', file_name); plt.savefig(file_name)
+    plt.subplots_adjust(top=0.99, bottom=0.07, left=0.1, right=0.95, hspace=0.2)
+    file_name = output_dir+'/discriminant.png'
+    print('Saving test sample discriminant   to:', file_name); plt.savefig(file_name)
 
 
 def performance_ratio(sample, y_true, y_prob, bkg, output_dir, inclusive, output_tag='CNN2LLH'):
     #pt_bins  = [4, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 80, 150, 250]
     pt_bins  = [4.5, 10, 20, 30, 40, 60, 80, 5000]
-    if inclusive:
-        eta_bins = [0, 2.47]
-    else:
-        #eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
-        eta_bins = [0, 0.6, 1.15, 1.37, 1.52, 2.01, 2.47]
+    if inclusive: eta_bins = [0, 2.47]
+    else        : eta_bins = [0, 0.6, 1.15, 1.37, 1.52, 2.01, 2.47]
     ratios = {wp:ratio_meshgrid(sample, y_true, y_prob, wp, output_dir, eta_bins, pt_bins)
               for wp in ['loose','medium','tight']}
     pickle_file = 'CNN2LLH_inclusive.pkl' if len(eta_bins)==2 else 'CNN2LLH.pkl'
@@ -296,10 +327,13 @@ def bkg_eff_ratio(sample, y_true, y_prob, wp, bin, ECIDS, return_dict):
     y_prob = y_prob[cuts]
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        fpr, tpr, _ = metrics.roc_curve(y_true, y_prob, pos_label=0)
-        LLH_fpr, LLH_tpr = LLH_rates(data, y_true, ECIDS)
-        LLH_fpr, LLH_tpr = LLH_fpr[-3:], LLH_tpr[-3:]
-        ratio = LLH_fpr[wp]/CNN_fpr(tpr, fpr, LLH_tpr[wp])
+        try:
+            fpr, tpr, _ = metrics.roc_curve(y_true, y_prob, pos_label=0)
+            LLH_fpr, LLH_tpr = LLH_rates(data, y_true, ECIDS)
+            LLH_fpr, LLH_tpr = LLH_fpr[-3:], LLH_tpr[-3:]
+            ratio = LLH_fpr[wp]/CNN_fpr(tpr, fpr, LLH_tpr[wp])
+        except:
+            ratio = 0
     return_dict[bin] = np.nan_to_num(ratio, nan=0, posinf=0, neginf=0)
 def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vmax=None, color='black'):
     eta = np.arange(0, len(eta_bins))
@@ -374,6 +408,7 @@ def binned_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, 
 
 def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                     ROC_values=None, combine_plots=False):
+    epsilon = 'ϵ' #'\epsilon'
     LLH_fpr, LLH_tpr = LLH_rates(sample, y_true, ECIDS)
     if ROC_values != None: fpr, tpr = ROC_values[0]
     #if ROC_values != None:
@@ -393,7 +428,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
     labels  = ['tight'      , 'medium'      , 'loose'       ,
                'tight+ECIDS', 'medium+ECIDS', 'loose+ECIDS']
     markers = 3*['o'] + 3*['D']
-    sig_eff, bkg_eff = '$\epsilon_{\operatorname{sig}}$', '$\epsilon_{\operatorname{bkg}}$'
+    sig_eff, bkg_eff = '$'+epsilon+'_{\operatorname{sig}}$', '$ϵ_{\operatorname{bkg}}$'
     fig = plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
                      bottom=True, top=True, left=True, right=True)
@@ -488,10 +523,10 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
                          label="{0:<15s} {1:>3.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
         for n in np.arange(len(LLH_fpr)):
             plt.scatter( 100*LLH_tpr[n], 1/LLH_fpr[n], s=40, marker=markers[n], c=colors[n], zorder=10,
-                         label='$\epsilon_{\operatorname{sig}}^{\operatorname{LH}}$'
+                         label='$'+epsilon+'_{\operatorname{sig}}^{\operatorname{LH}}$'
                          +'='+format(100*LLH_tpr[n],'.1f') +'%' +r'$\rightarrow$'
-                         +'$\epsilon_{\operatorname{bkg}}^{\operatorname{LH}}$/'
-                         +'$\epsilon_{\operatorname{bkg}}^{\operatorname{NN}}$='
+                         +'$'+epsilon+'_{\operatorname{bkg}}^{\operatorname{LH}}$/'
+                         +'$'+epsilon+'_{\operatorname{bkg}}^{\operatorname{NN}}$='
                          +format(LLH_fpr[n]*LLH_scores[n], '>.1f')
                          +' ('+labels[n]+')' )
             lim_inf =  1/LLH_fpr[n] - 1/( LLH_fpr[n] + np.sqrt(LLH_fpr[n]/n_bkg) )
@@ -500,7 +535,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
             lim_inf = np.sqrt(LLH_tpr[n]/n_sig)
             lim_sup = np.sqrt(LLH_tpr[n]/n_sig)
             plt.errorbar( 100*LLH_tpr[n], 1/LLH_fpr[n], xerr=[[lim_inf],[lim_sup]], ecolor=colors[n] )
-        plt.text(0.07, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
+        plt.text(0.07, 0.95, r'$\bf ATLAS$ Simulation Internal',
                  {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
         #plt.text(0.07, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t\:\leqslant\:$15 GeV',
         #plt.text(0.07, 0.91, r'$\sqrt{s}=$13 TeV $\:;\: E_t>$15 GeV',
@@ -672,7 +707,11 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
     for job in processes: job.join()
     file_name = output_dir+'/cal_images.png'
     print('SAVING IMAGES TO:', file_name, '\n')
-    fig = plt.figure(figsize=(7,14)) if n_classes == 2 else plt.figure(figsize=(18,12))
+
+    if len(layers) == 7: figsize = (18,12)
+    else               : figsize = (18,21)
+    if n_classes == 2  : figsize = (7,14)
+    fig = plt.figure(figsize=figsize)
     for e_class in np.arange(n_classes):
         if scale == 'class': vmax = max([np.max(image_dict[(e_class,key)]) for key in layers])
         for key in layers:
@@ -691,18 +730,21 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
 
 
 def plot_image(image, n_classes, e_class, layers, key, vmax, soft=True):
-    class_dict = {0:'Prompt Electron', 1:'Charge Flip'            , 2:'Photon Conversion',
+    class_dict = {0:'Prompt Electron', 1:'Charge Flip'            , 2:'Photon Conversion'  ,
                   3:'Heavy Flavor'   , 4:'Light Flavor e/$\gamma$', 5:'Light Flavor Hadron'}
-    #class_dict = {0:'iso electron',  1:'charge flip' , 2:'photon conversion', 3:'b/c hadron',
-    #              4:'light flavor'}
-    #layer_dict = {'em_barrel_Lr0'     :'presampler'            , 'em_barrel_Lr1'  :'EM cal $1^{st}$ layer' ,
-    #              'em_barrel_Lr1_fine':'EM cal $1^{st}$ layer' , 'em_barrel_Lr2'  :'EM cal $2^{nd}$ layer' ,
-    #              'em_barrel_Lr3'     :'EM cal $3^{rd}$ layer' , 'tile_barrel_Lr1':'had cal $1^{st}$ layer',
-    #              'tile_barrel_Lr2'   :'had cal $2^{nd}$ layer', 'tile_barrel_Lr3':'had cal $3^{rd}$ layer'}
-    layer_dict = {'em_barrel_Lr0'     :'Presampler'    , 'em_barrel_Lr1'  :'EM barrel L1'  ,
-                  'em_barrel_Lr1_fine':'EM barrel L1'  , 'em_barrel_Lr2'  :'EM barrel L2'  ,
-                  'em_barrel_Lr3'     :'EM barrel L3'  , 'tile_barrel_Lr1':'Tile barrel L1',
-                  'tile_barrel_Lr2'   :'Tile barrel L2', 'tile_barrel_Lr3':'Tile barrel L3'}
+    #class_dict = {0:'Prompt Electron', 1:'Charge Flip'            , 2:'Photon Conversion'  ,
+    #              3:'Heavy Flavor'   , 4:'Light Flavor'}
+    layer_dict = {'em_barrel_Lr0'  :'EM Presampler'    ,
+                  'em_barrel_Lr1'  :'EM Barrel L1'  , 'em_barrel_Lr1_fine':'EM Barrel L1'  ,
+                  'em_barrel_Lr2'  :'EM Barrel L2'  , 'em_barrel_Lr3'     :'EM Barrel L3'  ,
+                  'tile_gap_Lr1'   :'Tile Gap'      ,
+                  'em_endcap_Lr0'  :'EM Endcap L0'  ,
+                  'em_endcap_Lr1'  :'EM Endcap L1'  , 'em_endcap_Lr1_fine':'EM Endcap L1'  ,
+                  'em_endcap_Lr2'  :'EM Endcap L2'  , 'em_endcap_Lr3'     :'EM Endcap L3'  ,
+                  'lar_endcap_Lr0' :'LAr Endcap L0' , 'lar_endcap_Lr1'    :'LAr Endcap L1' ,
+                  'lar_endcap_Lr2' :'LAr Endcap L2' , 'lar_endcap_Lr3'    :'LAr Endcap L3' ,
+                  'tile_barrel_Lr1':'Tile Barrel L1', 'tile_barrel_Lr2'   :'Tile Barrel L2',
+                  'tile_barrel_Lr3':'Tile Barrel L3'}
     if n_classes == 2: class_dict[1] = 'background'
     e_layer  = layers.index(key)
     n_layers = len(layers)

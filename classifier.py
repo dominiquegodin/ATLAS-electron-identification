@@ -57,7 +57,6 @@ parser.add_argument( '--t_scaler_in'    , default = ''                  )
 parser.add_argument( '--t_scaler_out'   , default = 't_scaler.pkl'      )
 parser.add_argument( '--results_in'     , default = ''                  )
 parser.add_argument( '--results_out'    , default = ''                  )
-parser.add_argument( '--runDiffPlots'   , default = 0, type = int       )
 parser.add_argument( '--feature_removal', default = 'OFF'               )
 parser.add_argument( '--correlations'   , default = 'OFF'               )
 args = parser.parse_args()
@@ -65,7 +64,7 @@ args = parser.parse_args()
 
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_eval', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['bkg_ratio', 'flattening', 'match2s', 'match2b', 'match2class', 'match2max', 'none']:
+if args.weight_type not in ['bkg_ratio', 'flattening', 'match2class', 'match2max', 'none']:
     print('\nweight_type', args.weight_type, 'not recognized --> resetting it to none')
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
@@ -93,11 +92,41 @@ images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_
 others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
            'p_vertexIndex'  , 'p_charge'   , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin' ,
-           'p_firstEgMotherPdgId'          , 'p_numberOfSCTHits'           , 'p_numberOfPixelHits'        ,
+           'p_firstEgMotherPdgId'          , 'p_numberOfSCTHits'           , 'p_numberOfPixelHits'        ,]
            'p_ambiguityType'               , 'averageInteractionsPerCrossing'                             ]
 
 
-# DATASET AND TRAINING DICTIONARY
+# SAMPLES CUTS
+#gen_cuts = '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
+#gen_cuts = '(sample["pt"] > 4.5) & (sample["pt"] < 20)'
+#gen_cuts = '((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)'
+gen_cuts  =    '(sample["mcChannelNumber"]!=423107) & (sample["mcChannelNumber"]!=423108)'
+gen_cuts += ' & (sample["mcChannelNumber"]!=423109) & (sample["mcChannelNumber"]!=423110)'
+gen_cuts += ' & (sample["mcChannelNumber"]!=423111) & (sample["mcChannelNumber"]!=423112)'
+if args.train_cuts == '': args.train_cuts  = gen_cuts
+else                    : args.train_cuts += '& ' + gen_cuts
+if args.valid_cuts == '': args.valid_cuts  = gen_cuts
+else                    : args.valid_cuts += '& ' + gen_cuts
+args.valid_cuts += ' & (sample["p_numberOfSCTHits"]+sample["p_numberOfPixelHits"]>=7)'
+args.valid_cuts += ' & (sample["p_numberOfPixelHits"]>=2)'
+args.valid_cuts += ' & (sample["p_ambiguityType"]<=4)'
+
+
+# PERFORMANCE FROM SAVED VALIDATION RESULTS
+if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
+    if args.eta_region in ['0.0-1.3', '1.3-1.6', '1.6-2.5']:
+        eta_1, eta_2 = args.eta_region.split('-')
+        valid_cuts   = '(abs(sample["eta"]) >= '+str(eta_1)+') & (abs(sample["eta"]) <= '+str(eta_2)+')'
+        if args.valid_cuts == '': args.valid_cuts  = valid_cuts
+        else                    : args.valid_cuts  = valid_cuts + '& ('+args.valid_cuts+')'
+    inputs = {'scalars':scalars, 'images':[], 'others':others}
+    validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
+               args.n_etypes, inputs, args.valid_cuts, args.sep_bkg)
+elif args.results_in != '': print('\nOption --results_in not matching any file --> aborting\n')
+if   args.results_in != '': sys.exit()
+
+
+# TRAINING DATA
 data_files = get_dataset(args.host_name, args.node_dir, args.eta_region)
 keys       = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])
 images     = [key for key in images  if key in keys or key=='tracks']
@@ -114,40 +143,13 @@ train_data = {'scalars':scalars, 'images':images}
 input_data = {**train_data, 'others':others}
 
 
-# SAMPLES SIZES AND APPLIED CUTS ON PHYSICS VARIABLES
+# SAMPLES SIZES
 sample_size  = sum([len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files])
 args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
 if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
 if args.n_eval != 0: args.n_eval = [args.n_valid[0], min(args.n_valid[1],args.n_valid[0]+args.n_eval)]
 else               : args.n_eval =  args.n_valid
-#args.train_cuts = '(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)'
-#args.valid_cuts = '(sample["pt"] > 4.5) & (sample["pt"] < 20)'
-#args.train_cuts = '((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)'
-gen_cuts  =    '(sample["mcChannelNumber"]!=423107) & (sample["mcChannelNumber"]!=423108)'
-gen_cuts += ' & (sample["mcChannelNumber"]!=423109) & (sample["mcChannelNumber"]!=423110)'
-gen_cuts += ' & (sample["mcChannelNumber"]!=423111) & (sample["mcChannelNumber"]!=423112)'
-if args.train_cuts == '': args.train_cuts  = gen_cuts
-else                    : args.train_cuts += '& ' + gen_cuts
-if args.valid_cuts == '': args.valid_cuts  = gen_cuts
-else                    : args.valid_cuts += '& ' + gen_cuts
-args.valid_cuts += ' & (sample["p_numberOfSCTHits"]+sample["p_numberOfPixelHits"]>=7)'
-args.valid_cuts += ' & (sample["p_numberOfPixelHits"]>=2)'
-args.valid_cuts += ' & (sample["p_ambiguityType"]<=4)'
-
-
-# OBTAINING PERFORMANCE FROM EXISTING VALIDATION RESULTS
-if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
-    if args.eta_region in ['0.0-1.3', '1.3-1.6', '1.6-2.5']:
-        eta_1, eta_2 = args.eta_region.split('-')
-        valid_cuts   = '(abs(sample["eta"]) >= '+str(eta_1)+') & (abs(sample["eta"]) <= '+str(eta_2)+')'
-        if args.valid_cuts == '': args.valid_cuts  = valid_cuts
-        else                    : args.valid_cuts  = valid_cuts + '& ('+args.valid_cuts+')'
-    inputs = {'scalars':scalars, 'images':[], 'others':others}
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid, args.n_etypes,
-               data_files, inputs, args.valid_cuts, args.sep_bkg, args.runDiffPlots)
-elif args.results_in != '': print('\nOption --results_in not matching any file --> aborting\n')
-if   args.results_in != '': sys.exit()
 
 
 # MODEL CREATION AND MULTI-GPU DISTRIBUTION
@@ -243,16 +245,16 @@ if args.n_epochs > 0:
     sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
-                      train_weights, bins, args.output_dir)
+                      train_weights, bins, args.output_dir); #sys.exit()
     callbacks = callback(args.model_out, args.patience, args.metrics)
     if args.generator == 'ON':
         del(train_sample)
         if np.all(train_weights) != None: train_weights = gen_weights(args.n_train, weight_idx, train_weights)
         print('\nLAUNCHING GENERATOR FOR', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
-        eval_gen  = Batch_Generator(data_files, args.n_eval, input_data, args.n_tracks, n_classes,
-                                    valid_batch_size, args.valid_cuts, scaler, t_scaler, shuffle='OFF')
         train_gen = Batch_Generator(data_files, args.n_train, input_data, args.n_tracks, n_classes,
                                     train_batch_size, args.train_cuts, scaler, t_scaler, train_weights, shuffle='ON')
+        eval_gen  = Batch_Generator(data_files, args.n_eval , input_data, args.n_tracks, n_classes,
+                                    valid_batch_size, args.train_cuts, scaler, t_scaler, shuffle='OFF')
         training  = model.fit( train_gen, validation_data=eval_gen, max_queue_size=100*max(1,n_gpus),
                                callbacks=callbacks, workers=1, epochs=args.n_epochs, verbose=args.verbose )
     else:
@@ -278,8 +280,8 @@ else:
         valid_probs = model.predict(valid_gen, verbose=args.verbose)
     else:
         valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
-bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, args.n_etypes, training,
-                        args.output_dir, args.plotting, args.sep_bkg, args.runDiffPlots)
+bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, args.n_etypes,
+                        training, args.output_dir, args.plotting, args.sep_bkg)
 if '.pkl' in args.results_out:
     args.results_out = args.output_dir+'/'+args.results_out
     if args.feature_removal == 'ON':

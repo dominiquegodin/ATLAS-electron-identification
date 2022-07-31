@@ -176,7 +176,8 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
         sample = {key:data[key][idx[0]:idx[1]] for key in set(scalars+others)-{'tracks'}}
         sample.update({'eta'      :sample['p_eta']            , 'pt'       :sample['p_et_calo'],
                        'SCTHits'  :sample['p_numberOfSCTHits'], 'pixelHits':sample['p_numberOfPixelHits'],
-                       'ambiguity':sample['p_ambiguityType']  , 'mu'       :sample['averageInteractionsPerCrossing']})
+                       #'ambiguity':sample['p_ambiguityType']  , 'mu'       :sample['averageInteractionsPerCrossing']
+                       })
         for key in set(images)-{'tracks'}:
             try: sample[key] = data[key][idx[0]:idx[1]]
             except KeyError:
@@ -467,39 +468,22 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
         return valid_ratios
 
 
-def validation(output_dir, results_in, plotting, n_valid, n_etypes,
-               data_files, inputs, valid_cuts, sep_bkg, diff_plots):
+def validation(output_dir, results_in, plotting, n_valid, n_etypes, inputs, valid_cuts, sep_bkg):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
-    n_e = min(len(probs), int(n_valid[1]-n_valid[0]))
-    """ Adding variables to the results """
-    if False or len(valid_data) == 1:
-        print('Loading valid sample', n_e, end=' --> ', flush=True)
-        sample, labels, _ = merge_samples(data_files, n_valid, inputs, n_tracks=5, n_classes=probs.shape[1],
-                                          valid_cuts=valid_cuts, scaler=None)
-        n_e = len(labels)
+    n_e = min(len(probs), int(n_valid))
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    """ Saving the added variables to the results file """
-    if False:
-        print('Saving validation data to:', output_dir+'/'+'valid_data.pkl', '\n')
-        pickle.dump((sample, labels, probs), open(output_dir+'/'+'valid_data.pkl','wb')); sys.exit()
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' --> ', flush=True)
     #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
     #valid_cuts = '(sample["pt"] >= 20) & (sample["pt"] <= 80)'
     cuts = n_e*[True] if valid_cuts == '' else eval(valid_cuts)
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
-    if False: #generate calorimeter images
-        layers = ['em_barrel_Lr0'  , 'em_barrel_Lr1_fine'  , 'em_barrel_Lr2', 'em_barrel_Lr3',
-                  'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-        from plots_DG import cal_images
-        cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
     if len(labels) == n_e: print('')
     else: print('('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
     #multi_cuts(sample, labels, probs, output_dir); sys.exit()
-    valid_results(sample, labels, probs, None, n_etypes, None, output_dir, plotting, sep_bkg, diff_plots)
-    print()
+    valid_results(sample, labels, probs, None, n_etypes, None, output_dir, plotting, sep_bkg); print()
     #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
 
 
@@ -574,7 +558,6 @@ def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, in
     for job in processes: job.start()
     for job in processes: job.join()
     sys.exit()
-
     #ROC_values = (ROC_values[::int(np.ceil(ROC_values.shape[0]/10e6))], apply_filter(ROC_values, index))
     #ROC_values = (ROC_values[0][:,:-1], ROC_values[1][:,:-1])
     #processes  = [mp.Process(target=ROC_curves, args=(sample, labels, probs, bkg, ROC_values, output_dir))
@@ -630,7 +613,7 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
 def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
                   sig_list, bkg, return_dict, separation=True, ECIDS=True):
     sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg)
-    #pickle.dump((sample, labels, probs), open(output_dir+'/'+'results_0_vs_'+str(bkg)+'.pkl','wb'))
+    #pickle.dump((sample, labels, probs), open(output_dir+'/'+'results_0vs'+str(bkg).title()+'.pkl','wb'))
     if plotting == 'ON':
         output_dir += '/'+'class_0vs'+str(bkg).title()
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
@@ -638,8 +621,8 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
         #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
-        processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
+        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
+        #processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -649,7 +632,7 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
 
 
 def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etypes,
-                  training, output_dir, plotting, sep_bkg, diff_plots):
+                  training, output_dir, plotting, sep_bkg, diff_plots=False):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
     """ Plotting efficiciency ratios mesh grid """
     valid_ratios = compo_matrix(valid_labels, train_labels, valid_probs, n_etypes); print(print_dict[2])
@@ -804,11 +787,11 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #plot_heatmaps(sample, labels, output_dir); sys.exit()
     # CALORIMETER IMAGES
     from plots_DG import cal_images
-    layers  = [ 'em_barrel_Lr0',   'em_barrel_Lr1_fine',   'em_barrel_Lr2',   'em_barrel_Lr3',
-               #                    'tile_gap_Lr1'                                      ,
-               # 'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3',
-               #'lar_endcap_Lr0',  'lar_endcap_Lr1',  'lar_endcap_Lr2',  'lar_endcap_Lr3',
-                                 'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3']
+    layers  = [ 'em_barrel_Lr0', 'em_barrel_Lr1_fine',   'em_barrel_Lr2',   'em_barrel_Lr3',
+               #                  'tile_gap_Lr1'      ,
+               # 'em_endcap_Lr0', 'em_endcap_Lr1_fine',   'em_endcap_Lr2',   'em_endcap_Lr3',
+               #'lar_endcap_Lr0', 'lar_endcap_Lr1'    ,  'lar_endcap_Lr2',  'lar_endcap_Lr3',
+                                 'tile_barrel_Lr1'   , 'tile_barrel_Lr2', 'tile_barrel_Lr3']
     cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
 
 
