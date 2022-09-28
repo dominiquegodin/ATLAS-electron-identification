@@ -8,15 +8,15 @@
 #SBATCH --nodes=1               #number of nodes
 ##SBATCH --mem=128G              #memory per node (on Beluga)
 #SBATCH --cpus-per-task=4       #number of CPU threads per node
-#SBATCH --gres=gpu:2            #number of GPU(s) per node
-#SBATCH --job-name=e-ID
-#SBATCH --output=outputs/log_files/%x_%A_%a.out
+#SBATCH --gres=gpu:1            #number of GPU(s) per node
+#SBATCH --job-name=e-ID_CNN
+#SBATCH --output=%x_%A_%a.out
 #SBATCH --array=0
 #---------------------------------------------------------------------
 
 export SBATCH_VAR=$SLURM_ARRAY_TASK_ID
-export HOST_NAME=$SLURM_SUBMIT_HOST
-export NODE_DIR=$SLURM_TMPDIR
+export  HOST_NAME=$SLURM_SUBMIT_HOST
+export   NODE_DIR=$SLURM_TMPDIR
 export SCRIPT_VAR
 
 if [[ $HOST_NAME == *atlas* ]]
@@ -43,3 +43,6 @@ else
     SIF=/project/def-arguinj/shared/sing_images/tf-2.1.0-gpu-py3_sing-3.5.sif
     singularity shell --nv --bind $PATHS $SIF < classifier.sh $SBATCH_VAR $HOST_NAME $NODE_DIR
 fi
+
+mkdir -p outputs/log_files
+mv *.out log_files 2>/dev/null
