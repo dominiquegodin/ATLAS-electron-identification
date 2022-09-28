@@ -17,6 +17,7 @@ parser.add_argument( '--sampling'   , default = 'ON'              )
 parser.add_argument( '--merging'    , default = 'OFF'             )
 parser.add_argument( '--mixing'     , default = 'OFF'             )
 parser.add_argument( '--eta_region' , default = ''                )
+parser.add_argument( '--indir'		, default = '/home/zp/denis/root2hdf5/outputs/discrepancy_test/MC/electron/myTag', type=str)
 args = parser.parse_args()
 
 
@@ -28,18 +29,19 @@ if args.mixing == 'ON':
 
 
 # DATASET
-data_path  = '/lcg/storage19/atlas/godin/e-ID_data/2020-10-30'
-if args.eta_region != '': data_path += '/'+args.eta_region
-else                    : sys.exit()
+data_path  = args.indir
+#if args.eta_region != '': data_path += '/'+args.eta_region
+#else                    : sys.exit()
 if not os.path.isdir(data_path+'/'+'output'): os.mkdir(data_path+'/'+'output')
 output_dir = data_path+'/'+'output'
+print(os.listdir(data_path))
 data_files = [data_path+'/'+h5_file for h5_file in os.listdir(data_path) if '.h5' in h5_file]
 data_files = sorted(data_files)[0:max(1,args.n_files) if args.n_files != None else len(data_files)]
 
 
 # MERGING FILES / NO PRESAMPLING
 if args.sampling == 'OFF':
-    if args.merging == 'ON': print(); merge_presamples(output_dir, args.output_file)
+    if args.merging == 'ON': print(); merge_presamples(data_path, args.output_file)
     sys.exit()
 
 
@@ -76,6 +78,12 @@ integers = ['p_truthType'     , 'p_TruthType'     , 'p_iffTruth'      , 'p_nTrac
 h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file]
 for h5_file in h5_files: os.remove(output_dir+'/'+h5_file)
 
+# MODIFYING FILE STRUCTURE
+for h5_file in data_files:
+    with h5py.File(h5_file,"a") as data:
+        if 'train' not in data.keys():
+            data.create_group('train')
+            for key in data: data.move(key, 'train'+'/'+key)
 
 # STARTING SAMPLING AND COLLECTING DATA
 n_tasks = min(mp.cpu_count(), args.n_tasks)
