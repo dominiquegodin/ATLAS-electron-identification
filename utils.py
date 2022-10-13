@@ -2,12 +2,11 @@ import tensorflow        as tf
 import numpy             as np
 import multiprocessing   as mp
 import matplotlib.pyplot as plt
-import os, sys, h5py, pickle, time, itertools
+import os, sys, h5py, pickle, time, itertools, warnings
 from   sklearn  import metrics, utils, preprocessing
 from   tabulate import tabulate
 from   skimage  import transform
-from   plots_DG import valid_accuracy, plot_history, plot_distributions_DG, plot_ROC_curves, var_histogram
-from   plots_DG import performance_ratio
+from   plots_DG import plot_history, plot_discriminant, plot_ROC_curves, var_histogram, performance_ratio
 from   plots_KM import plot_distributions_KM, differential_plots
 
 
@@ -151,14 +150,14 @@ def match_distributions(sample, labels, target_sample, target_labels):
     return np.where(labels==0, weights_sig[indices], weights_bkg[indices])
 
 
-def get_dataset(host_name='lps', node_dir='', eta_region=''):
-    if 'lps'    in host_name                   : node_dir = '/opt/tmp/godin/e-ID_data/presamples'
-    if 'beluga' in host_name and node_dir == '': node_dir = '/project/def-arguinj/shared/e-ID_data'
-    if eta_region in ['0.0-1.3', '1.3-1.6', '1.6-2.5', '0.0-2.5', '0.0-2.5_mc', '0.0-2.5_data']:
-        folder = node_dir+'/'+eta_region
-        data_files = sorted([folder+'/'+h5_file for h5_file in os.listdir(folder) if 'e-ID_' in h5_file])
+def get_dataset(input_dir='', input_path='', host_name='lps'):
+    if 'lps'    in host_name and input_path == '': input_path = '/opt/tmp/godin/e-ID_data/presamples'
+    if 'beluga' in host_name and input_path == '': input_path = '/project/def-arguinj/shared/e-ID_data'
+    if input_dir != '':
+        folder = input_path+'/'+input_dir
+        data_files = sorted([folder+'/'+h5_file for h5_file in os.listdir(folder) if 'e-ID' in h5_file])
     else:
-        barrel_dir, midgap_dir, endcap_dir = [node_dir+'/'+folder for folder in ['0.0-1.3', '1.3-1.6', '1.6-2.5']]
+        barrel_dir, midgap_dir, endcap_dir = [input_path+'/'+folder for folder in ['0.0-1.3', '1.3-1.6', '1.6-2.5']]
         barrel_files = sorted([barrel_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
         midgap_files = sorted([midgap_dir+'/'+h5_file for h5_file in os.listdir(midgap_dir) if 'e-ID_' in h5_file])
         endcap_files = sorted([endcap_dir+'/'+h5_file for h5_file in os.listdir(endcap_dir) if 'e-ID_' in h5_file])
@@ -174,10 +173,10 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
         start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in set(scalars+others)-{'tracks'}}
-        sample.update({'eta'      :sample['p_eta']            , 'pt'       :sample['p_et_calo'],
-                       'SCTHits'  :sample['p_numberOfSCTHits'], 'pixelHits':sample['p_numberOfPixelHits'],
-                       #'ambiguity':sample['p_ambiguityType']  , 'mu'       :sample['averageInteractionsPerCrossing']
-                       })
+        sample.update({'eta'    :sample['p_eta']            , 'pt'       :sample['p_et_calo']          ,
+                       'SCTHits':sample['p_numberOfSCTHits'], 'pixelHits':sample['p_numberOfPixelHits']})
+        try: sample.update({'mu':sample['averageInteractionsPerCrossing']})
+        except: pass
         for key in set(images)-{'tracks'}:
             try: sample[key] = data[key][idx[0]:idx[1]]
             except KeyError:
@@ -204,7 +203,7 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     firstEgMotherPdgId = 'p_firstEgMotherPdgId'
     charge             = 'p_charge'
     vertexIndex        = 'p_vertexIndex'
-    labels = np.full(sample[iffTruth].shape, -1)
+    labels = np.full_like(sample[iffTruth], -1)
     labels[(sample[iffTruth] ==  2) & (sample[firstEgMotherPdgId]*sample[charge] < 0)] = 0
     labels[(sample[iffTruth] ==  2) & (sample[firstEgMotherPdgId]*sample[charge] > 0)] = 1
     labels[ sample[iffTruth] ==  3                                                   ] = 1
@@ -214,6 +213,7 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
+    #labels[(sample[iffTruth] ==  1)] = 6 #KnowUnknown class
     if n_classes == 2:
         labels[labels >= 2] = 1
     if n_classes == 5:
@@ -255,7 +255,12 @@ def merge_samples(data_files, idx, input_data, n_tracks, n_classes, cuts, scaler
     for key in list(samples[0].keys()):
         sample[key] = np.concatenate([n[key] for n in samples])
         for n in samples: n.pop(key)
-    indices = np.where( np.logical_and(labels!=-1, eval(cuts) if cuts!='' else True) )[0]
+    cut_list = [np.full_like(labels, True)]
+    for cut in cuts:
+        try   : cut_list.append(eval(cut))
+        except: pass
+    eval_cuts = np.logical_and.reduce(cut_list)
+    indices = np.where( np.logical_and(labels!=-1, eval_cuts if cuts!='' else True) )[0]
     sample, labels, _ = sample_cuts(sample, labels, cuts=cuts, verbose='ON')
     if   scaler != None: sample = apply_scaler(sample, input_data['scalars'], scaler, verbose='ON')
     if t_scaler != None: sample = apply_t_scaler(sample, t_scaler, verbose='ON')
@@ -273,8 +278,7 @@ class Batch_Generator(tf.keras.utils.Sequence):
         self.weights    = weights   ; self.shuffle    = shuffle
         self.batch_dict = batch_idx(self.data_files, self.batch_size, self.indexes, self.weights, self.shuffle)
     def __len__(self):
-        #number of batches per epoch
-        return len(self.batch_dict)
+        return len(self.batch_dict) #Number of batches per epoch
     def __getitem__(self, gen_index):
         file_index = self.batch_dict[gen_index]['file']
         file_idx   = self.batch_dict[gen_index]['indices']
@@ -283,7 +287,7 @@ class Batch_Generator(tf.keras.utils.Sequence):
         sample, labels = make_sample(data_file, file_idx, self.input_data, self.n_tracks, self.n_classes)
         sample, labels, weights = sample_cuts(sample, labels, weights, self.cuts)
         if len(labels) != 0:
-            if self.scaler != None: sample = apply_scaler(sample, self.input_data['scalars'], self.scaler)
+            if self.scaler   != None: sample = apply_scaler(sample, self.input_data['scalars'], self.scaler)
             if self.t_scaler != None: sample = apply_t_scaler(sample, self.t_scaler)
         return sample, labels, weights
 
@@ -295,17 +299,22 @@ def sample_cuts(sample, labels, weights=None, cuts='', verbose='OFF'):
         if np.all(weights) != None: weights = weights[labels!=-1]
         labels = labels[labels!=-1]
         if verbose == 'ON':
-            print('Applying IFF labels cuts -->', format(len(labels),'8d'), 'e conserved', end=' ')
+            print('Applying IFFtruth cuts -->', format(len(labels),'8d'), 'e conserved', end=' ')
             print('(' + format(100*len(labels)/length, '.2f') + ' %)')
-    if cuts != '':
-        length = len(labels)
-        eval_cuts = eval(cuts)
-        labels = labels[eval_cuts]
-        if np.all(weights) != None: weights = weights[eval_cuts]
-        sample = {key:sample[key][eval_cuts] for key in sample}
-        if verbose == 'ON':
-            print('Applying features cuts -->', format(len(labels),'8d') ,'e conserved', end=' ')
-            print('(' + format(100*len(labels)/length,'.2f')+' %)\napplied cuts:', cuts.split('&')[0]+'& ...')
+    cut_list = [np.full_like(labels, True)]
+    for cut in cuts:
+        try:
+            cut_list.append(eval(cut))
+        except:
+            if verbose == 'ON': print('WARNING --> invalid cut:' , cut)
+    eval_cuts = np.logical_and.reduce(cut_list)
+    length = len(labels)
+    labels = labels[eval_cuts]
+    if np.all(weights) != None: weights = weights[eval_cuts]
+    sample = {key:sample[key][eval_cuts] for key in sample}
+    if verbose == 'ON':
+        print('Applying selected cuts -->', format(len(labels),'8d') ,'e conserved', end=' ')
+        print('(' + format(100*len(labels)/length,'.2f')+' %)\napplied cuts:', cuts[0]+' & ...')
     return sample, labels, weights
 
 
@@ -355,13 +364,13 @@ def process_images_mp(sample, image_list, verbose='OFF', n_tasks=16):
 
 
 def fit_scaler(sample, scalars, scaler_out):
-    print('Fitting quantile transform to training scalars', end=' --> ', flush=True); start_time = time.time()
+    print('Fitting  quantile transform from scalars', end=' --> ', flush=True); start_time = time.time()
     scalars = [key for key in scalars if key != 'tracks']
     scalars_array = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
     scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
     scaler.fit(scalars_array) #scaler.fit_transform(scalars_array)
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print('Saving quantile transform to', scaler_out, '\n')
+    print('Saving   quantile transform to', scaler_out, '\n')
     pickle.dump(scaler, open(scaler_out, 'wb'))
     return scaler
 
@@ -377,19 +386,20 @@ def apply_scaler(sample, scalars, scaler, verbose='OFF'):
 
 
 def fit_t_scaler(sample, scaler_out):
-    print('Fitting quantile transform to training tracks', end='  --> ', flush=True); start_time = time.time()
+    print('Fitting  quantile transform from tracks', end='  --> ', flush=True); start_time = time.time()
     tracks = sample['tracks']; shape = tracks.shape
-    scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
+    #scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
+    scaler = preprocessing.RobustScaler()
     scaler.fit(np.reshape(tracks, (shape[0]*shape[1],-1)))
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
-    print('Saving tracks scaler file in', scaler_out, '\n')
+    print('Saving   tracks scaler file in', scaler_out, '\n')
     pickle.dump(scaler, open(scaler_out, 'wb'))
     return scaler
 
 
 def apply_t_scaler(sample, scaler, verbose='OFF'):
     if verbose == 'ON':
-        print('Applying robust transform to tracks', end=' --> ', flush=True); start_time = time.time()
+        print('Applying quantile transform to tracks', end=' --> ', flush=True); start_time = time.time()
     tracks = sample['tracks']; shape = tracks.shape
     tracks = np.reshape(tracks, (shape[0]*shape[1],-1))
     tracks = scaler.transform(tracks)
@@ -433,7 +443,7 @@ def class_ratios(labels, n_etypes):
 
 def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=None):
     if n_etypes is None: n_etypes = len(np.unique(valid_labels))
-    classes      = ['CLASS '+str(n) for n in range(n_etypes)]
+    classes = ['CLASS '+str(n) for n in range(n_etypes)]
     valid_ratios = class_ratios(valid_labels, n_etypes)
     train_ratios = class_ratios(train_labels, n_etypes) if train_labels is not None else n_etypes*['n/a']
     if valid_probs is None:
@@ -447,8 +457,9 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
         #matrix = 100 * matrix.T / matrix.sum(axis=1)
         matrix = 100*metrics.confusion_matrix(valid_labels, valid_preds, normalize='true').T
         """ Predictions ratios """
-        pred_ratios = matrix @ valid_ratios / 100
+        #pred_ratios = 100*np.mean(valid_probs, axis=0, dtype=np.float64)
         #pred_ratios = [100*np.sum(valid_preds==n)/len(valid_preds) for n in range(n_etypes)]
+        pred_ratios = matrix @ valid_ratios / 100
         classes = ['CLASS '+str(n) for n in range(n_etypes)]
         if n_etypes > 2:
             headers = ['CLASS #', 'TRAIN', 'VALID'] + classes + ['       VALID']
@@ -465,10 +476,10 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
         valid_accuracy = valid_ratios @ matrix.diagonal() /100
         print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
         print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
-        return valid_ratios
+        return {'truth':valid_ratios, 'pred':pred_ratios, 'none':np.ones_like(valid_ratios)}
 
 
-def validation(output_dir, results_in, plotting, n_valid, n_etypes, inputs, valid_cuts, sep_bkg):
+def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts, sep_bkg):
     print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
@@ -566,33 +577,35 @@ def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, in
     #for job in processes: job.join()
 
 
-def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg):
+def make_discriminant(sample, labels, probs, n_etypes, ratios, sig_list, bkg):
     n_classes = probs.shape[1]
-    from functools import reduce
+    #from functools import reduce
     def class_weights(sig_list, optimal_bkg=None):
         weights = np.ones(n_classes)
         if optimal_bkg != None:
             for n in range(n_classes):
                 if n not in sig_list and n != optimal_bkg: weights[n] = 0
         if optimal_bkg == 'bkg':
-            weights = class_ratios(labels, n_etypes)
-        return weights
+            weights = ratios
+        return np.array(weights)
     if n_classes > 2:
         """ Multi-class discriminant """
-        bkg_list  = set(np.arange(n_classes))-set(sig_list)
-        bkg       = bkg_list if bkg=='bkg' else [bkg]
+        bkg_list = list(set(np.arange(n_classes))-set(sig_list))
+        bkg      = bkg_list if bkg=='bkg' else [bkg]
         print_dict[1] += 'SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
         #for n in [None]+list(np.arange(1, n_classes))+['bkg']: print(class_weights(sig_list, n))
-        weights   = class_weights(sig_list, 'bkg')
-        #weights   = class_weights(sig_list, 'bkg' if bkg==bkg_list else bkg[0])
-        labels    = np.array([0 if label in sig_list else 1 if label in bkg else -1 for label in labels])
-        sig_probs = reduce(np.add, [weights[n]*probs[:,n] for n in sig_list])[labels!=-1]
-        bkg_probs = reduce(np.add, [weights[n]*probs[:,n] for n in bkg_list])[labels!=-1]
+        weights = class_weights(sig_list, 'bkg')                               #Optimal combined background
+        #weights = class_weights(sig_list, 'bkg' if bkg==bkg_list else bkg[0]) #Optimal individual classes
+        labels  = np.array([0 if label in sig_list else 1 if label in bkg else -1 for label in labels])
+        #sig_probs = reduce(np.add, [weights[n]*probs[:,n] for n in sig_list])[labels!=-1]
+        #bkg_probs = reduce(np.add, [weights[n]*probs[:,n] for n in bkg_list])[labels!=-1]
+        sig_probs = (probs[:,sig_list]@weights[sig_list])[labels!=-1]
+        bkg_probs = (probs[:,bkg_list]@weights[bkg_list])[labels!=-1]
         sample    = {key:sample[key][labels!=-1] for key in sample}
         labels    = labels[labels!=-1]
         sig_probs = np.where(sig_probs!=bkg_probs, sig_probs, 0.5)
         bkg_probs = np.where(sig_probs!=bkg_probs, bkg_probs, 0.5)
-        probs     = (np.vstack([sig_probs, bkg_probs])/(sig_probs+bkg_probs)).T
+        probs     = (np.vstack([sig_probs,bkg_probs])/(sig_probs+bkg_probs)).T
     else:
         """ Background separation for binary classification """
         if bkg == 'bkg': return sample, labels, probs
@@ -610,19 +623,19 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
         print_dict[3] += format(np.nan_to_num(1/fpr[np.argwhere(tpr>=val/100)[0]][0]),'>6.0f')+'\n'
 
 
-def print_results(sample, labels, probs, n_etypes, plotting, output_dir,
-                  sig_list, bkg, return_dict, separation=True, ECIDS=True):
-    sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg)
-    #pickle.dump((sample, labels, probs), open(output_dir+'/'+'results_0vs'+str(bkg).title()+'.pkl','wb'))
+def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg, ratios,
+                  return_dict, separation=True, ECIDS=True):
+    sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, ratios['truth'], sig_list, bkg)
     if plotting == 'ON':
-        output_dir += '/'+'class_0vs'+str(bkg).title()
+        output_dir += '/'+'class_'+''.join([str(n) for n in sig_list])+'vs'+str(bkg).title()
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
         #for iter_tuple in itertools.product( [False,True], ['CNN2LLH','CNN2CNN'] ):
         #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
+        ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
-        #processes += [mp.Process(target=plot_distributions_DG, args=arguments)]
+        #processes += [mp.Process(target=plot_discriminant, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -635,16 +648,18 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etype
                   training, output_dir, plotting, sep_bkg, diff_plots=False):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
     """ Plotting efficiciency ratios mesh grid """
-    valid_ratios = compo_matrix(valid_labels, train_labels, valid_probs, n_etypes); print(print_dict[2])
-    sig_list  = [0]
-    bkg_list  = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg=='ON' else ['bkg']
-    manager   = mp.Manager(); return_dict = manager.dict()
-    arguments = [(valid_sample, valid_labels, valid_probs, n_etypes, plotting,
-                  output_dir, sig_list, bkg, return_dict) for bkg in bkg_list]
-    processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
-    if training is not None: processes += [mp.Process(target=plot_history, args=(training, output_dir,))]
-    for job in processes: job.start()
-    for job in processes: job.join()
+    ratios = compo_matrix(valid_labels, train_labels, valid_probs, n_etypes); print(print_dict[2])
+    #from plots_DG import plot_ratios
+    #plot_ratios(valid_sample, valid_labels, valid_probs, n_etypes, output_dir)
+    if training is not None: plot_history(training, output_dir)
+    for sig_list in [[0], [0,1]]:
+        bkg_list  = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg=='ON' else ['bkg']
+        manager   = mp.Manager(); return_dict = manager.dict()
+        arguments = [(valid_sample, valid_labels, valid_probs, n_etypes, plotting, output_dir,
+                      sig_list, bkg, ratios, return_dict) for bkg in bkg_list]
+        processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
+        for job in processes: job.start()
+        for job in processes: job.join()
     """ Background rejection extraction for feature ranking """
     if plotting=='OFF':
         for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
@@ -676,6 +691,7 @@ def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_f
     print('########################################################################'  )
     print('##### STARTING '+str(n_folds)+'-FOLD CROSS-VALIDATION ################################'  )
     print('########################################################################\n')
+    from plots_DG import valid_accuracy
     n_classes    = max(valid_labels)+1
     valid_probs  = np.full(valid_labels.shape + (n_classes,), -1.)
     event_number = valid_sample['eventNumber']
@@ -777,7 +793,6 @@ def print_channels(sample, labels, col=0, reverse=False):
 
 
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
-    #for key in sample: print(key, sample[key].shape); sys.exit()
     #verify_sample(sample); sys.exit()
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
@@ -791,8 +806,9 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
                #                  'tile_gap_Lr1'      ,
                # 'em_endcap_Lr0', 'em_endcap_Lr1_fine',   'em_endcap_Lr2',   'em_endcap_Lr3',
                #'lar_endcap_Lr0', 'lar_endcap_Lr1'    ,  'lar_endcap_Lr2',  'lar_endcap_Lr3',
-                                 'tile_barrel_Lr1'   , 'tile_barrel_Lr2', 'tile_barrel_Lr3']
-    cal_images(sample, labels, layers, output_dir, mode='mean', soft=False)
+                                 'tile_barrel_Lr1'   , 'tile_barrel_Lr2', 'tile_barrel_Lr3'
+               ]
+    cal_images(sample, labels, layers, output_dir, mode='mean', scale='free', soft=False)
 
 
 def feature_removal(scalars, images, groups, index):
@@ -960,21 +976,21 @@ def get_idx(size, start_value=0, n_sets=5):
     return list(zip(idx_list[:-1], idx_list[1:]))
 
 
-def mix_datafiles():
-    data_files = get_dataset()
+def mix_datafiles(input_dir, input_path='', temp_dir='temp_dir'):
+    data_files = get_dataset(input_dir, input_path)
     LF_path  = '/opt/tmp/godin/e-ID_data/presamples/LF_data'
     LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
     #for index in range(len(data_files)):
     #    print(data_files[index])
     #    print(LF_files[index])
     #sys.exit()
-    arguments  = [(data_files[index], LF_files[index], index) for index in range(len(data_files))[:30]]
+    output_dir = data_files[0].split(input_dir)[0] + temp_dir
+    if not os.path.isdir(output_dir): os.mkdir(output_dir)
+    arguments  = [(data_files[index], LF_files[index], index, output_dir) for index in range(len(data_files))]
     processes  = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
     for job in processes: job.start()
     for job in processes: job.join()
-def file_mixing(h5_file, LF_file, index, replace_data=False):
-    output_dir = h5_file[0:h5_file.rfind('/')] + '/outputs'
-    if not os.path.isdir(output_dir): os.mkdir(output_dir)
+def file_mixing(h5_file, LF_file, index, output_dir, replace_data=False):
     features  = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
     MC_data   = h5py.File(h5_file,'r')
     if replace_data:
@@ -1001,17 +1017,18 @@ def file_mixing(h5_file, LF_file, index, replace_data=False):
             # Labelling light flavor data
             if key == 'p_iffTruth' : data_in = np.where(MC_criteria, 10, data_in )
             if key == 'p_TruthType': data_in = np.where(MC_criteria,  1, data_in )
-        dtype   = np.int32 if data_in.dtype=='int32' else np.float16
-        chunks  = (2000,) + data_in.shape[1:]
+        dtype  = np.int32 if data_in.dtype=='int32' else np.float16
+        chunks = (2000,) + data_in.shape[1:]
         data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
         print( 'Mixing file', h5_file.split('/')[-2]+'/'+h5_file.split('/')[-1], 'with feature', key )
         data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
 
 
-def mix_presamples(n_files, n_tasks, output_dir):
-    data_files = get_dataset()
+def mix_presamples(output_dir, input_path, temp_dir='temp_dir', n_files=20, n_tasks=5):
+    data_files = get_dataset(temp_dir, input_path)
     #for data_file in data_files: print(data_file)
     #sys.exit()
+    output_dir = data_files[0].split(temp_dir)[0] + output_dir
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     n_e      = [len(h5py.File(h5_file,'r')['eventNumber']) for h5_file in data_files]
     idx_list = [get_idx(n, n_sets=n_files) for n in n_e]
@@ -1023,6 +1040,7 @@ def mix_presamples(n_files, n_tasks, output_dir):
         for job in processes: job.start()
         for job in processes: job.join()
         print('run time:', format(time.time() - start_time, '2.1f'), '\b'+' s\n')
+    import shutil; shutil.rmtree( data_files[0].split(temp_dir)[0] + temp_dir )
 def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
     features = list(set().union(*[h5py.File(h5_file,'r').keys() for h5_file in data_files]))
     features = utils.shuffle(features, random_state=out_idx)
