@@ -150,12 +150,12 @@ def match_distributions(sample, labels, target_sample, target_labels):
     return np.where(labels==0, weights_sig[indices], weights_bkg[indices])
 
 
-def get_dataset(input_dir='', input_path='', host_name='lps'):
+def get_dataset(input_path='', input_dir='', host_name='lps'):
     if 'lps'    in host_name and input_path == '': input_path = '/opt/tmp/godin/e-ID_data/presamples'
     if 'beluga' in host_name and input_path == '': input_path = '/project/def-arguinj/shared/e-ID_data'
     if input_dir != '':
         folder = input_path+'/'+input_dir
-        data_files = sorted([folder+'/'+h5_file for h5_file in os.listdir(folder) if 'e-ID' in h5_file])
+        data_files = sorted([folder+'/'+h5_file for h5_file in os.listdir(folder) if '.h5' in h5_file])
     else:
         barrel_dir, midgap_dir, endcap_dir = [input_path+'/'+folder for folder in ['0.0-1.3', '1.3-1.6', '1.6-2.5']]
         barrel_files = sorted([barrel_dir+'/'+h5_file for h5_file in os.listdir(barrel_dir) if 'e-ID_' in h5_file])
@@ -173,10 +173,8 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
         start_time = time.time()
     with h5py.File(data_file, 'r') as data:
         sample = {key:data[key][idx[0]:idx[1]] for key in set(scalars+others)-{'tracks'}}
-        sample.update({'eta'    :sample['p_eta']            , 'pt'       :sample['p_et_calo']          ,
-                       'SCTHits':sample['p_numberOfSCTHits'], 'pixelHits':sample['p_numberOfPixelHits']})
-        try: sample.update({'mu':sample['averageInteractionsPerCrossing']})
-        except: pass
+        sample.update({'eta':sample['p_eta'    ], 'SCTHits'  :sample['p_numberOfSCTHits'  ],
+                       'pt' :sample['p_et_calo'], 'pixelHits':sample['p_numberOfPixelHits']})
         for key in set(images)-{'tracks'}:
             try: sample[key] = data[key][idx[0]:idx[1]]
             except KeyError:
@@ -652,7 +650,7 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etype
     #from plots_DG import plot_ratios
     #plot_ratios(valid_sample, valid_labels, valid_probs, n_etypes, output_dir)
     if training is not None: plot_history(training, output_dir)
-    for sig_list in [[0], [0,1]]:
+    for sig_list in [[0]]:#, [0,1]]:
         bkg_list  = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg=='ON' else ['bkg']
         manager   = mp.Manager(); return_dict = manager.dict()
         arguments = [(valid_sample, valid_labels, valid_probs, n_etypes, plotting, output_dir,
@@ -976,8 +974,8 @@ def get_idx(size, start_value=0, n_sets=5):
     return list(zip(idx_list[:-1], idx_list[1:]))
 
 
-def mix_datafiles(input_dir, input_path='', temp_dir='temp_dir'):
-    data_files = get_dataset(input_dir, input_path)
+def mix_datafiles(input_path='', input_dir='', temp_dir='temp_dir', n_tasks=20):
+    data_files = get_dataset(input_path, input_dir) ; n_files = len(data_files)
     LF_path  = '/opt/tmp/godin/e-ID_data/presamples/LF_data'
     LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
     #for index in range(len(data_files)):
@@ -986,13 +984,14 @@ def mix_datafiles(input_dir, input_path='', temp_dir='temp_dir'):
     #sys.exit()
     output_dir = data_files[0].split(input_dir)[0] + temp_dir
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
-    arguments  = [(data_files[index], LF_files[index], index, output_dir) for index in range(len(data_files))]
-    processes  = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
-    for job in processes: job.start()
-    for job in processes: job.join()
+    for idx in np.split(utils.shuffle(np.arange(n_files)), np.arange(n_tasks,n_files,n_tasks)):
+        arguments = [(data_files[index], LF_files[index], index, output_dir) for index in idx]
+        processes = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
+        for job in processes: job.start()
+        for job in processes: job.join()
 def file_mixing(h5_file, LF_file, index, output_dir, replace_data=False):
-    features  = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
-    MC_data   = h5py.File(h5_file,'r')
+    features = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
+    MC_data  = h5py.File(h5_file,'r')
     if replace_data:
         # Light flavor indices in MC file
         iffTruth  = MC_data['p_iffTruth' ][:]
@@ -1024,9 +1023,10 @@ def file_mixing(h5_file, LF_file, index, output_dir, replace_data=False):
         data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
 
 
-def mix_presamples(output_dir, input_path, temp_dir='temp_dir', n_files=20, n_tasks=5):
-    data_files = get_dataset(temp_dir, input_path)
-    #for data_file in data_files: print(data_file)
+def mix_presamples(input_path, output_dir, temp_dir='temp_dir', n_files=20, n_tasks=2):
+    data_files = get_dataset(input_path, temp_dir)
+    #for data_file in data_files:
+    #    print(data_file)
     #sys.exit()
     output_dir = data_files[0].split(temp_dir)[0] + output_dir
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
@@ -1040,7 +1040,7 @@ def mix_presamples(output_dir, input_path, temp_dir='temp_dir', n_files=20, n_ta
         for job in processes: job.start()
         for job in processes: job.join()
         print('run time:', format(time.time() - start_time, '2.1f'), '\b'+' s\n')
-    import shutil; shutil.rmtree( data_files[0].split(temp_dir)[0] + temp_dir )
+    #import shutil; shutil.rmtree( data_files[0].split(temp_dir)[0] + temp_dir )
 def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
     features = list(set().union(*[h5py.File(h5_file,'r').keys() for h5_file in data_files]))
     features = utils.shuffle(features, random_state=out_idx)
@@ -1048,7 +1048,8 @@ def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
         sample_list = []
         for in_idx in utils.shuffle(np.arange(len(data_files)), random_state=out_idx):
             idx = idx_list[in_idx][out_idx]
-            try: sample_list += [h5py.File(data_files[in_idx],'r')[key][idx[0]:idx[1]]]
+            try:
+                sample_list += [h5py.File(data_files[in_idx],'r')[key][idx[0]:idx[1]]]
             except KeyError:
                 if 'fine' in key: sample_list += [np.zeros((idx[1]-idx[0],)+(56,11), dtype=np.int8)]
                 else            : sample_list += [np.zeros((idx[1]-idx[0],)+( 7,11), dtype=np.int8)]

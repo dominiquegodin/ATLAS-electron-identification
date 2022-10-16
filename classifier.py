@@ -94,7 +94,7 @@ others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_
            'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
            'p_vertexIndex'  , 'p_charge'   , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin' ,
            'p_passWVeto'    , 'p_passZVeto', 'p_firstEgMotherPdgId'        , 'p_ambiguityType'            ,
-           'averageInteractionsPerCrossing'                                                               ]
+           'p_topoetcone20' , 'p_ptvarcone30', 'averageInteractionsPerCrossing'                           ]
 if args.tracks == 'ON': images += ['tracks']
 
 
@@ -111,6 +111,8 @@ args.valid_cuts += ['(sample["p_numberOfSCTHits"]+sample["p_numberOfPixelHits"]>
 args.valid_cuts += ['(sample["p_numberOfPixelHits"]>=2)']
 args.valid_cuts += ['(sample["p_ambiguityType"]<=4)']
 args.valid_cuts += ['(sample["p_passWVeto"]==True)', '(sample["p_passZVeto"]==True)']
+#args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"]<0.2)']
+#args.valid_cuts += ['(sample["p_ptvarcone30"]/sample["pt"]<0.15)']
 #channels_dict = {'Zee' :[361106], 'ttbar':[410470], 'Ztautau':[361108], 'Wtaunu':[361102,361105],
 #                 'JF17':[423300], 'JF35' :[423302], 'JF50'   :[423303], 'Wenu'  :[361100,361103]}
 #channels = channels_dict['Wenu']
@@ -134,7 +136,7 @@ if   args.results_in != '': sys.exit()
 
 
 # TRAINING DATA
-data_files = get_dataset(args.input_dir, args.input_path, args.host_name)
+data_files = get_dataset(args.input_path, args.input_dir, args.host_name)
 keys    = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_files])
 images  = [key for key in images  if key in keys or key=='tracks']
 scalars = [key for key in scalars if key in keys or key=='tracks']
