@@ -487,7 +487,11 @@ def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts, 
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end=' --> ', flush=True)
     #valid_cuts = '(labels==0) & (probs[:,0]<=0.05)'
     #valid_cuts = '(sample["pt"] >= 20) & (sample["pt"] <= 80)'
-    cuts = n_e*[True] if valid_cuts == '' else eval(valid_cuts)
+    cut_list = [np.full_like(labels, True)]
+    for cut in valid_cuts:
+        try   : cut_list.append(eval(cut))
+        except: pass #print('WARNING --> invalid cut:' , cut)
+    cuts = np.logical_and.reduce(cut_list)
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     if len(labels) == n_e: print('')
     else: print('('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
