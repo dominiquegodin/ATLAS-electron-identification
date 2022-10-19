@@ -306,7 +306,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
               'tight+ECIDS', 'medium+ECIDS', 'loose+ECIDS']
     #markers = 3*['o'] + 3*['D']
     markers = 2*['o','D','^']
-    sig_eff, bkg_eff = '$'+epsilon+'_{\operatorname{sig}}$', '$ϵ_{\operatorname{bkg}}$'
+    sig_eff, bkg_eff = '$'+epsilon+'_{\operatorname{sig}}$', '$'+epsilon+'_{\operatorname{bkg}}$'
     fig = plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
                      bottom=True, top=True, left=True, right=True)
@@ -326,17 +326,14 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
         else:
             y_max = 1000*np.ceil(max(1/fpr)/1000)
         plt.xlim([x_min, 100]); plt.ylim([1, y_max])
-        #LLH_scores = [1/fpr[np.argwhere(tpr >= value)[0]][0] for value in LLH_tpr]
-        #LLH_scores = [1/fpr[np.argmin(abs(tpr-value))] for value in LLH_tpr]
         def interpolation(tpr, fpr, value):
-            try:
-                idx1 = np.where(tpr>value)[0][np.argmin(tpr[tpr>value])]
-                idx2 = np.where(tpr<value)[0][np.argmax(tpr[tpr<value])]
-                M = (1/fpr[idx2]-1/fpr[idx1]) / (tpr[idx2]-tpr[idx1])
-                return 1/fpr[idx1] + M*(value-tpr[idx1])
-            except ValueError:
-                return np.max(1/fpr)
-        LLH_scores = [interpolation(tpr, fpr, value) for value in LLH_tpr]
+            #idx1 = np.argmax(tpr[tpr<value])
+            idx1 = np.where(tpr<=value)[0][-1]
+            idx2 = np.where(tpr>=value)[0][ 0]
+            M = (fpr[idx2]-fpr[idx1])/(tpr[idx2]-tpr[idx1]) if tpr[idx2]!=tpr[idx1] else 0
+            return fpr[idx1] + M*(value-tpr[idx1])
+        #LLH_scores = [1/fpr[np.argmin(abs(tpr-value))] for value in LLH_tpr]
+        LLH_scores = [1/interpolation(tpr, fpr, value) for value in LLH_tpr]
         for n in np.arange(len(LLH_scores[:3])):
             axes.axhline(LLH_scores[n], xmin=(LLH_tpr[n]-x_min/100)/(1-x_min/100), xmax=1,
             ls='--', linewidth=0.5, color='tab:gray', zorder=10)
@@ -391,7 +388,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
         if ROC_values != None:
             tag = 'combined bkg'
             extra_labels = {1:'{$w_{\operatorname{bkg}}$} for best AUC',
-                            2:'{$w_{\operatorname{bkg}}$} for best TNR @ 70% $\epsilon_{\operatorname{sig}}$'}
+                            2:'{$w_{\operatorname{bkg}}$} for best TNR @ 70% $'+epsilon+'_{\operatorname{sig}}$'}
             extra_colors = {1:'tab:orange', 2:'tab:green'   , 3:'tab:red'     , 4:'tab:brown'}
             for n in [1,2]:#range(1,len(ROC_values)):
                 extra_fpr, extra_tpr = ROC_values[n]
@@ -544,7 +541,11 @@ def ratio_meshgrid(sample, y_true, y_prob, wp, output_dir, eta_bins, pt_bins, EC
 def bkg_eff_ratio(sample, y_true, y_prob, wp, bin, ECIDS, return_dict):
     def CNN_fpr(tpr, fpr, LLH_tpr):
         """ Getting CNN bkg_eff for a given LLH sig_eff """
-        return fpr[np.where(tpr <= LLH_tpr)[0][-1]]
+        #idx1 = np.argmax(tpr[tpr <= LLH_tpr])
+        idx1 = np.where(tpr <= LLH_tpr)[0][-1]
+        idx2 = np.where(tpr >= LLH_tpr)[0][ 0]
+        M = (fpr[idx2]-fpr[idx1])/(tpr[idx2]-tpr[idx1]) if tpr[idx2]!=tpr[idx1] else 0
+        return fpr[idx1] + M*(LLH_tpr-tpr[idx1])
     wp = {'tight':0, 'medium':1, 'loose':2}[wp]
     eta, pt = sample['eta'], sample['pt']
     cut_list = [abs(eta)>=bin[0][0], abs(eta)<bin[0][1], pt>=bin[1][0], pt<bin[1][1]]
@@ -660,7 +661,10 @@ def plot_ratios(valid_sample, valid_labels, valid_probs, n_etypes, output_dir):
     channels_list = ['Zee', 'Wenu', 'Ztautau', 'Wtaunu', 'ttbar', 'JF17', 'JF35', 'JF50']
     ratios  = {process:return_dict[process][0] for process in channels_list}
     bkg_rej = {process:return_dict[process][1] for process in channels_list}
-    ratios  = np.vstack(      [ratios[process]['pred']- ratios[process]['truth']    for process in ratios] ).T
+    ratios = np.vstack([ratios[process]['truth'] for process in ratios] ).T
+    #ratios = np.vstack([ratios[process]['pred']-ratios[process]['truth'] for process in ratios] ).T
+    #ratios = np.vstack([(ratios[process]['pred']-ratios[process]['truth'])/ratios[process]['truth']
+    #                    for process in ratios] ).T
     #bkg_rej = np.vstack([100*(bkg_rej[process]['pred' ]-bkg_rej[process]['none'])/bkg_rej[process]['none']
     #                     for process in bkg_rej]).T
     #bkg_rej = np.vstack([100*(bkg_rej[process]['truth']-bkg_rej[process]['pred'])/bkg_rej[process]['pred']
@@ -672,13 +676,15 @@ def plot_ratios(valid_sample, valid_labels, valid_probs, n_etypes, output_dir):
     Y_val = [' Prompt \nElectron', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavour',
              'Light Flavour\n        e$/\gamma$        ', 'Light Flavour\n    Hadron    '       ]
     #plot_meshgrid(X_val, Y_val, bkg_rej, output_dir, vmin=0, vmax=200, prec=0)
-    plot_meshgrid(X_val, Y_val, ratios, output_dir, prec=1); sys.exit()
-def plot_meshgrid(X_val, Y_val, Z_val, output_dir, vmin=None, vmax=None, color='black', prec=2):
+    plot_meshgrid(X_val, Y_val, ratios, output_dir, prec=1, vmax=50); sys.exit()
+def plot_meshgrid(X_val, Y_val, Z_val, output_dir, prec=2, vmin=None, vmax=None, color='black'):
     X_idx = np.arange(0, len(X_val)+1) - 0.5
     Y_idx = np.arange(0, len(Y_val)+1) - 0.5
     plt.figure(figsize=(12.5,7.5)); ax = plt.gca()
     if vmin is None: vmin = np.min(Z_val[Z_val!=-1])
+    else           : vmin = max(vmin, np.min(Z_val[Z_val!=-1]))
     if vmax is None: vmax = np.max(Z_val[Z_val!=-1])
+    else           : vmax = min(vmax, np.max(Z_val[Z_val!=-1]))
     plt.pcolormesh(X_idx, Y_idx, Z_val, cmap="Blues"  , edgecolors='grey', vmin=vmin, vmax=vmax)
     #plt.pcolormesh(X_idx, Y_idx, Z_val, cmap="Blues_r", edgecolors='black', vmin=vmin, vmax=vmax)
     plt.xticks(np.arange(len(X_val)), X_val, rotation=0)
@@ -703,16 +709,17 @@ def plot_meshgrid(X_val, Y_val, Z_val, output_dir, vmin=None, vmax=None, color='
              and round(val,1)!=round(vmin,1) and round(val,1)!=round(vmax,1)]
     ticks = [vmin] + ticks + [vmax]
     cbar.set_ticks(ticks)
-    cbar.set_ticklabels([format(n,'.1f') for n in ticks])
+    cbar.set_ticklabels([format(n,'.0f') for n in ticks])
     cbar.ax.tick_params(labelsize=15, length=5, width=1.5)
     cbar.outline.set_linewidth(1.5)
-    #cbar.set_label('Predicted Ratio$-$Truth Ratio (%)', fontsize=22, labelpad=25, rotation=270)
-    cbar.set_label('Predicted Ratio$-$Truth Ratio (%)', fontsize=22, labelpad=0, rotation=90, loc='top')
+    cbar.set_label('Truth Ratio (%)', fontsize=22, labelpad=10, rotation=90, loc='top')
+    #cbar.set_label('Predicted Ratio$-$Truth Ratio (%)', fontsize=22, labelpad=0, rotation=90, loc='top')
+    #cbar.set_label('(Predicted Ratio$-$Truth Ratio)/Truth Ratio', fontsize=22, labelpad=10, rotation=90, loc='top')
     #plt.title('Relative Improvement in Background Rejection\n from Agnostic to Predicted Ratios (%)', fontsize=25)
     #plt.title('Relative Improvement in Background Rejection\n from Predicted to Truth Ratios (%)', fontsize=25)
     plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=color)
     plt.tight_layout()
-    file_name = output_dir+'/'+'ratios.png'
+    file_name = output_dir+'/'+'class_ratios.png'
     print('Saving meshgrid to:', file_name); plt.savefig(file_name)
 def get_bkg_rej(sample, labels, probs, n_etypes, ratios, ratio_type, bkg_rej_dict, sig_list=[0], val=90):
     def bkg_rej(sample, labels, probs, n_etypes, ratios, sig_list, bkg, return_dict):

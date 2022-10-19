@@ -10,7 +10,6 @@ from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_
 from   utils     import cross_valid, valid_results, sample_analysis, feature_removal, feature_ranking
 from   utils     import sample_histograms, fit_scaler, apply_scaler, fit_t_scaler, apply_t_scaler
 from   models    import callback, create_model
-#os.system('nvidia-modprobe -u -c=0') # for atlas15
 
 
 # PROGRAM ARGUMENTS
@@ -111,8 +110,8 @@ args.valid_cuts += ['(sample["p_numberOfSCTHits"]+sample["p_numberOfPixelHits"]>
 args.valid_cuts += ['(sample["p_numberOfPixelHits"]>=2)']
 args.valid_cuts += ['(sample["p_ambiguityType"]<=4)']
 args.valid_cuts += ['(sample["p_passWVeto"]==True)', '(sample["p_passZVeto"]==True)']
-#args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"]<0.2)']
-#args.valid_cuts += ['(sample["p_ptvarcone30"]/sample["pt"]<0.15)']
+#args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"]<0.20)']
+#args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"]<0.15)']
 #channels_dict = {'Zee' :[361106], 'ttbar':[410470], 'Ztautau':[361108], 'Wtaunu':[361102,361105],
 #                 'JF17':[423300], 'JF35' :[423302], 'JF50'   :[423303], 'Wenu'  :[361100,361103]}
 #channels = channels_dict['Wenu']
