@@ -631,8 +631,8 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
     if plotting == 'ON':
         output_dir += '/'+'class_'+''.join([str(n) for n in sig_list])+'vs'+str(bkg).title()
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
-        #for iter_tuple in itertools.product( [False,True], ['CNN2LLH','CNN2CNN'] ):
-        #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
+        for iter_tuple in itertools.product( [False,True], ['CNN2LLH','CNN2CNN'] ):
+            performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
         ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]

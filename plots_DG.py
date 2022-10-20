@@ -291,6 +291,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
     #    fpr     , tpr      = ROC_values[1][:,index], ROC_values[1][:,0]
     else:
         fpr, tpr, thresholds = metrics.roc_curve(y_true, y_prob, pos_label=0)
+        fpr, tpr, thresholds = fpr[::-2][::-1], tpr[::-2][::-1], thresholds[::-2][::-1]
         fpr_0 = np.sum(fpr==0)
         fpr, tpr, thresholds = fpr[fpr_0:], tpr[fpr_0:], thresholds[fpr_0:]
         pickle.dump({'fpr':fpr, 'tpr':tpr}, open(output_dir+'/'+'pos_rates.pkl','wb'), protocol=4)
@@ -317,7 +318,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
         axes.spines[axis].set_linewidth(1.5)
         axes.spines[axis].set_color('black')
     if ROC_type == 1:
-        pylab.grid(False)
+        pylab.grid(False, which="both")
         x_min = min(80, 10*np.floor(10*min(LLH_tpr)))
         if fpr[np.argwhere(tpr >= x_min/100)[0]] != 0:
             y_max = 10*np.ceil( 1/min(np.append(fpr[tpr >= x_min/100], min(LLH_fpr)))/10 )
@@ -339,8 +340,10 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
             ls='--', linewidth=0.5, color='tab:gray', zorder=10)
             axes.axvline(100*LLH_tpr[n], ymin=abs(1/LLH_fpr[n]-1)/(plt.yticks()[0][-1]-1),
             ymax=abs(LLH_scores[n]-1)/(plt.yticks()[0][-1]-1), ls='--', linewidth=0.5, color='tab:gray', zorder=5)
-            plt.text(100+(100.3-100)/(100.3-50)*(100.3-x_min), LLH_scores[n], str(int(LLH_scores[n])),
-                     {'color':colors[n], 'fontsize':15 if ECIDS else 15}, va="center", ha="left")
+            if LLH_scores[n] < 1e5: score_text = format(LLH_scores[n],'.0f')
+            else                  : score_text = format(LLH_scores[n],'.1e').replace('e+0','e')
+            plt.text(100+(100.3-100)/(100.3-50)*(100.3-x_min), LLH_scores[n], score_text,
+                     {'color':colors[n], 'fontsize':15}, va="center", ha="left")
         axes.xaxis.set_major_locator(MultipleLocator(10))
         axes.xaxis.set_minor_locator(AutoMinorLocator(10))
         yticks = plt.yticks()[0]
@@ -371,16 +374,16 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
                 plt.fill_between(100*tpr, lim_inf, lim_sup, color=color, alpha=0.2, edgecolor=None)
                 return P
             file_tag   = '0-5000GeV'
-            #file_paths = ['outputs/6c_180m/scalars+tracks', 'outputs/6c_180m/scalars+images', 'outputs/6c_180m/scalars']
-            file_paths = ['outputs/6c_180m/scalars+tracks+images/pred_ratios',
-                          'outputs/6c_180m/scalars+tracks+images/none_ratios']
+            file_paths = ['outputs/6c_180m/scalars+tracks', 'outputs/6c_180m/scalars+images', 'outputs/6c_180m/scalars']
+            #file_paths = ['outputs/6c_180m/scalars+tracks+images/pred_ratios',
+            #              'outputs/6c_180m/scalars+tracks+images/none_ratios']
             file_paths = [path+'/'+file_tag for path in file_paths]
             #linestyles = ['--', '-.', ':']
             linestyles = [(0, (5, 1)), (0, (3, 1, 1, 1,)), (0, (1, 1))]
             #color_list = ['royalblue', 'cornflowerblue', 'lightsteelblue']
             color_list = ['tab:orange', 'tab:green', 'tab:red']
-            #leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images', 'HLV$\:\!+\:\!$tracks', 'HLV$\:\!+\:\!$images', 'HLV']
-            leg_labels = ['Truth Ratios', 'Predicted Ratios', 'Agnostic Ratios']
+            leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images', 'HLV$\:\!+\:\!$tracks', 'HLV$\:\!+\:\!$images', 'HLV']
+            #leg_labels = ['Truth Ratios', 'Predicted Ratios', 'Agnostic Ratios']
             Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,color_list,linestyles)]
             anchor = (1.,0.55) if ECIDS else (1.,0.77)
             L = plt.legend(Ps, leg_labels, loc='upper right', bbox_to_anchor=anchor, fontsize=17,
@@ -498,7 +501,8 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, ROC_val
     if multiplots:
         for pkl_file in [name for name in os.listdir(output_dir) if '.pkl' in name]:
             os.remove(output_dir+'/'+pkl_file)
-        if not os.path.isdir(output_dir+'/../ROC_curves'): os.mkdir(output_dir+'/../ROC_curves')
+        try: os.mkdir(output_dir+'/../ROC_curves')
+        except FileExistsError: pass
         plt.savefig(output_dir+'/../ROC_curves/ROC_'+output_dir.split('class_')[-1]+'.png')
 
 
@@ -557,6 +561,7 @@ def bkg_eff_ratio(sample, y_true, y_prob, wp, bin, ECIDS, return_dict):
         warnings.simplefilter('ignore')
         try:
             fpr, tpr, _ = metrics.roc_curve(y_true, y_prob, pos_label=0)
+            fpr, tpr    = fpr[::-2][::-1], tpr[::-2][::-1]
             LLH_fpr, LLH_tpr = LLH_rates(data, y_true, ECIDS)
             LLH_fpr, LLH_tpr = LLH_fpr[-3:], LLH_tpr[-3:]
             ratio = LLH_fpr[wp]/CNN_fpr(tpr, fpr, LLH_tpr[wp])
@@ -728,6 +733,7 @@ def get_bkg_rej(sample, labels, probs, n_etypes, ratios, ratio_type, bkg_rej_dic
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+            fpr, tpr    = fpr[::-2][::-1], tpr[::-2][::-1]
             #return_dict[bkg] = np.nan_to_num(1/fpr[np.argwhere(tpr>=val/100)[0]][0], nan=1.)
             return_dict[bkg] = 1/fpr[np.argwhere(tpr>=val/100)[0]][0]
     bkg_list  = ['bkg'] + list(set(np.arange(n_etypes))-set(sig_list))
