@@ -246,11 +246,9 @@ if args.n_epochs > 0:
     if args.t_scaling:
         if not os.path.isfile(args.t_scaler_in):
             t_scaler = fit_t_scaler(train_sample, args.t_scaler_out)
-            sys.exit()
             if args.generator != 'ON': valid_sample = apply_t_scaler(valid_sample, t_scaler, verbose='OFF')
         if args.generator != 'ON': train_sample = apply_t_scaler(train_sample, t_scaler, verbose='ON')
     sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print()
-    sys.exit()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
                       train_weights, bins, args.output_dir)#; sys.exit()
