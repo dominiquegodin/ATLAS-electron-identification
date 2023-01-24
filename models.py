@@ -39,7 +39,7 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
     #TRACKS FCN
     if 'tracks' in scalars:
         outputs = Flatten()(input_dict['tracks'])
-        for n_neurons in []:#[200, 200]:
+        for n_neurons in []:#[100, 100]:
             outputs = Dense(n_neurons, kernel_regularizer=regularizer)                             (outputs)
             if batchNorm: outputs = BatchNormalization()                                           (outputs)
             outputs = LeakyReLU(alpha=0)                                                           (outputs)
@@ -50,7 +50,7 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
     outputs = [Flatten()(input_dict[key]) for key in scalars if key!='tracks']
     if len(outputs) != 0:
         outputs = concatenate(outputs)
-        for n_neurons in []:#[200, 200]:
+        for n_neurons in []:#[100, 100]:
             outputs = Dense(n_neurons, kernel_regularizer=regularizer)                             (outputs)
             if batchNorm: outputs = BatchNormalization()                                           (outputs)
             outputs = LeakyReLU(alpha=0)                                                           (outputs)
@@ -76,8 +76,9 @@ def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, trai
         if 'tracks' in train_var['images']: CNN[sample['tracks'].shape[1:]] = CNN.pop('tracks')
         model = multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, **train_var)
         print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
-        model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy',
-                      metrics=['accuracy'], weighted_metrics=['accuracy'])
+        model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        #model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy',
+        #              metrics=['accuracy'], weighted_metrics=['accuracy'])
     return model
 
 

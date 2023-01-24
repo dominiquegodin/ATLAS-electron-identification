@@ -9,6 +9,7 @@ from   utils     import get_dataset, validation, make_sample, merge_samples, sam
 from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_weights, Batch_Generator
 from   utils     import cross_valid, valid_results, sample_analysis, feature_removal, feature_ranking
 from   utils     import sample_histograms, fit_scaler, apply_scaler, fit_t_scaler, apply_t_scaler
+from   plots_DG  import plot_history
 from   models    import callback, create_model
 
 
@@ -22,7 +23,7 @@ parser.add_argument( '--n_epochs'       , default =  100,  type = int   )
 parser.add_argument( '--n_etypes'       , default =    6,  type = int   )
 parser.add_argument( '--multiclass'     , default = 'ON'                )
 parser.add_argument( '--n_tracks'       , default =    5,  type = int   )
-parser.add_argument( '--bkg_ratio'      , default =    4,  type = float )
+parser.add_argument( '--bkg_ratio'      , default =    5,  type = float )
 parser.add_argument( '--n_folds'        , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'         , default =    1,  type = int   )
 parser.add_argument( '--verbose'        , default =    1,  type = int   )
@@ -42,7 +43,6 @@ parser.add_argument( '--scaling'        , default = 'ON'                )
 parser.add_argument( '--t_scaling'      , default = 'OFF'               )
 parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
-parser.add_argument( '--sep_bkg'        , default = 'ON'                )
 parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
 #parser.add_argument( '--metrics'        , default = 'accuracy_1'      )
 parser.add_argument( '--host_name'      , default = 'lps'               )
@@ -74,49 +74,49 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 # CNN PARAMETERS
 CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (4,1) , (2,1) ]},
         (7,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (1,1) , (1,1) ]},
-        #(7,11):{'maps':[100,100], 'kernels':[(3,5,3),(3,5,3)], 'pools':[(1,1,1),(1,1,1)]},
+       #(7,11):{'maps':[100,100], 'kernels':[(3,5,3),(3,5,3)], 'pools':[(1,1,1),(1,1,1)]},
       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
 # TRAINING VARIABLES
-scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_deltaPhiRescaled2'         ,
-           'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'         ,
-           'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'           ,
-           'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'         ,
-           'p_TRTPID', 'p_numberOfInnermostPixelHits'                                                     ]
-images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine',
+scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_deltaPhiRescaled2'          ,
+           'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'          ,
+           'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'            ,
+           'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'          ,
+           'p_TRTPID', 'p_numberOfInnermostPixelHits', 'p_charge'                                          ]
+images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine' ,
                                 'tile_gap_Lr1',
-            'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine',
+            'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine' ,
            'lar_endcap_Lr0',  'lar_endcap_Lr1',  'lar_endcap_Lr2',  'lar_endcap_Lr3',
-                             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'                      ]
-others  = ['mcChannelNumber', 'eventNumber', 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue' ,
-           'p_LHTight'      , 'p_LHMedium' , 'p_LHLoose'  , 'p_ECIDSResult', 'p_eta'        , 'p_et_calo' ,
-           'p_vertexIndex'  , 'p_charge'   , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin' ,
-           'p_passWVeto'    , 'p_passZVeto', 'p_firstEgMotherPdgId'        , 'p_ambiguityType'            ,
-           'p_topoetcone20' , 'p_ptvarcone30', 'averageInteractionsPerCrossing'                           ]
-if args.tracks == 'ON': images += ['tracks']
+                             'tile_barrel_Lr1', 'tile_barrel_Lr2', 'tile_barrel_Lr3'                       ]
+others  = ['mcChannelNumber', 'eventNumber'  , 'p_TruthType', 'p_iffTruth'   , 'p_TruthOrigin', 'p_LHValue',
+           'p_LHTight'      , 'p_LHMedium'   , 'p_LHLoose'  , 'p_ECIDSResult', 'p_vertexIndex', 'p_charge' ,
+           'p_topoetcone20' , 'p_ptvarcone30', 'p_passWVeto', 'p_passZVeto'  , 'p_ambiguityType'           ,
+           'p_firstEgMotherPdgId'            , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin',
+           'averageInteractionsPerCrossing'  , 'p_passPreselection'          , 'p_trigMatches_pTbin'       ]
 
 
 # SAMPLES CUTS
-#gen_cuts = ['(abs(sample["eta"]) > 0.8) & (abs(sample["eta"]) < 1.15)']
-#gen_cuts = ['(sample["pt"] > 4.5) & (sample["pt"] < 20)']
-#gen_cuts = ['((sample["mcChannelNumber"]==361106) | (sample["mcChannelNumber"]==423300)) & (sample["pt"]>=15)']
-gen_cuts = ['(sample["mcChannelNumber"]!='+n+')' for n in ['423107','423108','423109','423110','423111','423112']]
+gen_cuts  = ['(sample["mcChannelNumber"] != '+n+')' for n in ['423107','423108','423109','423110','423111','423112']]
+#gen_cuts += ['(abs(sample["eta"]) <= 2.47)']
+#gen_cuts += ['(abs(sample["eta"]) >= 1.30) & (sample["eta"] <= 1.60)']
 if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
-args.valid_cuts += ['(sample["p_numberOfSCTHits"]+sample["p_numberOfPixelHits"]>=7)']
-args.valid_cuts += ['(sample["p_numberOfPixelHits"]>=2)']
-args.valid_cuts += ['(sample["p_ambiguityType"]<=4)']
-args.valid_cuts += ['(sample["p_passWVeto"]==True)', '(sample["p_passZVeto"]==True)']
-#args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"]<0.20)']
-#args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"]<0.15)']
+args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
+args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
+args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
+args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
+#args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
+#args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.15)']
+#args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.06)']
+#args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.06)']
 #channels_dict = {'Zee' :[361106], 'ttbar':[410470], 'Ztautau':[361108], 'Wtaunu':[361102,361105],
 #                 'JF17':[423300], 'JF35' :[423302], 'JF50'   :[423303], 'Wenu'  :[361100,361103]}
 #channels = channels_dict['Wenu']
-#channel_cuts = '( (sample["mcChannelNumber"]=='+str(channels[0])+')'
-#for channel in channels[1:]: channel_cuts += ' | (sample["mcChannelNumber"]=='+str(channel)+')'
+#channel_cuts = '( (sample["mcChannelNumber"] == '+str(channels[0])+')'
+#for channel in channels[1:]: channel_cuts += ' | (sample["mcChannelNumber"] == '+str(channel)+')'
 #channel_cuts += ' )'
 #args.valid_cuts += [channel_cuts]
 
@@ -128,8 +128,8 @@ if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.ou
         valid_cuts   = '(abs(sample["eta"]) >= '+str(eta_1)+') & (abs(sample["eta"]) <= '+str(eta_2)+')'
         if args.valid_cuts == '': args.valid_cuts  = valid_cuts
         else                    : args.valid_cuts  = valid_cuts + '& ('+args.valid_cuts+')'
-    validation(args.output_dir, args.results_in, args.plotting, args.n_valid,
-               args.n_etypes, args.valid_cuts, args.sep_bkg)
+    class_eff = validation(args.output_dir, args.results_in, args.plotting,
+                           args.n_valid, args.n_etypes, args.valid_cuts)
 elif args.results_in != '': print('\nOption --results_in not matching any file --> aborting\n')
 if   args.results_in != '': sys.exit()
 
@@ -140,8 +140,10 @@ keys    = set().union(*[h5py.File(data_file,'r').keys() for data_file in data_fi
 images  = [key for key in images  if key in keys or key=='tracks']
 scalars = [key for key in scalars if key in keys or key=='tracks']
 others  = [key for key in others  if key in keys]
-if args.scalars != 'ON': scalars=[]
-if args.images  != 'ON': images =[]
+if args.scalars != 'ON'                        : scalars = []
+if args.tracks  != 'ON' and args.images != 'ON': images  = []
+if args.tracks  == 'ON' and args.images != 'ON': images  = ['tracks']
+if args.tracks  == 'ON' and args.images == 'ON': images += ['tracks']
 if args.feature_removal == 'ON':
     groups = [('em_barrel_Lr1','em_barrel_Lr1_fine'), ('em_barrel_Lr0','em_barrel_Lr2','em_barrel_Lr3')]
     scalars, images, removed_feature = feature_removal(scalars, images, groups=[], index=args.sbatch_var)
@@ -155,7 +157,8 @@ input_data = {**train_data, 'others':others}
 sample_size  = sum([len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files])
 args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
-if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
+#args.n_valid = [max(0,sample_size-args.n_valid), sample_size                       ]
+#args.n_train = [0                              , min(args.n_train, args.n_valid[0])]
 if args.n_eval != 0: args.n_eval = [args.n_valid[0], min(args.n_valid[1],args.n_valid[0]+args.n_eval)]
 else               : args.n_eval =  args.n_valid
 
@@ -215,7 +218,7 @@ valid_t_scaler = None if args.generator=='ON' else t_scaler
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks,
                                               n_classes, args.valid_cuts, valid_scaler, valid_t_scaler)
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.output_dir); sys.exit()
-#sample_composition(valid_sample); sys.exit()
+#sample_composition(valid_sample); compo_matrix(valid_labels, n_etypes=args.n_etypes); sys.exit()
 
 
 # EVALUATING FEATURES CORRELATIONS
@@ -238,6 +241,10 @@ if args.n_epochs > 0:
         inputs['images'] = ['tracks']
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
                                                            n_classes, args.train_cuts)
+    sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print() #; sys.exit()
+    train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
+    sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
+                      train_weights, bins, args.output_dir) ; print()                   #; sys.exit()
     if args.scaling:
         if not os.path.isfile(args.scaler_in):
             scaler = fit_scaler(train_sample, scalars, args.scaler_out)
@@ -248,15 +255,11 @@ if args.n_epochs > 0:
             t_scaler = fit_t_scaler(train_sample, args.t_scaler_out)
             if args.generator != 'ON': valid_sample = apply_t_scaler(valid_sample, t_scaler, verbose='OFF')
         if args.generator != 'ON': train_sample = apply_t_scaler(train_sample, t_scaler, verbose='ON')
-    sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print()
-    train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
-    sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
-                      train_weights, bins, args.output_dir)#; sys.exit()
     callbacks = callback(args.model_out, args.patience, args.metrics)
+    print('TRAINING ON SAMPLE', args.n_train)
     if args.generator == 'ON':
         del(train_sample)
         if np.all(train_weights) != None: train_weights = gen_weights(args.n_train, weight_idx, train_weights)
-        print('\nLAUNCHING GENERATOR FOR', np.diff(args.n_train)[0], 'TRAINING SAMPLES')
         train_gen = Batch_Generator(data_files, args.n_train, input_data, args.n_tracks, n_classes,
                                     train_batch_size, args.train_cuts, scaler, t_scaler, train_weights, shuffle='ON')
         eval_gen  = Batch_Generator(data_files, args.n_eval , input_data, args.n_tracks, n_classes,
@@ -271,23 +274,24 @@ if args.n_epochs > 0:
                               epochs=args.n_epochs, verbose=args.verbose )
     model.load_weights(args.model_out); print()
 else:
-    train_labels = None; training = None
+    train_labels = None ; training = None
 
 
-# RESULTS AND PLOTTING SECTION
+# PLOTTING PERFORMANCE RESULTS
 if args.n_folds > 1:
     valid_probs = cross_valid(valid_sample, valid_labels, scalars, args.output_dir, args.n_folds, data_files,
                               args.n_valid, input_data, args.n_tracks, args.valid_cuts, model, args.generator)
 else:
-    print('Validation sample', args.n_valid, 'class predictions:')
+    print('VALIDATING ON SAMPLE', args.n_valid)
     if args.generator == 'ON':
         valid_gen   = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, n_classes,
                                       valid_batch_size, args.valid_cuts, scaler, t_scaler, shuffle='OFF')
         valid_probs = model.predict(valid_gen, verbose=args.verbose)
     else:
         valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
-bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels, args.n_etypes,
-                        training, args.output_dir, args.plotting, args.sep_bkg)
+if args.plotting == 'ON' and training is not None: plot_history(training, args.output_dir)
+bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels,
+                        args.n_etypes, args.output_dir, args.plotting)
 if '.pkl' in args.results_out:
     args.results_out = args.output_dir+'/'+args.results_out
     if args.feature_removal == 'ON':
