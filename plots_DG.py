@@ -162,18 +162,18 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
         pylab.hist(class_values, bins, histtype='step', weights=class_weights,
                    color=color_dict[n], label=label_dict[n], lw=3)[0]
     #plt.ylabel('Distribution density (%)' if density else 'Distribution (%)', fontsize=25)
-    plt.ylabel('Fraction of Candidates (GeV$^{-1}$)', fontsize=25, loc='top')
+    plt.ylabel('Fraction of Candidates'+(' (GeV$^{-1}$)' if var=='pt' else ''), fontsize=25, loc='top')
     loc, ncol = ('upper right',2) if var=='pt' else ('upper right',2)
     # Create new legend handles with existing colors
     handles, labels = axes.get_legend_handles_labels()
     new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
-    plt.legend(handles=new_handles, labels=labels, loc=loc, fontsize=16.5, columnspacing=1.,
+    plt.legend(handles=new_handles, labels=labels, loc=loc, fontsize=16, columnspacing=1.,
                frameon=True, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
     # Adding ATLAS messaging
-    xpos, ha = (0.02, 'left') if var=='pt' else (0.02, 'left')
-    plt.text(xpos, 0.95, r'$\bf ATLAS$ Simulation Internal', {'color':'black', 'fontsize':18},
+    xpos, ha = (0.01, 'left') if var=='pt' else (0.02, 'left')
+    plt.text(xpos, 0.95, r'$\bf ATLAS$ Simulation Preliminary', {'color':'black', 'fontsize':17.5},
              va='center', ha=ha, transform=axes.transAxes, zorder=20)
-    plt.text(xpos, 0.91, r'$\sqrt{s}=$13$\,$TeV', {'color':'black', 'fontsize':18},
+    plt.text(xpos, 0.91, r'$\sqrt{s}=$13$\,$TeV', {'color':'black', 'fontsize':17.5},
              va='center', ha=ha, transform=axes.transAxes, zorder=20)
     plt.subplots_adjust(left=0.1, top=0.97, bottom=0.12, right=0.95)
     file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
@@ -247,15 +247,15 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
         # Create new legend handles with existing colors
         handles, labels = axes.get_legend_handles_labels()
         new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
-        plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16.5, columnspacing=1.,
+        plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16, columnspacing=1.,
                    frameon=True, handlelength=2, ncol=2, facecolor=None, framealpha=1.).set_zorder(10)
         # Adding ATLAS messaging
-        plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Internal',
-                 {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV',
-        plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}>$15$\,$GeV',
+        plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
+                 {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+        plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV',
+        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}>$15$\,$GeV',
         #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}$ inclusive',
-                 {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+                 {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
     plt.figure(figsize=(12,16))
     plt.subplot(2, 1, 1); pylab.grid(False); axes = plt.gca()
     pylab.xlim(0,100); pylab.ylim(1e-7 if n_classes>2 else 1e-6, 1e0)
@@ -400,7 +400,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
             #leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images', 'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images (no coarse Lr1\'s)']
             file_paths = [path+'/'+file_tag for path in file_paths]
             Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,color_list,linestyles)]
-            anchor = (1.,0.55) if ECIDS else (1.,0.77)
+            anchor = (1.,0.59) if ECIDS else (1.,0.77)
             L = plt.legend(Ps, leg_labels, loc='upper right', bbox_to_anchor=anchor, fontsize=17,
                            ncol=1, frameon=False, facecolor=None, framealpha=1); L.set_zorder(10)
         if ROC_values != None:
@@ -434,15 +434,25 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
             yerr_sup = -1/LLH_fpr[n] + 1/( LLH_fpr[n] - np.sqrt(LLH_fpr[n]/n_bkg) )
             plt.errorbar( 100*LLH_tpr[n], 1/LLH_fpr[n], ecolor='black', linewidth=2,
                           xerr=[[xerr_inf],[xerr_sup]], yerr=[[yerr_inf],[yerr_sup]] )
-        #plt.text(0.07, 0.95, r'$\bf ATLAS$ Simulation Internal',
-        #         {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-        #plt.text(0.07, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV',
-        #plt.text(0.07, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}>$15$\,$GeV',
-        #plt.text(0.07, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}$ inclusive',
-        #         {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-        plt.legend(loc='upper right', fontsize=17 if ECIDS else 17, frameon=False,
+        plt.legend(loc='upper right', fontsize=16.5 if ECIDS else 17, frameon=False,
                    handletextpad=0., facecolor=None, framealpha=1).set_zorder(10)
-        if multiplots: plt.gca().add_artist(L)
+        if multiplots:
+            sig, bkg = output_dir.split('/')[-1].split('vs')
+            sig_dict = {'class_0':'Prompt Electron', 'class_01':'Prompt Electron + Charge Flip'}
+            bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavour',
+                        '4':'Light Flavour e/$\gamma$', '5':'Light Flavour Hadron', 'Bkg':'Combined Background'}
+            plt.gca().add_artist(L)
+            plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
+                     {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+            if   file_tag == '0-5000GeV'   : text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV'
+            elif file_tag == '15-5000GeV': text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}>$15$\,$GeV'
+            else                         : text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}$ inclusive'
+            plt.text(0.02, 0.895, text, {'color':'black', 'fontsize':18},
+                     va='center', ha='left', transform=axes.transAxes, zorder=20)
+            plt.text(0.02, 0.84, r'Sig : '+sig_dict[sig],
+                     {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+            plt.text(0.02, 0.785, r'Bkg: '+bkg_dict[bkg],
+                     {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
     if ROC_type == 2:
         plt.xlim([0.6, 1]); plt.ylim([0.9, 1-1e-4])
         plt.xticks([0.6, 0.7, 0.8, 0.9, 1], [60, 70, 80, 90, 100])
@@ -530,6 +540,7 @@ def CNN_fpr(tpr, fpr, LLH_tpr):
 
 
 def performance_plots(sample, y_true, y_prob, output_dir, ECIDS=False):
+    #sample['mu'] = sample['averageInteractionsPerCrossing' ]
     output_dir += '/'+'performance_plots'
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     iter_tuples = itertools.product(['eta', 'pt', 'mu'], ['loose', 'tight'])
@@ -600,7 +611,7 @@ def CNNvsLLH(sample, y_true, y_prob, output_dir, var, wp, ECIDS, isolation=False
         AX.tick_params(axis="y", pad=5, labelsize=14)
         for axis in ['top', 'bottom', 'left', 'right']: AX.spines[axis].set_linewidth(1.5)
         if AX == ax11 or AX == ax21:
-            legend_title = r'$\bf ATLAS$ Simulation Internal'+'\n'+r'$\sqrt{s} = 13\,$TeV'+'\n' \
+            legend_title = r'$\bf ATLAS$ Simulation Preliminary'+'\n'+r'$\sqrt{s} = 13\,$TeV'+'\n' \
                          + 'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images'+'\n' + wp.title()            \
                          + (' + isolation' if isolation else '')                                \
                          + (' ('+sig_eff+'='+format(LLH_tpr,'.3f')+')' if var=='mu' else '')
@@ -1039,6 +1050,8 @@ def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False
     else:
         class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavour',
                       4:'Light Flavour e/$\gamma$', 5:'Light Flavour Hadron', 6:'KnownUnknown'}
+    #class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavour',
+    #              4:'Light Flavour e/$\gamma$', 5:'Light Flavour Hadron', 6:'KnownUnknown'}
     layer_dict = {'em_barrel_Lr0'  :'EM Presampler' ,
                   'em_barrel_Lr1'  :'EM Barrel L1'  , 'em_barrel_Lr1_fine':'EM Barrel L1'  ,
                   'em_barrel_Lr2'  :'EM Barrel L2'  , 'em_barrel_Lr3'     :'EM Barrel L3'  ,
@@ -1081,6 +1094,98 @@ def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False
         cbar.set_ticks([1e-4, 1e-3, 1e-2, 1e-2, 1e-1, 1, 10, 100])
 
 
+def plot_inputs(input_path, host_name, inputs, n_e, n_tracks, n_classes, cuts, output_dir):
+    from utils import get_dataset, merge_samples, sample_composition, compo_matrix
+    mc_input   = '0.0-2.5_mc'
+    #data_input = 'LFdata/LFdata_15'
+    data_input = '0.0-2.5_LFdata17-18'
+    mc_files   = get_dataset(input_path,   mc_input, host_name)
+    data_files = get_dataset(input_path, data_input, host_name)
+    ne_mc   = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in   mc_files]))]
+    ne_data = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in data_files]))]
+    print('\nLoading sample [', format(str(ne_mc[0])  ,'>8s')+', '+format(str(ne_mc[1])  ,'>8s'), end=']')
+    print(' from', mc_files[0].split('/')[-2], flush=True)
+    mc_sample  , mc_labels  , _ = merge_samples(  mc_files, ne_mc  , inputs, n_tracks, n_classes, cuts)
+    print(  'Loading sample [', format(str(ne_data[0]),'>8s')+', '+format(str(ne_data[1]),'>8s'), end=']')
+    print(' from', data_files[0].split('/')[-2], flush=True)
+    data_sample, data_labels, _ = merge_samples(data_files, ne_data, inputs, n_tracks, n_classes, cuts)
+    sample_composition(  mc_sample); compo_matrix(  mc_labels, n_etypes=n_classes); print()
+    sample_composition(data_sample); compo_matrix(data_labels, n_etypes=n_classes); print()
+    mc_sample   = {key.split('p_')[-1]:val[  mc_labels==4] for key,val in   mc_sample.items()}
+    data_sample = {key.split('p_')[-1]:val[data_labels==4] for key,val in data_sample.items()}
+    track_keys = ['pOverE', 'deta', 'dphi', 'd0', 'z0',
+                  'charge', 'vertex', 'chi2', 'ndof', 'pixhits', 'scthits', 'trthits', 'sigmad0']
+    mc_sample  ['tracks'] = dict(zip(track_keys, [np.mean(  mc_sample['tracks'][:,:,n], axis=1)
+                                                  for n in range(len(track_keys))]))
+    data_sample['tracks'] = dict(zip(track_keys, [np.mean(data_sample['tracks'][:,:,n], axis=1)
+                                                  for n in range(len(track_keys))]))
+    #cuts = {'eta':['0.6'], 'pt':['10','15']}
+    for cut in cuts:
+        if 'sample["pt"]' in cut or 'abs(sample["eta"])' in cut:
+            import re
+            all_num = re.findall(r'[-+]?(?:\d*\.*\d+)', cut)
+            dec_num = re.findall(r'\d+\.\d+'          , cut)
+            cuts = {'eta':np.sort(dec_num), 'pt':np.sort(list(set(all_num)-set(dec_num)))}
+    #for key in inputs['scalars']:
+    #    plot_variable(mc_sample          , data_sample          , key.split('p_')[-1], 'HLVs'  , cuts, output_dir)
+    #for key in track_keys:
+    #    plot_variable(mc_sample['tracks'], data_sample['tracks'], key                , 'tracks', cuts, output_dir)
+    plot_variable(mc_sample, data_sample, 'LHValue', None, cuts, output_dir)
+    sys.exit()
+def plot_variable(mc_sample, data_sample, var, var_type, cuts, output_dir, n_bins=100, density=False):
+    if var_type == 'HLVs':
+        logs = ['d0', 'd0Sig', 'deltaEta1', 'deltaPhiRescaled2', 'dPOverP', 'EoverP', 'EptRatio',
+                'et_calo', 'qd0Sig', 'Reta', 'Rhad', 'Rhad1', 'Rphi', 'weta2', 'wtots1']
+    else:
+        logs = ['pOverE', 'd0', 'deta', 'dphi', 'pixhits', 'scthits', 'trthits', 'sigmad0', 'vertex', 'z0']
+    fig = plt.figure(figsize=(12,8)); axes = plt.gca()
+    values = np.append(mc_sample[var], data_sample[var])
+    if mc_sample[var].dtype == np.int32: bins = np.arange  (np.min(values), np.max(values)+1        )
+    else                               : bins = np.linspace(np.min(values), np.max(values)  , n_bins)
+    # Axes parameters
+    axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(axis="both", pad=8, labelsize=18)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        axes.spines[axis].set_linewidth(1.5)
+        axes.spines[axis].set_color('black')
+    mc_weights    = np.ones_like(  mc_sample[var], dtype=np.float32)
+    data_weights  = np.ones_like(data_sample[var], dtype=np.float32)
+    mc_weights   *= 100/np.sum(  mc_weights)
+    data_weights *= 100/np.sum(data_weights)
+    if density:
+        indices       = np.searchsorted(bins,   mc_sample[var], side='right')
+        mc_weights   /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+        indices       = np.searchsorted(bins, data_sample[var], side='right')
+        data_weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+        plt.ylabel('Distribution Density (%)', fontsize=25)
+    else:
+        plt.ylabel('Distribution (%)'        , fontsize=25)
+    pylab.hist(  mc_sample[var], bins=bins, weights=  mc_weights, histtype='step', lw=3,
+                 log=True if var in logs else False, label='LF (mc)')
+    pylab.hist(data_sample[var], bins=bins, weights=data_weights, histtype='step', lw=3,
+                 log=True if var in logs else False, label='LF (data)')
+    plt.xlabel(var, fontsize=25)
+    plt.text(0.02, 0.95, '$|\eta|<$'+cuts['eta'][0],
+             {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
+    plt.text(0.02, 0.89, cuts['pt'][0]+'$<E_\mathrm{T}$[GeV]$<$'+cuts['pt'][1],
+             {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
+    # Create new legend handles with existing colors
+    handles, labels = axes.get_legend_handles_labels()
+    new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
+    plt.legend(handles=new_handles, labels=labels, loc='best', fontsize=18, columnspacing=1.,
+               frameon=True, handlelength=2, ncol=1, facecolor=None, framealpha=1.).set_zorder(10)
+    plt.subplots_adjust(left=0.1, top=0.97, bottom=0.12, right=0.95)
+    if var_type == 'HLVs'  : output_dir += '/'+'HLVs'
+    if var_type == 'tracks': output_dir += '/'+'tracks'
+    if not os.path.isdir(output_dir): os.mkdir(output_dir)
+    file_name = output_dir+'/'+var+'.png'
+    print('Printing:', file_name)
+    plt.savefig(file_name); plt.close()
+
+
 def plot_vertex(sample):
     bins = np.arange(0,50,1)
     fig = plt.figure(figsize=(12,8))
@@ -1092,27 +1197,6 @@ def plot_vertex(sample):
     weights = len(sample)*[100/len(sample)]
     pylab.hist(sample, bins=bins, weights=weights, histtype='bar', align='left', rwidth=0.5, lw=2)
     file_name = 'outputs/tracks_vertex.png'
-    print('Printing:', file_name)
-    plt.savefig(file_name)
-
-
-
-def plot_scalars(sample, sample_trans, variable):
-    bins = np.arange(-1,1,0.01)
-    fig = plt.figure(figsize=(18,8))
-    plt.subplot(1,2,1)
-    pylab.xlim(-1,1)
-    plt.title('Histogram')
-    plt.xlabel('Value')
-    plt.ylabel('Number of Entries')
-    #pylab.hist(sample_trans[variable], bins=bins, histtype='step', density=True)
-    pylab.hist(variable, bins=bins, histtype='step', density=False)
-    plt.subplot(1,2,2)
-    plt.title('Histogram')
-    plt.xlabel('Value')
-    plt.ylabel('Number of Entries')
-    pylab.hist(sample_trans[variable], bins=bins)
-    file_name = 'outputs/plots/scalars/'+variable+'.png'
     print('Printing:', file_name)
     plt.savefig(file_name)
 

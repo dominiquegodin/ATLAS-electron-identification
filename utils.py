@@ -226,6 +226,7 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     if n_classes == 5:
         #labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
         labels[labels == 5] = 4                      #light flavor = egamma + hadrons
+        labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
     if match_to_vertex:
         labels[sample[vertexIndex] == -999] = -1
     #labels[labels == -1] = 4
@@ -376,7 +377,7 @@ def process_images_mp(sample, image_list, verbose='OFF', n_tasks=16):
 def fit_scaler(sample, scalars, scaler_out):
     print('Fitting quantile transform from scalars', end=' --> ', flush=True); start_time = time.time()
     scalars = [key for key in scalars if key != 'tracks']
-    scalars_array = np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars])
+    scalars_array = np.hstack([np.expand_dims(np.float32(sample[key]), axis=1) for key in scalars])
     scaler = preprocessing.QuantileTransformer(output_distribution='normal', n_quantiles=10000, random_state=0)
     scaler.fit(scalars_array) #scaler.fit_transform(scalars_array)
     print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)')
@@ -389,7 +390,7 @@ def apply_scaler(sample, scalars, scaler, verbose='OFF'):
     if verbose == 'ON':
         print('Applying quantile transform to scalars', end=' --> ', flush=True); start_time = time.time()
     scalars = [key for key in scalars if key != 'tracks']
-    scalars_array = scaler.transform(np.hstack([np.expand_dims(sample[key], axis=1) for key in scalars]))
+    scalars_array = scaler.transform(np.hstack([np.expand_dims(np.float32(sample[key]), axis=1) for key in scalars]))
     for n in np.arange(len(scalars)): sample[scalars[n]] = scalars_array[:,n]
     if verbose == 'ON': print('(', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
     return sample
@@ -832,7 +833,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #verify_sample(sample); sys.exit()
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
-    print_channels(sample, labels)
+    #print_channels(sample, labels)
     # DISTRIBUTION HEATMAPS
     #from plots_DG import plot_heatmaps
     #plot_heatmaps(sample, labels, output_dir); sys.exit()
@@ -1015,7 +1016,7 @@ def get_idx(size, start_value=0, n_sets=5):
 
 def mix_datafiles(input_path='', input_dir='', temp_dir='temp_dir', n_tasks=10):
     data_files = get_dataset(input_path, input_dir) ; n_files = len(data_files)
-    LF_path  = '/nvme1/atlas/godin/e-ID_data/LF_data'
+    LF_path  = '/nvme1/atlas/godin/e-ID_data/LFdata/LFdata_17-18'
     LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
     #for index in range(len(data_files)):
     #    print(data_files[index], LF_files[index])

@@ -9,7 +9,7 @@ from   utils     import get_dataset, validation, make_sample, merge_samples, sam
 from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_weights, Batch_Generator
 from   utils     import cross_valid, valid_results, sample_analysis, feature_removal, feature_ranking
 from   utils     import sample_histograms, fit_scaler, apply_scaler, fit_t_scaler, apply_t_scaler
-from   plots_DG  import plot_history
+from   plots_DG  import plot_history, plot_inputs
 from   models    import callback, create_model
 
 
@@ -23,7 +23,7 @@ parser.add_argument( '--n_epochs'       , default =  100,  type = int   )
 parser.add_argument( '--n_etypes'       , default =    6,  type = int   )
 parser.add_argument( '--multiclass'     , default = 'ON'                )
 parser.add_argument( '--n_tracks'       , default =    5,  type = int   )
-parser.add_argument( '--bkg_ratio'      , default =    5,  type = float )
+parser.add_argument( '--bkg_ratio'      , default =    4,  type = float )
 parser.add_argument( '--n_folds'        , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'         , default =    1,  type = int   )
 parser.add_argument( '--verbose'        , default =    1,  type = int   )
@@ -97,7 +97,12 @@ others  = ['mcChannelNumber', 'eventNumber'  , 'p_TruthType', 'p_iffTruth'   , '
 
 
 # SAMPLES CUTS
-gen_cuts  = ['(sample["mcChannelNumber"] != '+n+')' for n in ['423107','423108','423109','423110','423111','423112']]
+gen_cuts  = []
+#gen_cuts += ['(sample["mcChannelNumber"] == 0) | (sample["mcChannelNumber"] == 423300)']
+gen_cuts += ['(sample["mcChannelNumber"] != '+n+')' for n in ['423107','423108','423109','423110','423111','423112']]
+#gen_cuts = ['(sample["mcChannelNumber"] == 423107) | (sample["mcChannelNumber"] == 423108) | '
+#           +'(sample["mcChannelNumber"] == 423109) | (sample["mcChannelNumber"] == 423110) | '
+#           +'(sample["mcChannelNumber"] == 423111) | (sample["mcChannelNumber"] == 423112)   ']
 #gen_cuts += ['(abs(sample["eta"]) <= 2.47)']
 #gen_cuts += ['(abs(sample["eta"]) >= 1.30) & (sample["eta"] <= 1.60)']
 if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
@@ -219,6 +224,8 @@ valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, 
                                               n_classes, args.valid_cuts, valid_scaler, valid_t_scaler)
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.output_dir); sys.exit()
 #sample_composition(valid_sample); compo_matrix(valid_labels, n_etypes=args.n_etypes); sys.exit()
+#plot_inputs(args.input_path, args.host_name, inputs, args.n_valid,
+#            args.n_tracks, n_classes, args.valid_cuts, args.output_dir)
 
 
 # EVALUATING FEATURES CORRELATIONS
@@ -244,7 +251,7 @@ if args.n_epochs > 0:
     sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print() #; sys.exit()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
-                      train_weights, bins, args.output_dir) ; print()                   #; sys.exit()
+                      train_weights, bins, args.output_dir) ; print() ; sys.exit()
     if args.scaling:
         if not os.path.isfile(args.scaler_in):
             scaler = fit_scaler(train_sample, scalars, args.scaler_out)
