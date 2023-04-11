@@ -93,7 +93,8 @@ others  = ['mcChannelNumber', 'eventNumber'  , 'p_TruthType', 'p_iffTruth'   , '
            'p_LHTight'      , 'p_LHMedium'   , 'p_LHLoose'  , 'p_ECIDSResult', 'p_vertexIndex', 'p_charge' ,
            'p_topoetcone20' , 'p_ptvarcone30', 'p_passWVeto', 'p_passZVeto'  , 'p_ambiguityType'           ,
            'p_firstEgMotherPdgId'            , 'p_firstEgMotherTruthType'    , 'p_firstEgMotherTruthOrigin',
-           'averageInteractionsPerCrossing'  , 'p_passPreselection'          , 'p_trigMatches_pTbin'       ]
+           'averageInteractionsPerCrossing'  , 'p_passPreselection'          , 'p_trigMatches_pTbin'       ,
+           'p_numberOfSCTHits', 'p_numberOfPixelHits', 'p_numberOfInnermostPixelHits', 'p_eta', 'p_et_calo']
 
 
 # SAMPLES CUTS
