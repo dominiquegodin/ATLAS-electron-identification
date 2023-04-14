@@ -83,7 +83,7 @@ scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_d
            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'          ,
            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'            ,
            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'          ,
-           'p_TRTPID', 'p_numberOfInnermostPixelHits', 'p_charge'                                          ]
+           'p_TRTPID', 'p_numberOfInnermostPixelHits']#, 'p_charge'                                          ]
 images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine' ,
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine' ,
@@ -249,10 +249,10 @@ if args.n_epochs > 0:
         inputs['images'] = ['tracks']
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
                                                            n_classes, args.train_cuts)
-    sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print() #; sys.exit()
+    sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print() #;sys.exit()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
-                      train_weights, bins, args.output_dir) ; print() ; sys.exit()
+                      train_weights, bins, args.output_dir) ;print() #;sys.exit()
     if args.scaling:
         if not os.path.isfile(args.scaler_in):
             scaler = fit_scaler(train_sample, scalars, args.scaler_out)

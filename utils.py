@@ -183,10 +183,18 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
                        'PixelHits':sample['p_numberOfPixelHits'            ],
                        'BLHits'   :sample['p_numberOfInnermostPixelHits'   ]})
         for key in set(images)-{'tracks'}:
-            try: sample[key] = data[key][idx[0]:idx[1]]
+            try:
+                sample[key] = data[key][idx[0]:idx[1]]
             except KeyError:
                 if 'fine' in key: sample[key] = np.zeros((idx[1]-idx[0],)+(56,11))
                 else            : sample[key] = np.zeros((idx[1]-idx[0],)+( 7,11))
+        for key in set(images)-{'tracks'}:
+            if key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
+                energy_fine   = np.sum(sample[key+'_fine'], axis=(1,2))
+                energy_coarse = np.sum(sample[key]        , axis=(1,2))
+                energy_fine  [energy_coarse == 0] = 0.
+                energy_coarse[energy_coarse == 0] = 1.
+                sample[key] *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
         if 'tracks' in scalars+images:
             n_tracks    = min(n_tracks, data[prefix+'tracks'].shape[1])
             tracks_data = data[prefix+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
@@ -939,9 +947,18 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
             data[key][sum_e:sum_e+batch_size,...] = utils.shuffle(sample[key], random_state=0)
 
 
-def resize_images(images_array, target_shape=(7,11)):
-    if images_array.shape[1:] == target_shape: return images_array
-    else: return transform.resize(images_array, ((len(images_array),)+target_shape))
+#def resize_images(images_array, target_shape=(7,11)):
+#    if images_array.shape[1:] == target_shape: return images_array
+#    else: return transform.resize(images_array, ((len(images_array),)+target_shape))
+def resize_images(images, target_shape=(7,11)):
+    if images.shape[1:] != target_shape:
+        energy_fine   = np.sum(images, axis=(1,2))
+        images        = transform.resize(images, ((len(images),)+target_shape))
+        energy_coarse = np.sum(images, axis=(1,2))
+        energy_fine  [energy_coarse == 0] = 0.
+        energy_coarse[energy_coarse == 0] = 1.
+        images *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
+    return images
 
 
 def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
