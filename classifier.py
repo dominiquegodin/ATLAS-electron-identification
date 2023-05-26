@@ -1,10 +1,9 @@
 # IMPORT PACKAGES AND FUNCTIONS
 import tensorflow as tf
 import numpy      as np
-import os, sys, h5py, pickle
+import os, sys, h5py, pickle, itertools
 from   argparse  import ArgumentParser
 from   tabulate  import tabulate
-from   itertools import accumulate
 from   utils     import get_dataset, validation, make_sample, merge_samples, sample_composition
 from   utils     import compo_matrix, get_sample_weights, get_class_weight, gen_weights, Batch_Generator
 from   utils     import cross_valid, valid_results, sample_analysis, feature_removal, feature_ranking
@@ -83,7 +82,7 @@ scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_d
            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'          ,
            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'            ,
            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'          ,
-           'p_TRTPID', 'p_numberOfInnermostPixelHits']#, 'p_charge'                                          ]
+           'p_TRTPID', 'p_numberOfInnermostPixelHits', 'p_charge'                                          ]
 images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine' ,
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine' ,
@@ -99,32 +98,26 @@ others  = ['mcChannelNumber', 'eventNumber'  , 'p_TruthType', 'p_iffTruth'   , '
 
 # SAMPLES CUTS
 gen_cuts  = []
-#gen_cuts += ['(sample["mcChannelNumber"] == 0) | (sample["mcChannelNumber"] == 423300)']
-gen_cuts += ['(sample["mcChannelNumber"] != '+n+')' for n in ['423107','423108','423109','423110','423111','423112']]
-#gen_cuts = ['(sample["mcChannelNumber"] == 423107) | (sample["mcChannelNumber"] == 423108) | '
-#           +'(sample["mcChannelNumber"] == 423109) | (sample["mcChannelNumber"] == 423110) | '
-#           +'(sample["mcChannelNumber"] == 423111) | (sample["mcChannelNumber"] == 423112)   ']
 #gen_cuts += ['(abs(sample["eta"]) <= 2.47)']
 #gen_cuts += ['(abs(sample["eta"]) >= 1.30) & (sample["eta"] <= 1.60)']
+channels_dict = {'Zee' :['361106'], 'ttbar':['410470'], 'Ztautau':['361108'], 'Wtaunu':['361102,361105'],
+                 'JF17':['423300'], 'JF35' :['423302'], 'JF50'   :['423303'], 'Wenu'  :['361100,361103'],
+                 'high-pt_PC': ['423107','423108','423109','423110','423111','423112']                  }
+#channels = channels_dict['high-pt_PC']
+channels = channels_dict['JF17'] + channels_dict['JF35'] + channels_dict['JF50'] + ['0']
+gen_cuts += ['( ' + ''.join([    '(sample["mcChannelNumber"] == '+channels[0]+')']
+                            +[' | (sample["mcChannelNumber"] == '+n+')' for n in channels[1:]]) + ' )']
+#gen_cuts += ['(sample["mcChannelNumber"] != '+channel+')' for channel in channels]
 if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
-args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
-args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
-args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
-args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
+#args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
+#args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
+#args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
+#args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
 #args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
 #args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.15)']
-#args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.06)']
-#args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.06)']
-#channels_dict = {'Zee' :[361106], 'ttbar':[410470], 'Ztautau':[361108], 'Wtaunu':[361102,361105],
-#                 'JF17':[423300], 'JF35' :[423302], 'JF50'   :[423303], 'Wenu'  :[361100,361103]}
-#channels = channels_dict['Wenu']
-#channel_cuts = '( (sample["mcChannelNumber"] == '+str(channels[0])+')'
-#for channel in channels[1:]: channel_cuts += ' | (sample["mcChannelNumber"] == '+str(channel)+')'
-#channel_cuts += ' )'
-#args.valid_cuts += [channel_cuts]
 
 
 # PERFORMANCE FROM SAVED VALIDATION RESULTS
@@ -237,7 +230,7 @@ if args.correlations == 'ON':
 
 # TRAINING LOOP
 if args.n_epochs > 0:
-    for path in list(accumulate([folder+'/' for folder in args.output_dir.split('/')])):
+    for path in list(itertools.accumulate([folder+'/' for folder in args.output_dir.split('/')])):
         try: os.mkdir(path)
         except FileExistsError: pass
     print('Using TensorFlow', tf.__version__                            )
