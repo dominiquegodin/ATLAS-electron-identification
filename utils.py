@@ -928,8 +928,6 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
                    'p_mean_sigmad0':12, 'p_qd0Sig'      :13, 'p_nTracks'     :14, 'p_sct_weight_charge':15}
     for key in tracks_dict:
         if np.any(tracks_list[:,tracks_dict[key]]!=0): sample[key] = tracks_list[:,tracks_dict[key]]
-    #for key in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']: sample[key] = np.where(sample[key]==0, 1, 0)
-    #sample['true_m'] = np.float16(get_truth_m(sample))
     for key in tracks + ['p_truth_E', 'p_truth_e']:
         try: sample.pop(key)
         except KeyError: pass
@@ -947,9 +945,6 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
             data[key][sum_e:sum_e+batch_size,...] = utils.shuffle(sample[key], random_state=0)
 
 
-#def resize_images(images_array, target_shape=(7,11)):
-#    if images_array.shape[1:] == target_shape: return images_array
-#    else: return transform.resize(images_array, ((len(images_array),)+target_shape))
 def resize_images(images, target_shape=(7,11)):
     if images.shape[1:] != target_shape:
         energy_fine   = np.sum(images, axis=(1,2))

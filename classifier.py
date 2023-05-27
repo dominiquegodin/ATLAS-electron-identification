@@ -103,19 +103,19 @@ gen_cuts  = []
 channels_dict = {'Zee' :['361106'], 'ttbar':['410470'], 'Ztautau':['361108'], 'Wtaunu':['361102,361105'],
                  'JF17':['423300'], 'JF35' :['423302'], 'JF50'   :['423303'], 'Wenu'  :['361100,361103'],
                  'high-pt_PC': ['423107','423108','423109','423110','423111','423112']                  }
-#channels = channels_dict['high-pt_PC']
-channels = channels_dict['JF17'] + channels_dict['JF35'] + channels_dict['JF50'] + ['0']
-gen_cuts += ['( ' + ''.join([    '(sample["mcChannelNumber"] == '+channels[0]+')']
-                            +[' | (sample["mcChannelNumber"] == '+n+')' for n in channels[1:]]) + ' )']
-#gen_cuts += ['(sample["mcChannelNumber"] != '+channel+')' for channel in channels]
+channels = channels_dict['high-pt_PC']
+#channels = channels_dict['JF17'] + channels_dict['JF35'] + channels_dict['JF50'] + ['0']
+#gen_cuts += ['( ' + ''.join([   '(sample["mcChannelNumber"] == '+channels[0]+')']
+#                           +[' | (sample["mcChannelNumber"] == '+n+')' for n in channels[1:]]) + ' )']
+gen_cuts += ['(sample["mcChannelNumber"] != '+n+')' for n in channels]
 if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
-#args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
-#args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
-#args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
-#args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
+args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
+args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
+args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
+args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
 #args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
 #args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.15)']
 
