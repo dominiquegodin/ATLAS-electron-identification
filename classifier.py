@@ -46,7 +46,7 @@ parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
 #parser.add_argument( '--metrics'        , default = 'accuracy_1'      )
 parser.add_argument( '--host_name'      , default = 'lps'               )
 parser.add_argument( '--input_path'     , default = ''                  )
-parser.add_argument( '--input_dir'      , default = '0.0-2.5'           )
+parser.add_argument( '--input_dir'      , default = '0.0-2.5_mc'        )
 parser.add_argument( '--output_dir'     , default = 'outputs'           )
 parser.add_argument( '--model_in'       , default = ''                  )
 parser.add_argument( '--model_out'      , default = 'model.h5'          )
@@ -98,13 +98,12 @@ others  = ['mcChannelNumber', 'eventNumber'  , 'p_TruthType', 'p_iffTruth'   , '
 
 # SAMPLES CUTS
 gen_cuts  = []
-#gen_cuts += ['(abs(sample["eta"]) <= 2.47)']
-#gen_cuts += ['(abs(sample["eta"]) >= 1.30) & (sample["eta"] <= 1.60)']
-channels_dict = {'Zee' :['361106'], 'ttbar':['410470'], 'Ztautau':['361108'], 'Wtaunu':['361102,361105'],
-                 'JF17':['423300'], 'JF35' :['423302'], 'JF50'   :['423303'], 'Wenu'  :['361100,361103'],
-                 'high-pt_PC': ['423107','423108','423109','423110','423111','423112']                  }
-channels = channels_dict['high-pt_PC']
-#channels = channels_dict['JF17'] + channels_dict['JF35'] + channels_dict['JF50'] + ['0']
+#gen_cuts += ['(abs(sample["eta"]) <= 2.47)'] #['(abs(sample["eta"]) >= 1.30) & (sample["eta"] <= 1.60)']
+channel_dict = {'Zee' :['361106'], 'ttbar':['410470'], 'Ztautau':['361108'], 'Wtaunu':['361102,361105'],
+                'JF17':['423300'], 'JF35' :['423302'], 'JF50'   :['423303'], 'Wenu'  :['361100,361103'],
+                'high-pt_PC': ['423107','423108','423109','423110','423111','423112']                  }
+channels = channel_dict['high-pt_PC']
+#channels = channel_dict['JF17'] + channel_dict['JF35'] + channel_dict['JF50'] + ['0']
 #gen_cuts += ['( ' + ''.join([   '(sample["mcChannelNumber"] == '+channels[0]+')']
 #                           +[' | (sample["mcChannelNumber"] == '+n+')' for n in channels[1:]]) + ' )']
 gen_cuts += ['(sample["mcChannelNumber"] != '+n+')' for n in channels]
@@ -112,10 +111,10 @@ if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
-args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
-args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
-args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
-args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
+#args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
+#args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
+#args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
+#args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
 #args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
 #args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.15)']
 
@@ -156,10 +155,10 @@ input_data = {**train_data, 'others':others}
 sample_size  = sum([len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files])
 args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
-#args.n_valid = [max(0,sample_size-args.n_valid), sample_size                       ]
-#args.n_train = [0                              , min(args.n_train, args.n_valid[0])]
-if args.n_eval != 0: args.n_eval = [args.n_valid[0], min(args.n_valid[1],args.n_valid[0]+args.n_eval)]
-else               : args.n_eval =  args.n_valid
+if args.n_valid[0] == args.n_valid[1]: args.n_valid = args.n_train
+args.n_eval = [args.n_valid[0], min(args.n_valid[0]+args.n_eval, sample_size)]
+if args.n_eval[0] == args.n_eval[1]: args.n_eval = args.n_valid
+#print(args.n_train, args.n_eval, args.n_valid); sys.exit()
 
 
 # MODEL CREATION AND MULTI-GPU DISTRIBUTION
@@ -197,6 +196,8 @@ print(tabulate(table, headers=headers, tablefmt='psql')); print()
 args.model_in    = args.output_dir+'/'+args.model_in   ; args.model_out    = args.output_dir+'/'+args.model_out
 args.scaler_in   = args.output_dir+'/'+args.scaler_in  ; args.scaler_out   = args.output_dir+'/'+args.scaler_out
 args.t_scaler_in = args.output_dir+'/'+args.t_scaler_in; args.t_scaler_out = args.output_dir+'/'+args.t_scaler_out
+#plot_inputs(args.input_path, args.host_name, input_data, args.n_valid,
+#            args.n_tracks, n_classes, args.valid_cuts, args.output_dir)
 
 
 # GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
@@ -218,8 +219,6 @@ valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, 
                                               n_classes, args.valid_cuts, valid_scaler, valid_t_scaler)
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.output_dir); sys.exit()
 #sample_composition(valid_sample); compo_matrix(valid_labels, n_etypes=args.n_etypes); sys.exit()
-#plot_inputs(args.input_path, args.host_name, inputs, args.n_valid,
-#            args.n_tracks, n_classes, args.valid_cuts, args.output_dir)
 
 
 # EVALUATING FEATURES CORRELATIONS

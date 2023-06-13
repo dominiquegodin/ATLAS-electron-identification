@@ -1044,7 +1044,7 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
 
 def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False):
     image, vmin, vmax = 100*image, 100*vmin, 100*vmax
-    if len(classes) <=5:
+    if len(classes) <= 5:
         class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion',
                       3:'Heavy Flavour'  , 4:'Light Flavour'}
     else:
@@ -1094,26 +1094,125 @@ def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False
         cbar.set_ticks([1e-4, 1e-3, 1e-2, 1e-2, 1e-1, 1, 10, 100])
 
 
-def plot_inputs(input_path, host_name, inputs, n_e, n_tracks, n_classes, cuts, output_dir):
+def plot_inputs(input_path, host_name, input_data, n_e, n_tracks, n_classes, gen_cuts, output_dir):
     from utils import get_dataset, merge_samples, sample_composition, compo_matrix
     mc_input   = '0.0-2.5_mc'
     data_input = 'LFdata/LFdata_17-18'
-    #data_input = '0.0-2.5_LFdata17-18'
     mc_files   = get_dataset(input_path,   mc_input, host_name)
     data_files = get_dataset(input_path, data_input, host_name)
     ne_mc   = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in   mc_files]))]
     ne_data = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in data_files]))]
     print('\nLoading sample [', format(str(ne_mc[0])  ,'>8s')+', '+format(str(ne_mc[1])  ,'>8s'), end=']')
     print(' from', mc_files[0].split('/')[-2], flush=True)
-    n_classes=6
-    mc_sample  , mc_labels  , _ = merge_samples(  mc_files, ne_mc  , inputs, n_tracks, n_classes, cuts)
+    mc_sample  , mc_labels  , _ = merge_samples(  mc_files, ne_mc  , input_data, n_tracks, n_classes  , cuts=gen_cuts)
     sample_composition(  mc_sample); compo_matrix(  mc_labels, n_etypes=n_classes); print()
     print(  'Loading sample [', format(str(ne_data[0]),'>8s')+', '+format(str(ne_data[1]),'>8s'), end=']')
     print(' from', data_files[0].split('/')[-2], flush=True)
-    n_classes=5
-    data_sample, data_labels, _ = merge_samples(data_files, ne_data, inputs, n_tracks, n_classes, cuts)
+    data_sample, data_labels, _ = merge_samples(data_files, ne_data, input_data, n_tracks, n_classes=5, cuts=gen_cuts)
+    sample_composition(data_sample); compo_matrix(data_labels, n_etypes=5); print()
+    channels = mc_sample['mcChannelNumber']
+    channel_dict = {'Zee':[361106], 'ttbar':[410470], 'JF17':[423300], 'JF35':[423302], 'JF50':[423303]}
+    mc_selections  = [
+        {'label':'LF e/$\gamma$ (mc)', 'cut':(mc_labels==4) & (channels==channel_dict['JF17']), 'color':'magenta'},
+        {'label':'LF Hadron (mc)'    , 'cut':(mc_labels==5) & (channels==channel_dict['JF17']), 'color':'cyan'   },
+        ]
+    mc_samples  = {key.split('p_')[-1]:[val[n['cut']] for n in mc_selections] for key,val in mc_sample.items()}
+    data_sample = {key.split('p_')[-1]:val[data_labels==4] for key,val in data_sample.items()}
+    if 'tracks' in mc_sample:
+        track_keys = ['pOverE', 'deta', 'dphi', 'd0', 'z0',
+                      'charge', 'vertex', 'chi2', 'ndof', 'pixhits', 'scthits', 'trthits', 'sigmad0']
+        mc_samples ['tracks'] = dict(zip(track_keys, [[np.mean(tracks[:,:,n], axis=1) for tracks in mc_samples['tracks']]
+                                                      for n in range(len(track_keys))]))
+        data_sample['tracks'] = dict(zip(track_keys, [np.mean(data_sample['tracks'][:,:,n], axis=1)
+                                                      for n in range(len(track_keys))]))
+    for cut in gen_cuts:
+        if 'sample["pt"]' in cut or 'abs(sample["eta"])' in cut:
+            import re
+            all_num = re.findall(r'[-+]?(?:\d*\.*\d+)', cut)
+            dec_num = re.findall(r'\d+\.\d+'          , cut)
+            gen_cuts = {'eta':np.sort(dec_num), 'pt':np.sort(list(set(all_num)-set(dec_num)))}
+    plot_variable(mc_samples, data_sample, 'LHValue', None, gen_cuts, mc_selections, output_dir)
+    for key in input_data['scalars']:
+        plot_variable(mc_samples, data_sample, key.split('p_')[-1], 'HLVs', gen_cuts, mc_selections, output_dir)
+    #if 'tracks' in mc_sample:
+    #    mc_samples = mc_samples['tracks']; data_sample = data_sample['tracks']
+    #    for key in track_keys:
+    #        plot_variable(mc_samples, data_sample, key, 'tracks', gen_cuts, mc_selections, output_dir)
+    sys.exit()
+def plot_variable(mc_samples, data_sample, var, var_type, gen_cuts, mc_selections,
+                  output_dir, n_bins=100, density=False):
+    if var_type == 'HLVs' or var_type is None:
+        logs = ['d0', 'd0Sig', 'deltaEta1', 'deltaPhiRescaled2', 'dPOverP', 'EoverP', 'EptRatio',
+                'et_calo', 'qd0Sig', 'Reta', 'Rhad', 'Rhad1', 'Rphi', 'weta2', 'wtots1']
+    elif var_type == 'tracks':
+        logs = ['pOverE', 'd0', 'deta', 'dphi', 'pixhits', 'scthits', 'trthits', 'sigmad0', 'vertex', 'z0']
+    fig = plt.figure(figsize=(12,8)); axes = plt.gca()
+    values = np.concatenate(mc_samples[var] + [data_sample[var]])
+    if mc_samples[var][0].dtype == np.int32: bins = np.arange  (np.min(values), np.max(values)+1        )
+    else                                   : bins = np.linspace(np.min(values), np.max(values)  , n_bins)
+    # Axes parameters
+    axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
+                     bottom=True, top=True, left=True, right=True)
+    axes.tick_params(axis="both", pad=8, labelsize=18)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        axes.spines[axis].set_linewidth(1.5)
+        axes.spines[axis].set_color('black')
+    mc_weights    = [np.ones_like(     sample      , dtype=np.float32) for sample in mc_samples[var]]
+    data_weights  =  np.ones_like(data_sample [var], dtype=np.float32)
+    mc_weights    = [100*weights/np.sum(np.concatenate(mc_weights)) for weights in mc_weights]
+    data_weights *= 100/np.sum(data_weights)
+    if density:
+        for n in range(len(mc_samples[var])):
+            indices        = np.searchsorted(bins,   mc_samples[var][n], side='right')
+            mc_weights[n] /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+        indices       = np.searchsorted(bins, data_sample[var], side='right')
+        data_weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+        plt.ylabel('Distribution Density (%)', fontsize=25)
+    else:
+        plt.ylabel('Distribution (%)'        , fontsize=25)
+    pylab.hist(mc_samples[var], bins=bins, weights=mc_weights, histtype='barstacked', lw=3,
+               log=True if var in logs else False,
+               label=[n['label'] for n in mc_selections], color=[n['color'] for n in mc_selections])
+    pylab.hist(data_sample[var], bins=bins, weights=data_weights, histtype='step', lw=2, stacked=True,
+                 log=True if var in logs else False, label='LF (data)', color='black', ls='-')
+    plt.xlabel(var, fontsize=25)
+    if len(gen_cuts['eta']) == 1: eta_text =                     '$|\eta|<$'+gen_cuts['eta'][0]
+    else                        : eta_text = gen_cuts['eta'][0]+'$<|\eta|<$'+gen_cuts['eta'][1]
+    plt.text(0.07, 0.95, eta_text, {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
+    pt_text = gen_cuts['pt'][0]+'$<E_\mathrm{T}$[GeV]$<$'+gen_cuts['pt'][1]
+    plt.text(0.07, 0.89,  pt_text, {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
+    plt.legend(loc='upper center', fontsize=18, columnspacing=1.,
+               frameon=True, handlelength=2, ncol=1, facecolor=None, framealpha=1.).set_zorder(10)
+    plt.subplots_adjust(left=0.1, top=0.97, bottom=0.12, right=0.95)
+    if var_type == 'HLVs'  : output_dir += '/'+'HLVs'
+    if var_type == 'tracks': output_dir += '/'+'tracks'
+    if not os.path.isdir(output_dir): os.mkdir(output_dir)
+    file_name = output_dir+'/'+var+'.png'
+    print('Printing:', file_name)
+    plt.savefig(file_name); plt.close()
+
+
+'''
+def plot_inputs(input_path, host_name, inputs, n_e, n_tracks, n_classes, cuts, output_dir):
+    from utils import get_dataset, merge_samples, sample_composition, compo_matrix
+    mc_input   = '0.0-2.5_mc'
+    #data_input = '0.0-2.5_LFdata17-18'
+    data_input = 'LFdata/LFdata_17-18'
+    mc_files   = get_dataset(input_path,   mc_input, host_name)
+    data_files = get_dataset(input_path, data_input, host_name)
+    ne_mc   = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in   mc_files]))]
+    ne_data = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in data_files]))]
+    print('\nLoading sample [', format(str(ne_mc[0])  ,'>8s')+', '+format(str(ne_mc[1])  ,'>8s'), end=']')
+    print(' from', mc_files[0].split('/')[-2], flush=True)
+    mc_sample  , mc_labels  , _ = merge_samples(  mc_files, ne_mc  , inputs, n_tracks, n_classes=6, cuts=cuts)
+    sample_composition(  mc_sample); compo_matrix(  mc_labels, n_etypes=n_classes); print()
+    print(  'Loading sample [', format(str(ne_data[0]),'>8s')+', '+format(str(ne_data[1]),'>8s'), end=']')
+    print(' from', data_files[0].split('/')[-2], flush=True)
+    data_sample, data_labels, _ = merge_samples(data_files, ne_data, inputs, n_tracks, n_classes=5, cuts=cuts)
     sample_composition(data_sample); compo_matrix(data_labels, n_etypes=n_classes); print()
-    misc_sample = None #{key.split('p_')[-1]:val[  mc_labels==4] for key,val in   mc_sample.items()}
+    misc_sample = {key.split('p_')[-1]:val[  mc_labels==4] for key,val in   mc_sample.items()}
     mc_sample   = {key.split('p_')[-1]:val[  mc_labels==5] for key,val in   mc_sample.items()}
     data_sample = {key.split('p_')[-1]:val[data_labels==4] for key,val in data_sample.items()}
     if 'tracks' in mc_sample:
@@ -1156,11 +1255,14 @@ def plot_variable(mc_sample, data_sample, misc_sample, var, var_type, cuts, outp
         axes.spines[axis].set_linewidth(1.5)
         axes.spines[axis].set_color('black')
     mc_weights    = np.ones_like(  mc_sample[var], dtype=np.float32)
+    misc_weights  = np.ones_like(misc_sample[var], dtype=np.float32)
     data_weights  = np.ones_like(data_sample[var], dtype=np.float32)
-    #misc_weights  = np.ones_like(misc_sample[var], dtype=np.float32)
-    mc_weights   *= 100/np.sum(  mc_weights)
+    #mc_weights   *= 100/np.sum(  mc_weights)
+    #misc_weights *= 100/(np.sum(misc_weights)
     data_weights *= 100/np.sum(data_weights)
-    #misc_weights *= 100/np.sum(misc_weights)
+    weights = np.sum(mc_weights) + np.sum(misc_weights)
+    mc_weights   *= 100/weights
+    misc_weights *= 100/weights
     if density:
         indices       = np.searchsorted(bins,   mc_sample[var], side='right')
         mc_weights   /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
@@ -1169,22 +1271,27 @@ def plot_variable(mc_sample, data_sample, misc_sample, var, var_type, cuts, outp
         plt.ylabel('Distribution Density (%)', fontsize=25)
     else:
         plt.ylabel('Distribution (%)'        , fontsize=25)
-    pylab.hist(  mc_sample[var], bins=bins, weights=  mc_weights, histtype='step', lw=3,
-                 log=True if var in logs else False, label='LF e/$\gamma$ (mc)')
-    #pylab.hist(misc_sample[var], bins=bins, weights=misc_weights, histtype='step', lw=3,
+    #pylab.hist(  mc_sample[var], bins=bins, weights=  mc_weights, histtype='bar', lw=3, stacked=True,
     #             log=True if var in logs else False, label='LF Hadron (mc)')
-    pylab.hist(data_sample[var], bins=bins, weights=data_weights, histtype='step', lw=3,
-                 log=True if var in logs else False, label='LF (data)')
+    #pylab.hist(misc_sample[var], bins=bins, weights=misc_weights, histtype='step', lw=3,
+    #             log=True if var in logs else False, label='LF e/$\gamma$ (mc)')
+    pylab.hist([misc_sample[var],mc_sample[var]], bins=bins, weights=[misc_weights,mc_weights],
+               histtype='barstacked', lw=3, log=True if var in logs else False,
+               label=['LF e/$\gamma$ (mc)','LF Hadron (mc)'], color=['magenta','cyan'])
+    pylab.hist(data_sample[var], bins=bins, weights=data_weights, histtype='step', lw=2, stacked=True,
+                 log=True if var in logs else False, label='LF (data)', color='black', ls='-')
     plt.xlabel(var, fontsize=25)
-    if len(cuts['eta']) == 1: eta_text =                 '$|\eta|<$'+cuts['eta'][0],
+    if len(cuts['eta']) == 1: eta_text =                 '$|\eta|<$'+cuts['eta'][0]
     else                    : eta_text = cuts['eta'][0]+'$<|\eta|<$'+cuts['eta'][1]
     plt.text(0.07, 0.95, eta_text, {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
     pt_text = cuts['pt'][0]+'$<E_\mathrm{T}$[GeV]$<$'+cuts['pt'][1]
     plt.text(0.07, 0.89,  pt_text, {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
     # Create new legend handles with existing colors
-    handles, labels = axes.get_legend_handles_labels()
-    new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
-    plt.legend(handles=new_handles, labels=labels, loc='upper center', fontsize=18, columnspacing=1.,
+    #handles, labels = axes.get_legend_handles_labels()
+    #new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
+    #plt.legend(handles=new_handles, labels=labels, loc='upper center', fontsize=18, columnspacing=1.,
+    #           frameon=True, handlelength=2, ncol=1, facecolor=None, framealpha=1.).set_zorder(10)
+    plt.legend(loc='upper center', fontsize=18, columnspacing=1.,
                frameon=True, handlelength=2, ncol=1, facecolor=None, framealpha=1.).set_zorder(10)
     plt.subplots_adjust(left=0.1, top=0.97, bottom=0.12, right=0.95)
     if var_type == 'HLVs'  : output_dir += '/'+'HLVs'
@@ -1193,6 +1300,7 @@ def plot_variable(mc_sample, data_sample, misc_sample, var, var_type, cuts, outp
     file_name = output_dir+'/'+var+'.png'
     print('Printing:', file_name)
     plt.savefig(file_name); plt.close()
+'''
 
 
 def plot_vertex(sample):
