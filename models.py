@@ -39,21 +39,23 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
     #TRACKS FCN
     if 'tracks' in scalars:
         outputs = Flatten()(input_dict['tracks'])
-        for n_neurons in []:#[200, 200]:
+        for n_neurons in []:#[100, 100]:
             outputs = Dense(n_neurons, kernel_regularizer=regularizer)                             (outputs)
             if batchNorm: outputs = BatchNormalization()                                           (outputs)
             outputs = LeakyReLU(alpha=0)                                                           (outputs)
             outputs = Dropout(dropout)                                                             (outputs)
         output_list += [outputs]
     #SCALARS
+    #for key in set(scalars)-{'tracks'}: output_list += [Flatten()(input_dict[key])]
     outputs = [Flatten()(input_dict[key]) for key in scalars if key!='tracks']
-    outputs = concatenate(outputs)
-    for n_neurons in []:#[200, 200]:
-        outputs = Dense(n_neurons, kernel_regularizer=regularizer)                                 (outputs)
-        if batchNorm: outputs = BatchNormalization()                                               (outputs)
-        outputs = LeakyReLU(alpha=0)                                                               (outputs)
-        outputs = Dropout(dropout)                                                                 (outputs)
-    output_list += [outputs]
+    if len(outputs) != 0:
+        outputs = concatenate(outputs)
+        for n_neurons in []:#[100, 100]:
+            outputs = Dense(n_neurons, kernel_regularizer=regularizer)                             (outputs)
+            if batchNorm: outputs = BatchNormalization()                                           (outputs)
+            outputs = LeakyReLU(alpha=0)                                                           (outputs)
+            outputs = Dropout(dropout)                                                             (outputs)
+        output_list += [outputs]
     #CONCATENATION TO FCN
     outputs = concatenate(output_list) if len(output_list)>1 else output_list[0]
     for n_neurons in FCN_neurons:
@@ -66,17 +68,17 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
 
 
 def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, train_var, n_gpus):
-    devices = ['/gpu:0', '/gpu:1', '/gpu:2', '/gpu:3','/gpu:4', '/gpu:5', '/gpu:6', '/gpu:7']
     tf.debugging.set_log_device_placement(False)
-    strategy = tf.distribute.MirroredStrategy(devices=devices[:n_gpus])
+    strategy = tf.distribute.MirroredStrategy(devices=['/gpu:'+str(n) for n in range(n_gpus)])
     with strategy.scope():
         if tf.__version__ >= '2.1.0':
             mixed_precision.experimental.set_policy('mixed_float16')
         if 'tracks' in train_var['images']: CNN[sample['tracks'].shape[1:]] = CNN.pop('tracks')
         model = multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, **train_var)
         print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
-        model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy',
-                      metrics=['accuracy'], weighted_metrics=['accuracy'])
+        model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        #model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy',
+        #              metrics=['accuracy'], weighted_metrics=['accuracy'])
     return model
 
 

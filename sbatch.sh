@@ -16,7 +16,7 @@
 
 export SBATCH_VAR=$SLURM_ARRAY_TASK_ID
 export  HOST_NAME=$SLURM_SUBMIT_HOST
-export   NODE_DIR=$SLURM_TMPDIR
+export INPUT_PATH=$SLURM_TMPDIR
 export SCRIPT_VAR
 
 if [[ $HOST_NAME == *atlas* ]]
@@ -33,16 +33,16 @@ then
     singularity shell --nv --bind $PATHS $SIF classifier.sh $SBATCH_VAR $HOST_NAME $SCRIPT_VAR
 else
     # TRAINING ON BELUGA
-    if [[ -n "$NODE_DIR" ]]
+    if [[ -n "$INPUT_PATH" ]]
     then
 	echo "COPYING DATA FILES TO LOCAL NODE"
-	cp -r /project/def-arguinj/shared/e-ID_data/{0.0-1.3,1.3-1.6,1.6-2.5,0.0-2.5} $NODE_DIR
+	cp -r /project/def-arguinj/shared/e-ID_data/{0.0-1.3,1.3-1.6,1.6-2.5,0.0-2.5} $INPUT_PATH
     fi
     module load singularity/3.6
-    PATHS=/project/def-arguinj,$NODE_DIR
+    PATHS=/project/def-arguinj,$INPUT_PATH
     SIF=/project/def-arguinj/shared/sing_images/tf-2.1.0-gpu-py3_sing-3.5.sif
-    singularity shell --nv --bind $PATHS $SIF < classifier.sh $SBATCH_VAR $HOST_NAME $NODE_DIR
+    singularity shell --nv --bind $PATHS $SIF < classifier.sh $SBATCH_VAR $HOST_NAME $INPUT_PATH
 fi
 
 mkdir -p outputs/log_files
-mv *.out log_files 2>/dev/null
+mv *.out outputs/log_files 2>/dev/null

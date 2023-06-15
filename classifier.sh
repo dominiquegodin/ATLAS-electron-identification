@@ -1,9 +1,9 @@
 # SINGLE TRAINING
-python classifier.py  --n_train=20e6 --n_eval=10e6 --n_valid=20e6 --batch_size=1e4 --n_epochs=100  \
-                      --n_etypes=5 --eta_region=0.0-2.5 --weight_type=match2class --bkg_ratio=4    \
-                      --multiclass=ON --model_in='' --scaler_in='' --host_name=${HOST_NAME}        \
-                      --output_dir=outputs/test --results_out=valid_results.pkl                    \
-                      --scalars=ON --images=ON --plotting=ON --generator=ON
+python classifier.py  --n_train=180e6 --n_eval=100e6 --n_valid=100e6 --batch_size=1e4 --n_epochs=100 \
+                      --n_etypes=6 --input_dir=0.0-2.5 --weight_type=match2class --bkg_ratio=4       \
+                      --multiclass=ON --model_in='' --scaler_in='' --host_name=${HOST_NAME}          \
+                      --output_dir=outputs/test --results_out=valid_results.pkl                      \
+                      --scalars=ON --tracks=ON --images=ON --plotting=ON --generator=ON --n_gpus=1
 exit
 
 
@@ -61,8 +61,8 @@ python classifier.py  --n_train=0           --n_valid=$n_e        --n_epochs=0  
 
 
 # USING VALIDATION RESULTS FOR PLOTTING
-python classifier.py  --n_train=0  --n_valid=15e6  --output_dir=outputs  --results_in=valid_results.pkl        \
-                      --eta_region=0.0-1.3  --plotting=ON --sep_bkg=ON
+python classifier.py  --n_train=0  --n_valid=15e6  --n_etypes=6 --output_dir=outputs  \
+                      --results_in=valid_results.pkl --eta_region=0.0-1.3  --plotting=ON --sep_bkg=ON
 
 
 # FEATURE REMOVAL IMPORTANCE RANKING (array jobs)
