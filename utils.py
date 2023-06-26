@@ -7,7 +7,7 @@ from   sklearn  import metrics, utils, preprocessing
 from   tabulate import tabulate
 from   skimage  import transform
 from   plots_DG import var_histogram, plot_discriminant, plot_ROC_curves
-from   plots_DG import ratio_plots, performance_ratio, performance_plots
+from   plots_DG import ratio_plots, performance_ratio, performance_plots, plot_classes
 from   plots_KM import plot_distributions_KM, differential_plots
 
 
@@ -806,8 +806,8 @@ def order_kernels(image_shape, n_maps, FCN_neurons, n_classes):
     return sorted(par_tuple)[::-1]
 
 
-def print_channels(sample, labels, col=0, reverse=False):
-    def getkey(item): return item[col]
+def print_channels(sample, labels, col=1, reverse=True, composition='classes'):
+    def getkey(item): return item[col] if col==0 else 0 if item[col]=='' else np.float(item[col])
     channel_dict= {301000:'dyee 120-180'       , 301003:'dyee 400-600'      , 301004:'dyee 600-800'       ,
                    301009:'dyee 1750-2000'     , 301010:'dyee 2000-2250'    , 301012:'dyee 2500-2750'     ,
                    301016:'dyee 4000-4500'     , 301017:'dyee 4500-5000'    , 301018:'dyee 5000'          ,
@@ -830,11 +830,53 @@ def print_channels(sample, labels, col=0, reverse=False):
                    423112:'y+jets 3000'        , 423200:'direct:Jpsie3e3'   , 423201:'direct:Jpsie3e8'    ,
                    423202:'direct:Jpsie3e13'   , 423211:'np:bb --> Jpsie3e8', 423212:'np:bb --> Jpsie3e13',
                    423300:'JF17'               , 423301:'JF23'              , 423302:'JF35', 423303:'JF50'}
-    channels = sample['mcChannelNumber']; headers = ['Sample ', 'Process', 'Number e']
-    #channels = channels[labels==4]
-    channel_dict.update({**{n:'unknown' for n in set(channels)-set(channel_dict.keys())}, 0:'Data LF'})
-    channels = sorted([[str(n)+' ', channel_dict[n], int(np.sum(channels==n))] for n in set(channels)], key=getkey)
-    print(tabulate(channels[::-1] if reverse else channels, headers=headers, tablefmt='psql')); sys.exit()
+    channels = sample['mcChannelNumber']; classes = np.unique(labels); n_e = len(labels)
+    channel_dict.update({**{n:'unknown'  for n in set(channels)-set(channel_dict.keys())}, 0:'Data LF'})
+    channel_num = {n:np.sum(channels==n) for n in set(channels)}
+    if   composition == 'electrons':
+        class_ratios = {n:[np.sum(channels[labels==m]==n)/n_e               for m in classes] for n in set(channels)}
+    elif composition == 'channels':
+        class_ratios = {n:[np.sum(channels[labels==m]==n)/channel_num[n]    for m in classes] for n in set(channels)}
+    elif composition == 'classes':
+        class_ratios = {n:[np.sum(channels[labels==m]==n)/np.sum(labels==m) for m in classes] for n in set(channels)}
+    class_ratios = {n:['' if m==0 else format(1e2*m,'.1e').replace('e-0','e-0') if np.round(1e4*m)==0
+                       else format(1e2*m,'.2f') for m in val] for n,val in class_ratios.items()}
+    channel_rows = sorted([[channel_dict[n], format(100*channel_num[n]/n_e,'.2f'), str(n)] + class_ratios[n]
+                           for n in class_ratios], key=getkey)
+    class_dict = {0:'Prompt', 1:'CF', 2:'PC', 3:'HF', 4:'LF' if len(classes)<=5 else 'LF e/ɣ', 5:'LF Had'}
+    headers = ['Process', '%  ', 'Channel'] + [format(class_dict[n],'>6s')+' (%)' for n in classes]
+    print(tabulate(channel_rows[::-1] if reverse else channel_rows, headers=headers, tablefmt='psql', floatfmt='.2f',
+                   disable_numparse=True, colalign=['left','right','right']+['right' for n in classes])); sys.exit()
+
+
+def class_channels(sample, labels, output_dir, col=1, reverse=True, composition='classes'):
+    def getkey(item): return item[col] if col==0 else 0 if item[col]=='' else np.float(item[col])
+    channel_dict = {'JF17-35-50':[423300, 423302, 423303],
+                    'ttbar'     :[410470],
+                    'WZ'        :[361100, 361102, 361103, 361105, 361106, 361108],
+                    'Drell-Yan' :[301000, 301003, 301004, 301009, 301010, 301012, 301016, 301017, 301018, 361665],
+                    'gamma+jet' :[423100, 423101, 423102, 423103, 423107, 423108, 423109, 423110, 423111, 423112]}
+    channels = sample['mcChannelNumber']; classes = np.unique(labels); n_e = len(labels)
+    channel_dict = {key:set(np.unique(channels))&set(val) for key,val in channel_dict.items()}
+    channel_num = {key:np.sum(np.logical_or.reduce([channels==n for n in val])) for key,val in channel_dict.items()}
+    if   composition == 'electrons':
+        class_ratios = {key:[np.sum((np.logical_or.reduce([channels==n for n in val]))&(labels==m))/n_e
+                             for m in classes] for key,val in channel_dict.items()}
+    elif composition == 'channels':
+        class_ratios = {key:[np.sum((np.logical_or.reduce([channels==n for n in val]))&(labels==m))/channel_num[key]
+                             for m in classes] for key,val in channel_dict.items()}
+    elif composition == 'classes':
+        class_ratios = {key:[np.sum((np.logical_or.reduce([channels==n for n in val]))&(labels==m))/np.sum(labels==m)
+                             for m in classes] for key,val in channel_dict.items()}
+        plot_classes(sample, labels, channel_dict, class_ratios, output_dir); print()
+    class_ratios = {key:['' if m==0 else format(1e2*m,'.1e').replace('e-0','e-0') if np.round(1e4*m)==0
+                       else format(1e2*m,'.2f') for m in val] for key,val in class_ratios.items()}
+    channel_rows = sorted([[key, format(100*channel_num[key]/n_e,'.2f')] + val
+                           for key,val in class_ratios.items()], key=getkey)
+    class_dict = {0:'Prompt', 1:'CF', 2:'PC', 3:'HF', 4:'LF' if len(classes)<=5 else 'LF e/ɣ', 5:'LF Had'}
+    headers = ['Processes', '%  '] + [format(class_dict[n],'>6s')+' (%)' for n in classes]
+    print(tabulate(channel_rows[::-1] if reverse else channel_rows, headers=headers, tablefmt='psql', floatfmt='.2f',
+                   disable_numparse=True, colalign=['left','right']+['right' for n in classes])); sys.exit()
 
 
 def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
@@ -842,6 +884,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
     #print_channels(sample, labels)
+    class_channels(sample, labels, output_dir)
     # DISTRIBUTION HEATMAPS
     #from plots_DG import plot_heatmaps
     #plot_heatmaps(sample, labels, output_dir); sys.exit()
