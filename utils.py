@@ -188,13 +188,13 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
             except KeyError:
                 if 'fine' in key: sample[key] = np.zeros((idx[1]-idx[0],)+(56,11))
                 else            : sample[key] = np.zeros((idx[1]-idx[0],)+( 7,11))
-        for key in set(images)-{'tracks'}:
-            if key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
-                energy_fine   = np.sum(sample[key+'_fine'], axis=(1,2))
-                energy_coarse = np.sum(sample[key]        , axis=(1,2))
-                energy_fine  [energy_coarse == 0] = 0.
-                energy_coarse[energy_coarse == 0] = 1.
-                sample[key] *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
+        #for key in set(images)-{'tracks'}:
+        #    if key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
+        #        energy_fine   = np.sum(sample[key+'_fine'], axis=(1,2))
+        #        energy_coarse = np.sum(sample[key]        , axis=(1,2))
+        #        energy_fine  [energy_coarse == 0] = 0.
+        #        energy_coarse[energy_coarse == 0] = 1.
+        #        sample[key] *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
         if 'tracks' in scalars+images:
             n_tracks    = min(n_tracks, data[prefix+'tracks'].shape[1])
             tracks_data = data[prefix+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
@@ -662,8 +662,8 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
-        #processes += [mp.Process(target=plot_discriminant, args=arguments)]
+        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
+        processes += [mp.Process(target=plot_discriminant, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -774,7 +774,7 @@ def verify_sample(sample):
         idx1, idx2 = index*batch_size, (index+1)*batch_size
         return_dict[index] = sum([np.sum(np.isfinite(sample[key][idx1:idx2])==False) for key in sample])
     n_e = len(list(sample.values())[0]); start_time = time.time()
-    print('\nSCANNING', n_e, 'ELECTRONS FOR ERRORS -->', end=' ', flush=True)
+    print('SCANNING', n_e, 'ELECTRONS FOR ERRORS -->', end=' ', flush=True)
     for n in np.arange(min(12, mp.cpu_count()), 0, -1):
         if n_e % n == 0: n_tasks = n; batch_size = n_e//n_tasks; break
     manager   =  mp.Manager(); return_dict = manager.dict()
