@@ -76,7 +76,8 @@ def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, trai
         if 'tracks' in train_var['images']: CNN[sample['tracks'].shape[1:]] = CNN.pop('tracks')
         model = multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, **train_var)
         print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
-        model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        optimizer = optimizers.Adam(lr=5e-4, amsgrad=False)
+        model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
         #model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy',
         #              metrics=['accuracy'], weighted_metrics=['accuracy'])
     return model

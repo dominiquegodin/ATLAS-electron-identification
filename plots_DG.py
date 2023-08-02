@@ -63,8 +63,8 @@ def plot_history(history, output_dir, key='accuracy'):
 
 def plot_heatmaps(sample, labels, output_dir):
     n_classes = max(labels)+1
-    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavour',
-                  4:'Light Flavour e$/\gamma$'        , 5:'Light Flavour Hadron', 'bkg':'Background'}
+    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
+                  4:'Light Flavor e$/\gamma$'         , 5:'Light Flavor Hadron' , 'bkg':'Background'}
     pt  =     sample['pt']  ;  pt_bins = np.arange(0,81,1)
     eta = abs(sample['eta']); eta_bins = np.arange(0,2.55,0.05)
     extent = [eta_bins[0], eta_bins[-1], pt_bins[0], pt_bins[-1]]
@@ -137,12 +137,9 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
             pylab.ylim(1e-3, 2e0)
             plt.yscale('log')
     #bins[-1] = max(bins[-1], max(variable)+1e-3)
-    if n_etypes <= 5:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavour',
-                      4:'Light Flavour', 'bkg':'Background'}
-    if n_etypes == 6:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavour',
-                      4:'Light Flavour e$\;\!/\;\!\gamma$', 5:'Light Flavour Hadron', 'bkg':'Background'}
+    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
+                  4:'Light Flavor e$\;\!/\;\!\gamma$', 5:'Light Flavor Hadron', 'bkg':'Background'}
+    if n_etypes <= 5: label_dict[4] = 'Light Flavor'
     color_dict = {0:'tab:blue', 1:'tab:orange', 2:'tab:green', 3:'tab:red', 4:'tab:purple', 5:'tab:brown'}
     #if prefix == 'train':
     #    color_dict = {0:'tab:blue', 1:'tab:orange', 2:'tab:orange', 3:'tab:orange', 4:'tab:purple', 5:'tab:orange'}
@@ -182,16 +179,14 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
 
 
 def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=False, bkg='bkg'):
-    if n_etypes <= 5:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavour',
-                      4:'Light Flavour', 'bkg':'Background'}
-    if n_etypes == 6:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavour',
-                      4:'Light Flavour e$\;\!/\;\!\gamma$', 5:'Light Flavour Hadron', 'bkg':'Background'}
-        #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
-        #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
-    color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            ,   3  :'tab:red'   ,
-                  4:'tab:purple'                     , 5:'tab:brown'            , 'bkg':'tab:orange'}
+    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
+                  4:'Light Flavor e$\;\!/\;\!\gamma$', 5:'Light Flavor Hadron',
+                  'bkg':'Background', 45:'Light Flavor'}
+    if n_etypes <= 5: label_dict[4] = 'Light Flavor'
+    #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
+    #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
+    color_dict = {0:'tab:blue'    , 1:'tab:orange'   ,  2:'tab:green'   ,   3  :'tab:red'   ,
+                  4:'tab:purple'  , 5:'tab:brown'    , 45:'tab:purple'  , 'bkg':'tab:orange'}
     if separation:
         label_dict.pop('bkg')
     else:
@@ -247,8 +242,9 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
         # Create new legend handles with existing colors
         handles, labels = axes.get_legend_handles_labels()
         new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
+        ncol = 2 if separation else 1
         plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16, columnspacing=1.,
-                   frameon=True, handlelength=2, ncol=2, facecolor=None, framealpha=1.).set_zorder(10)
+                   frameon=True, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
         # Adding ATLAS messaging
         plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
                  {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
@@ -280,7 +276,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
     class_histo(y_true, y_prob, bins, color_dict)
     plt.subplots_adjust(top=0.99, bottom=0.07, left=0.1, right=0.95, hspace=0.2)
     file_name = output_dir+'/discriminant.png'
-    print('Saving test sample discriminant   to:', file_name); plt.savefig(file_name)
+    print('Saving discriminant plot to:', file_name); plt.savefig(file_name)
 
 
 def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
@@ -439,8 +435,8 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         if multiplots:
             sig, bkg = output_dir.split('/')[-1].split('vs')
             sig_dict = {'class_0':'Prompt Electron', 'class_01':'Prompt Electron + Charge Flip'}
-            bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavour',
-                        '4':'Light Flavour e/$\gamma$', '5':'Light Flavour Hadron', 'Bkg':'Combined Background'}
+            bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavor',
+                        '4':'Light Flavor e/$\gamma$', '5':'Light Flavor Hadron', 'Bkg':'Combined Background'}
             plt.gca().add_artist(L)
             plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
                      {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
@@ -522,7 +518,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC_'+output_dir.split('class_')[-1]+('_'+str(ROC_type) if ROC_type!=1 else '')+'.png'
     fig.subplots_adjust(left=0.12, top=0.97, bottom=0.12, right=0.94)
-    print('Saving ROC curve   plot to:', file_name); plt.savefig(file_name)
+    print('Saving ROC curve    plot to:', file_name); plt.savefig(file_name)
     if multiplots:
         for pkl_file in [name for name in os.listdir(output_dir) if '.pkl' in name]:
             os.remove(output_dir+'/'+pkl_file)
@@ -840,10 +836,10 @@ def ratio_plots(valid_sample, valid_labels, valid_probs, n_etypes, output_dir):
     #                     for process in bkg_rej]).T
     X_val = [r'Z$\rightarrow$ee'     , r'W$\rightarrow$e$\nu$'     , r'Z$\rightarrow \tau\tau$',
              r'W$\rightarrow \tau\nu$', r't$\bar{\operatorname{t}}$', r'JF17', r'JF35', r'JF50' ]
-    #Y_val = [' Combined \nBackground', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavour',
-    #         'Light Flavour\n        e$/\gamma$        ', 'Light Flavour\n    Hadron    '       ]
-    Y_val = [' Prompt \nElectron', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavour',
-             'Light Flavour\n        e$/\gamma$        ', 'Light Flavour\n    Hadron    '       ]
+    #Y_val = [' Combined \nBackground', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavor',
+    #         'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n    Hadron    '       ]
+    Y_val = [' Prompt \nElectron', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavor',
+             'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n    Hadron    '       ]
     #plot_meshgrid(X_val, Y_val, bkg_rej, output_dir, vmin=0, vmax=200, prec=0)
     plot_meshgrid(X_val, Y_val, ratios, output_dir, prec=1, vmax=50); sys.exit()
 def plot_meshgrid(X_val, Y_val, Z_val, output_dir, prec=2, vmin=None, vmax=None, color='black'):
@@ -1044,14 +1040,9 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
 
 def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False):
     image, vmin, vmax = 100*image, 100*vmin, 100*vmax
-    if len(classes) <= 5:
-        class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion',
-                      3:'Heavy Flavour'  , 4:'Light Flavour'}
-    else:
-        class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavour',
-                      4:'Light Flavour e/$\gamma$', 5:'Light Flavour Hadron', 6:'KnownUnknown'}
-    #class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavour',
-    #              4:'Light Flavour e/$\gamma$', 5:'Light Flavour Hadron', 6:'KnownUnknown'}
+    class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavor',
+                  4:'Light Flavor e/$\gamma$', 5:'Light Flavor Hadron', 6:'KnownUnknown'}
+    if 5 not in classes: class_dict[4] = 'Light Flavor'
     layer_dict = {'em_barrel_Lr0'  :'EM Presampler' ,
                   'em_barrel_Lr1'  :'EM Barrel L1'  , 'em_barrel_Lr1_fine':'EM Barrel L1'  ,
                   'em_barrel_Lr2'  :'EM Barrel L2'  , 'em_barrel_Lr3'     :'EM Barrel L3'  ,

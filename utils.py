@@ -613,7 +613,7 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=Non
     if n_classes > 2:
         """ Multi-class discriminant """
         bkg_list = list(set(np.arange(n_classes))-set(sig_list))
-        bkg = bkg_list if bkg=='bkg' else [bkg]
+        bkg = bkg_list if bkg=='bkg' else [int(n) for n in str(bkg)]
         if verbose: print_dict[1] += 'SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
         #for n in list(np.arange(1, n_classes))+['bkg']: print(n, class_weights(sig_list, ratios, n))
         weights = class_weights(sig_list, ratios, 'bkg')                              #Optimal combined background
@@ -688,7 +688,7 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etype
         #                                     sig_list, 'bkg', ratios=first_cut_ratios)
         #_, tpr, thresholds = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         #sig_eff=0.99 ; threshold = thresholds[np.argmin(abs(tpr-sig_eff))]
-        bkg_list  = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg else ['bkg']
+        bkg_list = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg else ['bkg']
         manager   = mp.Manager(); return_dict = manager.dict()
         arguments = [(valid_sample, valid_labels, valid_probs, n_etypes, plotting, output_dir,
                       sig_list, bkg, ratios['truth'], return_dict, threshold) for bkg in bkg_list]
@@ -703,8 +703,6 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etype
     #processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
     #for job in processes: job.start()
     #for job in processes: job.join()
-
-
     """ Background rejection extraction for feature ranking """
     if plotting == 'OFF':
         for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
@@ -884,7 +882,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
     #print_channels(sample, labels)
-    class_channels(sample, labels, output_dir)
+    #class_channels(sample, labels, output_dir)
     # DISTRIBUTION HEATMAPS
     #from plots_DG import plot_heatmaps
     #plot_heatmaps(sample, labels, output_dir); sys.exit()
