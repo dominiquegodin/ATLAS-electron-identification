@@ -688,7 +688,8 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etype
         #                                     sig_list, 'bkg', ratios=first_cut_ratios)
         #_, tpr, thresholds = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         #sig_eff=0.99 ; threshold = thresholds[np.argmin(abs(tpr-sig_eff))]
-        bkg_list = ['bkg']+list(set(np.unique(valid_labels))-set(sig_list))+[45] if sep_bkg else ['bkg']
+        bkg_list = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg else ['bkg']
+        if sep_bkg and n_etypes == 6: bkg_list += [45]
         manager   = mp.Manager(); return_dict = manager.dict()
         arguments = [(valid_sample, valid_labels, valid_probs, n_etypes, plotting, output_dir,
                       sig_list, bkg, ratios['truth'], return_dict, threshold) for bkg in bkg_list]
