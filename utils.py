@@ -498,6 +498,10 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
             valid_accuracy = valid_ratios @ matrix.diagonal() /100
             print_dict[2] += tabulate(table, headers=headers, tablefmt='psql', floatfmt=".2f")+'\n'
             print_dict[2] += 'VALIDATION SAMPLE ACCURACY: '+format(valid_accuracy,'.2f')+' %\n'
+        #print(valid_ratios)
+        #valid_ratios[-2] = valid_ratios[-2] + valid_ratios[-1]
+        #valid_ratios[-1] = valid_ratios[-2]
+        #print(valid_ratios)
         return {'truth':valid_ratios, 'pred':pred_ratios, 'none':np.ones_like(valid_ratios)}
 
 
@@ -662,8 +666,8 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
-        processes += [mp.Process(target=plot_discriminant, args=arguments)]
+        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
+        #processes += [mp.Process(target=plot_discriminant, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -689,7 +693,7 @@ def valid_results(valid_sample, valid_labels, valid_probs, train_labels, n_etype
         #_, tpr, thresholds = metrics.roc_curve(labels, probs[:,0], pos_label=0)
         #sig_eff=0.99 ; threshold = thresholds[np.argmin(abs(tpr-sig_eff))]
         bkg_list = ['bkg'] + list(set(np.unique(valid_labels))-set(sig_list)) if sep_bkg else ['bkg']
-        if sep_bkg and n_etypes == 6: bkg_list += [45]
+        #if sep_bkg and n_etypes == 6: bkg_list += [45]
         manager   = mp.Manager(); return_dict = manager.dict()
         arguments = [(valid_sample, valid_labels, valid_probs, n_etypes, plotting, output_dir,
                       sig_list, bkg, ratios['truth'], return_dict, threshold) for bkg in bkg_list]
@@ -940,8 +944,10 @@ def feature_ranking(output_dir, results_out, scalars, images, groups):
 #################################################################################
 
 
-def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key, index):
+def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key, n_tasks, index):
     idx = index*batch_size, (index+1)*batch_size
+    #print(index, index%n_tasks, idx, sum_e)
+    #return
     with h5py.File(h5_file, 'r') as data:
         images  = list(set(images  ) & set(data[file_key]))
         tracks  = list(set(tracks  ) & set(data[file_key]))
@@ -973,7 +979,7 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
     for key in tracks + ['p_truth_E', 'p_truth_e']:
         try: sample.pop(key)
         except KeyError: pass
-    with h5py.File(output_dir+'/'+'e-ID_'+'{:=02}'.format(index)+'.h5', 'w' if sum_e==0 else 'a') as data:
+    with h5py.File(output_dir+'/'+'e-ID_'+'{:=02}'.format(index%n_tasks)+'.h5', 'w' if sum_e==0 else 'a') as data:
         for key in sample:
             shape = (sum_e+batch_size,) + sample[key].shape[1:]
             if sum_e == 0:
