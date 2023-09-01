@@ -9,14 +9,15 @@ from   utils     import presample, merge_presamples, mix_datafiles, mix_presampl
 
 # OPTIONS
 parser = ArgumentParser()
-parser.add_argument( '--n_e'       , default = None , type=float )
-parser.add_argument( '--n_tasks'   , default = 20   , type=int   )
-parser.add_argument( '--n_files'   , default = None , type=int   )
-parser.add_argument( '--sampling'  , default = 'ON'              )
-parser.add_argument( '--mixing'    , default = 'OFF'             )
-parser.add_argument( '--merging'   , default = 'OFF'             )
-parser.add_argument( '--input_dir' , default = 'inputs'          )
-parser.add_argument( '--output_dir', default = 'outputs'         )
+parser.add_argument( '--n_e'        , default = None , type=float )
+parser.add_argument( '--n_tasks'    , default = 20   , type=int   )
+parser.add_argument( '--n_files'    , default = None , type=int   )
+parser.add_argument( '--sampling'   , default = 'ON'              )
+parser.add_argument( '--mixing'     , default = 'OFF'             )
+parser.add_argument( '--merging'    , default = 'OFF'             )
+parser.add_argument( '--input_dir'  , default = 'inputs'          )
+parser.add_argument( '--output_dir' , default = 'outputs'         )
+parser.add_argument( '--merged_file', default = 'e-ID.h5'         )
 args = parser.parse_args()
 
 
@@ -35,7 +36,7 @@ input_path += '/' + args.input_dir
 if not os.path.isdir(input_path+'/'+'outputs'): os.mkdir(input_path+'/'+'outputs')
 output_dir = input_path+'/'+'outputs'
 data_files = [input_path+'/'+h5_file for h5_file in os.listdir(input_path) if '.h5' in h5_file]
-data_files = sorted(data_files)[0:max(1,args.n_files) if args.n_files != None else len(data_files)]
+data_files = sorted(data_files)[0:max(1,args.n_files) if args.n_files is not None else len(data_files)]
 
 
 # MERGING FILES (NO PRESAMPLING)
@@ -96,19 +97,28 @@ for h5_file in h5_files: os.remove(output_dir+'/'+h5_file)
 n_tasks = min(mp.cpu_count(), args.n_tasks)
 max_e   = [len(h5py.File(h5_file,'r')[key]['eventNumber'])
            for h5_file in data_files for key in h5py.File(h5_file,'r')]
-n_e = min(int(args.n_e), sum(max_e)) if args.n_e!=None else sum(max_e)
+n_e = min(int(args.n_e), sum(max_e)) if args.n_e is not None else sum(max_e)
 n_e = np.int_(np.round(np.array(max_e)*min(1,n_e/sum(max_e)))) // n_tasks * n_tasks
 print('\nSTARTING ELECTRONS COLLECTION (', '\b'+str(sum(n_e)), end=' ', flush=True)
 print('electrons from', len(data_files),'files, using', n_tasks,'threads):')
 pool = mp.Pool(n_tasks); sum_e = 0; index = 0
 for h5_file in data_files:
     for file_key in h5py.File(h5_file,'r'):
-        batch_size = n_e[index]//n_tasks; start_time = time.time()
         print('Collecting', format(str(n_e[index]),'>7s'), 'e from:', h5_file.split('/')[-1], end=' ')
-        print(format('['+file_key+']','7s'), end=' ... ', flush=True)
-        func_args = (h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key)
-        pool.map(partial(presample, *func_args), np.arange(n_tasks))
-        sum_e += batch_size; index += 1
+        print(format('['+file_key+']','7s'), end=' ... ', flush=True); start_time = time.time()
+        n_passes = int(np.ceil(n_e[index]/1e6)) # 1e6 electrons per pass
+        batch_size = n_e[index]//(n_tasks*n_passes)
+        for pass_number in range(n_passes):
+            func_args = (h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key, n_tasks)
+            pool.map(partial(presample, *func_args), np.arange(pass_number*n_tasks,(pass_number+1)*n_tasks))
+            sum_e += batch_size
+        index += 1
+        #batch_size = n_e[index]//n_tasks
+        #func_args = (h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key)
+        #pool.map(partial(presample, *func_args), np.arange(n_tasks))
+        #pool.map(partial(presample, *func_args), np.arange(0         ,n_tasks//2))
+        #pool.map(partial(presample, *func_args), np.arange(n_tasks//2,n_tasks   ))
+        #sum_e += batch_size; index += 1
         print('(', '\b'+format(time.time() - start_time,'.1f'), '\b'+' s)')
 pool.close(); pool.join(); print()
 

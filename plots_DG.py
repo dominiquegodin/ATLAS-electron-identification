@@ -63,8 +63,8 @@ def plot_history(history, output_dir, key='accuracy'):
 
 def plot_heatmaps(sample, labels, output_dir):
     n_classes = max(labels)+1
-    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavour',
-                  4:'Light Flavour e$/\gamma$'        , 5:'Light Flavour Hadron', 'bkg':'Background'}
+    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
+                  4:'Light Flavor e$/\gamma$'         , 5:'Light Flavor Hadron' , 'bkg':'Background'}
     pt  =     sample['pt']  ;  pt_bins = np.arange(0,81,1)
     eta = abs(sample['eta']); eta_bins = np.arange(0,2.55,0.05)
     extent = [eta_bins[0], eta_bins[-1], pt_bins[0], pt_bins[-1]]
@@ -137,12 +137,9 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
             pylab.ylim(1e-3, 2e0)
             plt.yscale('log')
     #bins[-1] = max(bins[-1], max(variable)+1e-3)
-    if n_etypes <= 5:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavour',
-                      4:'Light Flavour', 'bkg':'Background'}
-    if n_etypes == 6:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavour',
-                      4:'Light Flavour e$\;\!/\;\!\gamma$', 5:'Light Flavour Hadron', 'bkg':'Background'}
+    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
+                  4:'Light Flavor e$\;\!/\;\!\gamma$', 5:'Light Flavor Hadron', 'bkg':'Background'}
+    if n_etypes <= 5: label_dict[4] = 'Light Flavor'
     color_dict = {0:'tab:blue', 1:'tab:orange', 2:'tab:green', 3:'tab:red', 4:'tab:purple', 5:'tab:brown'}
     #if prefix == 'train':
     #    color_dict = {0:'tab:blue', 1:'tab:orange', 2:'tab:orange', 3:'tab:orange', 4:'tab:purple', 5:'tab:orange'}
@@ -182,16 +179,14 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
 
 
 def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=False, bkg='bkg'):
-    if n_etypes <= 5:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'  ,     3:'Heavy Flavour',
-                      4:'Light Flavour', 'bkg':'Background'}
-    if n_etypes == 6:
-        label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavour',
-                      4:'Light Flavour e$\;\!/\;\!\gamma$', 5:'Light Flavour Hadron', 'bkg':'Background'}
-        #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
-        #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
-    color_dict = {0:'tab:blue'    , 1:'tab:orange'   , 2:'tab:green'            ,   3  :'tab:red'   ,
-                  4:'tab:purple'                     , 5:'tab:brown'            , 'bkg':'tab:orange'}
+    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
+                  4:'Light Flavor e$\;\!/\;\!\gamma$', 5:'Light Flavor Hadron',
+                  'bkg':'Background', 45:'Light Flavor'}
+    if n_etypes <= 5: label_dict[4] = 'Light Flavor'
+    #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
+    #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
+    color_dict = {0:'tab:blue'    , 1:'tab:orange'   ,  2:'tab:green'   ,   3  :'tab:red'   ,
+                  4:'tab:purple'  , 5:'tab:brown'    , 45:'tab:purple'  , 'bkg':'tab:orange'}
     if separation:
         label_dict.pop('bkg')
     else:
@@ -247,8 +242,9 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
         # Create new legend handles with existing colors
         handles, labels = axes.get_legend_handles_labels()
         new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
+        ncol = 2 if separation else 1
         plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16, columnspacing=1.,
-                   frameon=True, handlelength=2, ncol=2, facecolor=None, framealpha=1.).set_zorder(10)
+                   frameon=True, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
         # Adding ATLAS messaging
         plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
                  {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
@@ -280,7 +276,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
     class_histo(y_true, y_prob, bins, color_dict)
     plt.subplots_adjust(top=0.99, bottom=0.07, left=0.1, right=0.95, hspace=0.2)
     file_name = output_dir+'/discriminant.png'
-    print('Saving test sample discriminant   to:', file_name); plt.savefig(file_name)
+    print('Saving discriminant plot to:', file_name); plt.savefig(file_name)
 
 
 def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
@@ -439,8 +435,8 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         if multiplots:
             sig, bkg = output_dir.split('/')[-1].split('vs')
             sig_dict = {'class_0':'Prompt Electron', 'class_01':'Prompt Electron + Charge Flip'}
-            bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavour',
-                        '4':'Light Flavour e/$\gamma$', '5':'Light Flavour Hadron', 'Bkg':'Combined Background'}
+            bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavor',
+                        '4':'Light Flavor e/$\gamma$', '5':'Light Flavor Hadron', 'Bkg':'Combined Background'}
             plt.gca().add_artist(L)
             plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
                      {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
@@ -522,7 +518,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC_'+output_dir.split('class_')[-1]+('_'+str(ROC_type) if ROC_type!=1 else '')+'.png'
     fig.subplots_adjust(left=0.12, top=0.97, bottom=0.12, right=0.94)
-    print('Saving ROC curve   plot to:', file_name); plt.savefig(file_name)
+    print('Saving ROC curve    plot to:', file_name); plt.savefig(file_name)
     if multiplots:
         for pkl_file in [name for name in os.listdir(output_dir) if '.pkl' in name]:
             os.remove(output_dir+'/'+pkl_file)
@@ -540,7 +536,7 @@ def CNN_fpr(tpr, fpr, LLH_tpr):
 
 
 def performance_plots(sample, y_true, y_prob, output_dir, ECIDS=False):
-    #sample['mu'] = sample['averageInteractionsPerCrossing' ]
+    #sample['mu'] = sample['averageInteractionsPerCrossing']
     output_dir += '/'+'performance_plots'
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     iter_tuples = itertools.product(['eta', 'pt', 'mu'], ['loose', 'tight'])
@@ -840,10 +836,10 @@ def ratio_plots(valid_sample, valid_labels, valid_probs, n_etypes, output_dir):
     #                     for process in bkg_rej]).T
     X_val = [r'Z$\rightarrow$ee'     , r'W$\rightarrow$e$\nu$'     , r'Z$\rightarrow \tau\tau$',
              r'W$\rightarrow \tau\nu$', r't$\bar{\operatorname{t}}$', r'JF17', r'JF35', r'JF50' ]
-    #Y_val = [' Combined \nBackground', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavour',
-    #         'Light Flavour\n        e$/\gamma$        ', 'Light Flavour\n    Hadron    '       ]
-    Y_val = [' Prompt \nElectron', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavour',
-             'Light Flavour\n        e$/\gamma$        ', 'Light Flavour\n    Hadron    '       ]
+    #Y_val = [' Combined \nBackground', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavor',
+    #         'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n    Hadron    '       ]
+    Y_val = [' Prompt \nElectron', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavor',
+             'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n    Hadron    '       ]
     #plot_meshgrid(X_val, Y_val, bkg_rej, output_dir, vmin=0, vmax=200, prec=0)
     plot_meshgrid(X_val, Y_val, ratios, output_dir, prec=1, vmax=50); sys.exit()
 def plot_meshgrid(X_val, Y_val, Z_val, output_dir, prec=2, vmin=None, vmax=None, color='black'):
@@ -1044,14 +1040,9 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
 
 def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False):
     image, vmin, vmax = 100*image, 100*vmin, 100*vmax
-    if len(classes) <= 5:
-        class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion',
-                      3:'Heavy Flavour'  , 4:'Light Flavour'}
-    else:
-        class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavour',
-                      4:'Light Flavour e/$\gamma$', 5:'Light Flavour Hadron', 6:'KnownUnknown'}
-    #class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavour',
-    #              4:'Light Flavour e/$\gamma$', 5:'Light Flavour Hadron', 6:'KnownUnknown'}
+    class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavor',
+                  4:'Light Flavor e/$\gamma$', 5:'Light Flavor Hadron', 6:'KnownUnknown'}
+    if 5 not in classes: class_dict[4] = 'Light Flavor'
     layer_dict = {'em_barrel_Lr0'  :'EM Presampler' ,
                   'em_barrel_Lr1'  :'EM Barrel L1'  , 'em_barrel_Lr1_fine':'EM Barrel L1'  ,
                   'em_barrel_Lr2'  :'EM Barrel L2'  , 'em_barrel_Lr3'     :'EM Barrel L3'  ,
@@ -1132,8 +1123,8 @@ def plot_inputs(input_path, host_name, input_data, n_e, n_tracks, n_classes, gen
             dec_num = re.findall(r'\d+\.\d+'          , cut)
             gen_cuts = {'eta':np.sort(dec_num), 'pt':np.sort(list(set(all_num)-set(dec_num)))}
     plot_variable(mc_samples, data_sample, 'LHValue', None, gen_cuts, mc_selections, output_dir)
-    for key in input_data['scalars']:
-        plot_variable(mc_samples, data_sample, key.split('p_')[-1], 'HLVs', gen_cuts, mc_selections, output_dir)
+    #for key in input_data['scalars']:
+    #    plot_variable(mc_samples, data_sample, key.split('p_')[-1], 'HLVs', gen_cuts, mc_selections, output_dir)
     #if 'tracks' in mc_sample:
     #    mc_samples = mc_samples['tracks']; data_sample = data_sample['tracks']
     #    for key in track_keys:
@@ -1194,58 +1185,22 @@ def plot_variable(mc_samples, data_sample, var, var_type, gen_cuts, mc_selection
     plt.savefig(file_name); plt.close()
 
 
-'''
-def plot_inputs(input_path, host_name, inputs, n_e, n_tracks, n_classes, cuts, output_dir):
-    from utils import get_dataset, merge_samples, sample_composition, compo_matrix
-    mc_input   = '0.0-2.5_mc'
-    #data_input = '0.0-2.5_LFdata17-18'
-    data_input = 'LFdata/LFdata_17-18'
-    mc_files   = get_dataset(input_path,   mc_input, host_name)
-    data_files = get_dataset(input_path, data_input, host_name)
-    ne_mc   = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in   mc_files]))]
-    ne_data = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in data_files]))]
-    print('\nLoading sample [', format(str(ne_mc[0])  ,'>8s')+', '+format(str(ne_mc[1])  ,'>8s'), end=']')
-    print(' from', mc_files[0].split('/')[-2], flush=True)
-    mc_sample  , mc_labels  , _ = merge_samples(  mc_files, ne_mc  , inputs, n_tracks, n_classes=6, cuts=cuts)
-    sample_composition(  mc_sample); compo_matrix(  mc_labels, n_etypes=n_classes); print()
-    print(  'Loading sample [', format(str(ne_data[0]),'>8s')+', '+format(str(ne_data[1]),'>8s'), end=']')
-    print(' from', data_files[0].split('/')[-2], flush=True)
-    data_sample, data_labels, _ = merge_samples(data_files, ne_data, inputs, n_tracks, n_classes=5, cuts=cuts)
-    sample_composition(data_sample); compo_matrix(data_labels, n_etypes=n_classes); print()
-    misc_sample = {key.split('p_')[-1]:val[  mc_labels==4] for key,val in   mc_sample.items()}
-    mc_sample   = {key.split('p_')[-1]:val[  mc_labels==5] for key,val in   mc_sample.items()}
-    data_sample = {key.split('p_')[-1]:val[data_labels==4] for key,val in data_sample.items()}
-    if 'tracks' in mc_sample:
-        track_keys = ['pOverE', 'deta', 'dphi', 'd0', 'z0',
-                      'charge', 'vertex', 'chi2', 'ndof', 'pixhits', 'scthits', 'trthits', 'sigmad0']
-        mc_sample  ['tracks'] = dict(zip(track_keys, [np.mean(  mc_sample['tracks'][:,:,n], axis=1)
-                                                      for n in range(len(track_keys))]))
-        data_sample['tracks'] = dict(zip(track_keys, [np.mean(data_sample['tracks'][:,:,n], axis=1)
-                                                      for n in range(len(track_keys))]))
-    #cuts = {'eta':['0.6'], 'pt':['10','15']}
-    for cut in cuts:
-        if 'sample["pt"]' in cut or 'abs(sample["eta"])' in cut:
-            import re
-            all_num = re.findall(r'[-+]?(?:\d*\.*\d+)', cut)
-            dec_num = re.findall(r'\d+\.\d+'          , cut)
-            cuts = {'eta':np.sort(dec_num), 'pt':np.sort(list(set(all_num)-set(dec_num)))}
-    #for key in inputs['scalars']:
-    #    plot_variable(mc_sample          , data_sample          , key.split('p_')[-1], 'HLVs'  , cuts, output_dir)
-    #for key in track_keys:
-    #    plot_variable(mc_sample['tracks'], data_sample['tracks'], key                , 'tracks', cuts, output_dir)
-    plot_variable(mc_sample, data_sample, misc_sample, 'LHValue', None, cuts, output_dir)
-    sys.exit()
-def plot_variable(mc_sample, data_sample, misc_sample, var, var_type, cuts, output_dir, n_bins=100, density=False):
-    if var_type == 'HLVs':
-        logs = ['d0', 'd0Sig', 'deltaEta1', 'deltaPhiRescaled2', 'dPOverP', 'EoverP', 'EptRatio',
-                'et_calo', 'qd0Sig', 'Reta', 'Rhad', 'Rhad1', 'Rphi', 'weta2', 'wtots1']
-    else:
-        logs = ['pOverE', 'd0', 'deta', 'dphi', 'pixhits', 'scthits', 'trthits', 'sigmad0', 'vertex', 'z0']
+def plot_classes(sample, labels, channel_dict, class_ratios, output_dir):
+    channels = sample['mcChannelNumber']; classes = np.unique(labels)
+    class_orders = {n:class_ranking(class_ratios, n, threshold=0.01, sorting=True) for n in classes}
+    processes = [mp.Process(target=plot_class, args=(*iter_tuple, sample, labels, channels, channel_dict,
+                 class_orders, output_dir)) for iter_tuple in itertools.product(['eta','pt'], classes)]
+    for job in processes: job.start()
+    for job in processes: job.join()
+def plot_class(var, class_number, sample, labels, channels, channel_dict, class_orders, output_dir, density=True):
+    colors = ['tab:'+color for color in ['blue' ,'orange','green','red'  ,'purple',
+                                         'brown','pink'  ,'gray' ,'olive','cyan']]
+    color_dict = dict(zip(channel_dict, colors)); variable = np.abs(sample[var])
+    class_samples = [variable[(np.logical_or.reduce([channels==n for n in channel_dict[key_list]]))
+                     &(labels==class_number)] for key_list in class_orders[class_number]['channels']]
+    class_weights = [np.ones_like(sample, dtype=np.float32) for sample in class_samples]
+    class_weights = [100*weights/np.sum(labels==class_number) for weights in class_weights]
     fig = plt.figure(figsize=(12,8)); axes = plt.gca()
-    values = np.append(mc_sample[var], data_sample[var])
-    if mc_sample[var].dtype == np.int32: bins = np.arange  (np.min(values), np.max(values)+1        )
-    else                               : bins = np.linspace(np.min(values), np.max(values)  , n_bins)
-    # Axes parameters
     axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
                      bottom=True, top=True, left=True, right=True)
     axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
@@ -1254,53 +1209,45 @@ def plot_variable(mc_sample, data_sample, misc_sample, var, var_type, cuts, outp
     for axis in ['top', 'bottom', 'left', 'right']:
         axes.spines[axis].set_linewidth(1.5)
         axes.spines[axis].set_color('black')
-    mc_weights    = np.ones_like(  mc_sample[var], dtype=np.float32)
-    misc_weights  = np.ones_like(misc_sample[var], dtype=np.float32)
-    data_weights  = np.ones_like(data_sample[var], dtype=np.float32)
-    #mc_weights   *= 100/np.sum(  mc_weights)
-    #misc_weights *= 100/(np.sum(misc_weights)
-    data_weights *= 100/np.sum(data_weights)
-    weights = np.sum(mc_weights) + np.sum(misc_weights)
-    mc_weights   *= 100/weights
-    misc_weights *= 100/weights
+    if var == 'pt':
+        n_bins = 100; bins = np.logspace(np.log10(4.5), np.log10(500), n_bins+1)
+        plt.xlim(4.5, 500); plt.xscale('log')
+        plt.xticks( [4.5,10,100,500], [4.5,'$10^1$','$10^2$',r'$5\!\times\!10^2$'] )
+        plt.xlabel('$E_\mathrm{T}$ (GeV)', fontsize=30, loc='right')
+    if var == 'eta':
+        n_bins = 50; bins = np.linspace(0, 2.5, n_bins+1)
+        plt.xlim(0, 2.5)
+        axes.xaxis.set_minor_locator(FixedLocator(bins))
+        plt.xticks(np.arange(0, 2.6, 0.5))
+        plt.xlabel('$|\eta|$', fontsize=30, loc='right')
     if density:
-        indices       = np.searchsorted(bins,   mc_sample[var], side='right')
-        mc_weights   /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
-        indices       = np.searchsorted(bins, data_sample[var], side='right')
-        data_weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
-        plt.ylabel('Distribution Density (%)', fontsize=25)
+        def density_weights(weights, bins, variable):
+            indices = np.searchsorted(bins, variable, side='right')
+            return weights/np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+        class_weights = [density_weights(class_weights[n],bins,class_samples[n]) for n in range(len(class_samples))]
+        plt.ylabel('Distribution Density '+('(%/GeV)' if var=='pt' else '(%)'), fontsize=25, loc='top')
     else:
-        plt.ylabel('Distribution (%)'        , fontsize=25)
-    #pylab.hist(  mc_sample[var], bins=bins, weights=  mc_weights, histtype='bar', lw=3, stacked=True,
-    #             log=True if var in logs else False, label='LF Hadron (mc)')
-    #pylab.hist(misc_sample[var], bins=bins, weights=misc_weights, histtype='step', lw=3,
-    #             log=True if var in logs else False, label='LF e/$\gamma$ (mc)')
-    pylab.hist([misc_sample[var],mc_sample[var]], bins=bins, weights=[misc_weights,mc_weights],
-               histtype='barstacked', lw=3, log=True if var in logs else False,
-               label=['LF e/$\gamma$ (mc)','LF Hadron (mc)'], color=['magenta','cyan'])
-    pylab.hist(data_sample[var], bins=bins, weights=data_weights, histtype='step', lw=2, stacked=True,
-                 log=True if var in logs else False, label='LF (data)', color='black', ls='-')
-    plt.xlabel(var, fontsize=25)
-    if len(cuts['eta']) == 1: eta_text =                 '$|\eta|<$'+cuts['eta'][0]
-    else                    : eta_text = cuts['eta'][0]+'$<|\eta|<$'+cuts['eta'][1]
-    plt.text(0.07, 0.95, eta_text, {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
-    pt_text = cuts['pt'][0]+'$<E_\mathrm{T}$[GeV]$<$'+cuts['pt'][1]
-    plt.text(0.07, 0.89,  pt_text, {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
-    # Create new legend handles with existing colors
-    #handles, labels = axes.get_legend_handles_labels()
-    #new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
-    #plt.legend(handles=new_handles, labels=labels, loc='upper center', fontsize=18, columnspacing=1.,
-    #           frameon=True, handlelength=2, ncol=1, facecolor=None, framealpha=1.).set_zorder(10)
-    plt.legend(loc='upper center', fontsize=18, columnspacing=1.,
-               frameon=True, handlelength=2, ncol=1, facecolor=None, framealpha=1.).set_zorder(10)
+        plt.ylabel('Distribution (%)', fontsize=25, loc='top')
+    pylab.hist(class_samples, bins=bins, weights=class_weights, histtype='barstacked', lw=3,
+               label=class_orders[class_number]['channels'],
+               color=[color_dict[n] for n in class_orders[class_number]['channels']])
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.legend(handles[::-1], labels[::-1], loc='best', fontsize=18, columnspacing=1.,
+               ncol=(2 if var=='eta' and class_number==4 else 1),
+               frameon=True, handlelength=2, facecolor=None, framealpha=1.).set_zorder(10)
     plt.subplots_adjust(left=0.1, top=0.97, bottom=0.12, right=0.95)
-    if var_type == 'HLVs'  : output_dir += '/'+'HLVs'
-    if var_type == 'tracks': output_dir += '/'+'tracks'
-    if not os.path.isdir(output_dir): os.mkdir(output_dir)
-    file_name = output_dir+'/'+var+'.png'
-    print('Printing:', file_name)
+    output_dir += '/'+'class_histo'
+    #if not os.path.isdir(output_dir): os.mkdir(output_dir)
+    try: os.mkdir(output_dir)
+    except FileExistsError: pass
+    file_name = output_dir+'/'+'class'+str(class_number)+'_'+var+'.png'
+    print('Plotting:', file_name)
     plt.savefig(file_name); plt.close()
-'''
+def class_ranking(class_ratios, class_number, threshold=0.01, sorting=True):
+    def getkey(item): return item[class_number+1]
+    class_ratios = [[key]+val for key,val in class_ratios.items() if val[class_number]>=threshold]
+    if sorting: class_ratios = sorted(class_ratios, key=getkey)
+    return {'channels':list(zip(*class_ratios))[0], 'ratios':list(zip(*class_ratios))[class_number+1]}
 
 
 def plot_vertex(sample):

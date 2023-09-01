@@ -82,7 +82,8 @@ scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_d
            'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'          ,
            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'            ,
            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'          ,
-           'p_TRTPID', 'p_numberOfInnermostPixelHits', 'p_charge'                                          ]
+           'p_TRTPID', 'p_numberOfInnermostPixelHits'                                                      ]
+#scalars = scalars + ['p_charge']
 images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine' ,
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine' ,
@@ -111,10 +112,10 @@ if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
-#args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
-#args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
-#args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
-#args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
+args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
+args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
+args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
+args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
 #args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
 #args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.15)']
 
