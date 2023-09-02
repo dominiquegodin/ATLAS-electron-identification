@@ -22,15 +22,18 @@ export SCRIPT_VAR
 if [[ $HOST_NAME == *atlas* ]]
 then
     # TRAINING ON LPS
-    if   [[ -d "/nvme1" ]]
-    then
+    if [[ -d "/nvme1" ]] ; then
 	PATHS=/lcg,/opt,/nvme1
     else
 	PATHS=/lcg,/opt
     fi
     SIF=/opt/tmp/godin/sing_images/tf-2.1.0-gpu-py3_sing-2.6.sif
-    #singularity shell      --bind $PATHS $SIF presampler.sh
-    singularity shell --nv --bind $PATHS $SIF classifier.sh $SBATCH_VAR $HOST_NAME $SCRIPT_VAR
+    if  [ -z ${CODE+x} ] || [ $CODE != presampler ]
+    then
+	singularity shell --nv --bind $PATHS $SIF classifier.sh $SBATCH_VAR $HOST_NAME $SCRIPT_VAR
+    else
+	singularity shell      --bind $PATHS $SIF presampler.sh
+    fi
 else
     # TRAINING ON BELUGA
     if [[ -n "$INPUT_PATH" ]]
