@@ -66,15 +66,15 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 
 # Using Slurm jobs manager system (LPS or Beluga)
-1) Run classifier.sh script and send task to Slurm Workload Manager (run classifier.sh on default host)
+1) Run classifier.sh and send task to Slurm Workload Manager (uses default host)
    ```
    sbatch sbatch.sh
    ```
-   Run classifier.sh on specific host (e.g. on atlas16)
+   Run classifier.sh on specific host on LPS (e.g. atlas16)
    ```
    sbatch -w atlas16 sbatch.sh
    ```
-   Run presampler.sh on specific host (e.g. on atlas16)
+   Run presampler.sh on specific host on LPS (e.g. atlas16)
    ```
    sbatch -w atlas16 --export=CODE=presampler sbatch.sh
    ```
