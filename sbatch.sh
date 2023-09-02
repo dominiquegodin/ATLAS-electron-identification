@@ -28,7 +28,7 @@ then
 	PATHS=/lcg,/opt
     fi
     SIF=/opt/tmp/godin/sing_images/tf-2.1.0-gpu-py3_sing-2.6.sif
-    if  [ -z ${CODE+x} ] || [ $CODE != presampler ]
+    if  [ -z ${PRESAMPLER+x} ] || [ $PRESAMPLER != True ]
     then
 	singularity shell --nv --bind $PATHS $SIF classifier.sh $SBATCH_VAR $HOST_NAME $SCRIPT_VAR
     else

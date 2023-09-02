@@ -76,7 +76,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
    Run presampler.sh on specific host on LPS (e.g. atlas16)
    ```
-   sbatch -w atlas16 --export=CODE=presampler sbatch.sh
+   sbatch -w atlas16 --export=PRESAMPLER=True sbatch.sh
    ```
 2) Send array jobs with ID 1 to 10 to Slurm batch system
    ```
