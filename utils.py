@@ -664,7 +664,7 @@ def print_performance(labels, probs, sig_eff=[90, 80, 70]):
 
 
 def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg, ratios, return_dict,
-                  threshold, LF_cuts=None, separation=True, ECIDS=True):
+                  threshold, LF_cuts=None, sep_bkg=True, ECIDS=True):
     # Multi-discriminants
     #_, _, prob  = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg,
     #                                          ratios=[17.4375,0.,0.,0.,12.7207,67.1977])
@@ -679,8 +679,8 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, separation and bkg=='bkg', bkg)
-        #processes += [mp.Process(target=plot_discriminant, args=arguments)]
+        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg and bkg=='bkg', bkg)
+        processes += [mp.Process(target=plot_discriminant, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -957,11 +957,22 @@ def feature_ranking(output_dir, results_out, scalars, images, groups):
 
 def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key, n_tasks, index):
     idx = index*batch_size, (index+1)*batch_size
+    #print(index, index%n_tasks, utils.shuffle(np.arange(n_tasks),random_state=sum_e)[index%n_tasks], idx, sum_e)
+    #return
     with h5py.File(h5_file, 'r') as data:
         images  = list(set(images  ) & set(data[file_key]))
         tracks  = list(set(tracks  ) & set(data[file_key]))
         scalars = list(set(scalars ) & set(data[file_key]))
         int_val = list(set(integers) & set(data[file_key]))
+
+        #bad_idx = []
+        #for n in range(idx[0],idx[1]):
+        #    try   : variable = data[file_key]['em_barrel_Lr0'][n]
+        #    except: bad_idx += [n]
+        #print(bad_idx)
+        #print(len(bad_idx))
+        #return
+
         sample = {key:data[file_key][key][idx[0]:idx[1]] for key in images+tracks+scalars+int_val}
     for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
     for key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
@@ -1084,31 +1095,34 @@ def get_idx(size, start_value=0, n_sets=5):
     return list(zip(idx_list[:-1], idx_list[1:]))
 
 
-def mix_datafiles(input_path='', input_dir='', temp_dir='temp_dir', n_tasks=10):
+def mix_datafiles(input_path='', input_dir='', temp_dir='temp_dir', n_tasks=10, replace_LF=False):
     data_files = get_dataset(input_path, input_dir) ; n_files = len(data_files)
-    LF_path  = '/nvme1/atlas/godin/e-ID_data/LFdata/LFdata_17-18'
-    LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
-    #for index in range(len(data_files)):
-    #    print(data_files[index], LF_files[index])
-    #sys.exit()
+    if replace_LF:
+        LF_path  = '/nvme1/atlas/godin/e-ID_data/LFdata/LFdata_17-18'
+        LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
+        #for index in range(len(data_files)):
+        #    print(data_files[index], LF_files[index])
+        #sys.exit()
+    else:
+        LF_files = None
     output_dir = data_files[0].split(input_dir)[0] + temp_dir
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
     for idx in np.split(utils.shuffle(np.arange(n_files)), np.arange(n_tasks,n_files,n_tasks)):
-        arguments = [(data_files[index], LF_files[index], index, output_dir) for index in idx]
+        arguments = [(data_files[index], LF_files, index, output_dir) for index in idx]
         processes = [mp.Process(target=file_mixing, args=arg) for arg in arguments]
         for job in processes: job.start()
         for job in processes: job.join()
-def file_mixing(h5_file, LF_file, index, output_dir, replace_data=False):
+def file_mixing(h5_file, LF_files, index, output_dir):
     features = utils.shuffle(list(h5py.File(h5_file,'r')), random_state=index)
     MC_data  = h5py.File(h5_file,'r')
-    if replace_data:
+    if LF_files is not None:
         # Light flavor indices in MC file
         iffTruth  = MC_data['p_iffTruth' ][:]
         TruthType = MC_data['p_TruthType'][:]
         MC_criteria = np.logical_or.reduce([TruthType==4, TruthType==16, TruthType==17])
         MC_criteria = np.logical_and(MC_criteria, iffTruth==10)
         MC_idx  = np.where(MC_criteria)[0]
-        LF_data = h5py.File(LF_file,'r')
+        LF_data = h5py.File(LF_files[index],'r')
         source_size = len(list(LF_data.values())[0])
         target_size = np.sum(MC_criteria)
         # Light flavor indices from data file
@@ -1117,9 +1131,7 @@ def file_mixing(h5_file, LF_file, index, output_dir, replace_data=False):
         attribute = 'w' if key==features[0] else 'a'
         data_in  = MC_data[key][:]
         data_out = h5py.File(output_dir+'/'+h5_file.split('/')[-1], attribute)
-        if replace_data:
-            # Removing light flavor MC
-            #data_in = np.delete(data_in, MC_criteria, axis=0)
+        if LF_files is not None:
             # Replacing light flavor MC
             data_in[MC_idx] = np.take(LF_data[key], LF_idx, axis=0)
             # Labelling light flavor data
@@ -1129,8 +1141,8 @@ def file_mixing(h5_file, LF_file, index, output_dir, replace_data=False):
         chunks = (2000,) + data_in.shape[1:]
         data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
         print( 'Mixing file', h5_file.split('/')[-2]+'/'+h5_file.split('/')[-1], 'with feature', key )
-        if replace_data: data_out[key][:] =               data_in[:]
-        else:            data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
+        if LF_files is not None: data_out[key][:] =               data_in[:]
+        else                   : data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
 
 
 def mix_presamples(input_path, output_dir, temp_dir='temp_dir', n_files=20, n_tasks=2):

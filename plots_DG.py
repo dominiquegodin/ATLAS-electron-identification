@@ -4,12 +4,12 @@ import sys, os, h5py, pickle, time, itertools, warnings
 from   functools         import partial
 from   sklearn           import metrics
 from   scipy.spatial     import distance
-from   matplotlib        import pylab
+from   matplotlib        import pylab, colors as mcolors
 from   matplotlib.ticker import MultipleLocator, FormatStrFormatter, AutoMinorLocator, FixedLocator
 from   matplotlib.lines  import Line2D
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+#import matplotlib.colors as colors
 #plt.rcParams['mathtext.fontset'] = 'cm'
 #Unicode characters in Linux: CTRL-SHIFT-u ($ϵ$, $ε$, $ϕ$, $φ$, $σ$, $ς$ $η$)
 
@@ -19,25 +19,29 @@ def valid_accuracy(y_true, y_prob):
     return np.sum(y_pred==y_true)/len(y_true)
 
 
-def LLH_rates(sample, y_true, ECIDS=False, ECIDS_cut=-0.337671):
+def LLH_rates(sample, y_true, ECIDS=False, ECIDS_cut=-0.337671, old_samples=True):
     LLH_tpr, LLH_fpr = [], []
     for wp in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']:
         LLH_class0 = sample[wp][y_true==0]
         LLH_class1 = sample[wp][y_true!=0]
-        #LLH_tpr.append( np.sum(LLH_class0==0) / len(LLH_class0) )
-        #LLH_fpr.append( np.sum(LLH_class1==0) / len(LLH_class1) )
-        LLH_tpr.append( np.sum(LLH_class0!=0) / len(LLH_class0) )
-        LLH_fpr.append( np.sum(LLH_class1!=0) / len(LLH_class1) )
+        if old_samples:
+            LLH_tpr.append( np.sum(LLH_class0==0) / len(LLH_class0) )
+            LLH_fpr.append( np.sum(LLH_class1==0) / len(LLH_class1) )
+        else:
+            LLH_tpr.append( np.sum(LLH_class0!=0) / len(LLH_class0) )
+            LLH_fpr.append( np.sum(LLH_class1!=0) / len(LLH_class1) )
     if ECIDS:
         ECIDS_class0 = sample['p_ECIDSResult'][y_true==0]
         ECIDS_class1 = sample['p_ECIDSResult'][y_true!=0]
         for wp in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']:
             LLH_class0 = sample[wp][y_true==0]
             LLH_class1 = sample[wp][y_true!=0]
-            #LLH_tpr.append( np.sum((LLH_class0==0) & (ECIDS_class0>=ECIDS_cut)) / len(LLH_class0) )
-            #LLH_fpr.append( np.sum((LLH_class1==0) & (ECIDS_class1>=ECIDS_cut)) / len(LLH_class1) )
-            LLH_tpr.append( np.sum((LLH_class0!=0) & (ECIDS_class0>=ECIDS_cut)) / len(LLH_class0) )
-            LLH_fpr.append( np.sum((LLH_class1!=0) & (ECIDS_class1>=ECIDS_cut)) / len(LLH_class1) )
+            if old_samples:
+                LLH_tpr.append( np.sum((LLH_class0==0) & (ECIDS_class0>=ECIDS_cut)) / len(LLH_class0) )
+                LLH_fpr.append( np.sum((LLH_class1==0) & (ECIDS_class1>=ECIDS_cut)) / len(LLH_class1) )
+            else:
+                LLH_tpr.append( np.sum((LLH_class0!=0) & (ECIDS_class0>=ECIDS_cut)) / len(LLH_class0) )
+                LLH_fpr.append( np.sum((LLH_class1!=0) & (ECIDS_class1>=ECIDS_cut)) / len(LLH_class1) )
     return LLH_fpr, LLH_tpr
 
 
@@ -58,7 +62,7 @@ def plot_history(history, output_dir, key='accuracy'):
     plt.ylabel(key.title()+' (%)',fontsize=25)
     plt.legend(loc='lower right', fontsize=20, numpoints=3)
     file_name = output_dir+'/'+'train_history.png'
-    print('Saving training accuracy history to:', file_name, '\n'); plt.savefig(file_name)
+    print('\nSaving training accuracy history to:', file_name); plt.savefig(file_name)
 
 
 def plot_heatmaps(sample, labels, output_dir):
@@ -179,7 +183,7 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
 
 
 def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=False, bkg='bkg'):
-    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
+    label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion' , 3:'Heavy Flavor',
                   4:'Light Flavor e$\;\!/\;\!\gamma$', 5:'Light Flavor Hadron',
                   'bkg':'Background', 45:'Light Flavor'}
     if n_etypes <= 5: label_dict[4] = 'Light Flavor'
@@ -203,7 +207,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
                  {'color':'black', 'fontsize':10}, va='center', ha='right', transform=axes.transAxes)
         plt.text(0.990, 1.01-3*idx/100, format(distance.jensenshannon(P, Q), '.3f'),
                  {'color':color  , 'fontsize':10}, va='center', ha='right', transform=axes.transAxes)
-    def class_histo(y_true, y_prob, bins, colors):
+    def class_histo(y_true, y_prob, bins, colors, logit, density=False):
         h = np.full((len(bins)-1,n_classes), 0.)
         from utils import make_labels
         class_labels = make_labels(sample, n_classes)
@@ -212,8 +216,15 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
             #class_weights = len(class_probs)*[100/len(y_true)]
             class_weights = len(class_probs)*[1/len(y_true)]
             #class_weights = len(class_probs)*[100/len(class_probs)]
+            if density:
+                indices        = np.searchsorted(bins, class_probs, side='right')
+                bin_widths     = np.diff(inverse_logit(bins)) if logit else np.diff(bins)
+                class_weights /= np.take(bin_widths, np.minimum(indices, len(bins)-1)-1)
+            #h[:,n] = pylab.hist(class_probs, bins=bins, label=label_dict[n], histtype='step',
+            #                    weights=class_weights, log=True, color=colors[n], lw=3)[0]
             h[:,n] = pylab.hist(class_probs, bins=bins, label=label_dict[n], histtype='step',
-                                weights=class_weights, log=True, color=colors[n], lw=3)[0]
+                                edgecolor=colors[n], facecolor=mcolors.to_rgba(colors[n])[:-1]+(0.1,),
+                                weights=class_weights, log=True, lw=3, fill=True)[0]
         if n_classes == 2:
             colors = len(colors)*['black']
         if False:
@@ -243,8 +254,9 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
         handles, labels = axes.get_legend_handles_labels()
         new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
         ncol = 2 if separation else 1
+        new_handles = None
         plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16, columnspacing=1.,
-                   frameon=True, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
+                   frameon=False, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
         # Adding ATLAS messaging
         plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
                  {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
@@ -259,7 +271,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
     #pylab.xlim(0,10); pylab.ylim(1e-2 if n_classes>2 else 1e-2, 1e2)
     #plt.xticks(np.arange(0,11,step=1))
     bin_step = 0.5; bins = np.arange(0, 100+bin_step, bin_step)
-    class_histo(y_true, 100*y_prob, bins, color_dict)
+    class_histo(y_true, 100*y_prob, bins, color_dict, logit=False)
     plt.subplot(2, 1, 2); pylab.grid(False); axes = plt.gca()
     x_min=-10; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-6 if n_classes>2 else 1e-5, 3e-1)
     pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
@@ -273,7 +285,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
     plt.xticks(logit(np.array(pos)), lab, rotation=20)
     bin_step = 0.1; bins = np.arange(x_min-1, x_max+1, bin_step)
     y_prob = logit(y_prob)
-    class_histo(y_true, y_prob, bins, color_dict)
+    class_histo(y_true, y_prob, bins, color_dict, logit=True)
     plt.subplots_adjust(top=0.99, bottom=0.07, left=0.1, right=0.95, hspace=0.2)
     file_name = output_dir+'/discriminant.png'
     print('Saving discriminant plot to:', file_name); plt.savefig(file_name)
@@ -1076,7 +1088,7 @@ def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False
     plt.ylabel(y_label,fontsize=17); plt.yticks(y_ticks)
     if log:
         plt.imshow(image, cmap='viridis', interpolation='bilinear' if soft else None,
-                   extent=limits, norm=colors.LogNorm(1e-3,1e2))
+                   extent=limits, norm=mcolors.LogNorm(1e-3,1e2))
     else:
         plt.imshow(np.float32(image), cmap='viridis', interpolation='bilinear' if soft else None,
                    extent=limits, vmax=1 if np.max(image)==0 else vmax)
