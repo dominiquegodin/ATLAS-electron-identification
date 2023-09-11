@@ -19,7 +19,7 @@ def valid_accuracy(y_true, y_prob):
     return np.sum(y_pred==y_true)/len(y_true)
 
 
-def LLH_rates(sample, y_true, ECIDS=False, ECIDS_cut=-0.337671, old_samples=True):
+def LLH_rates(sample, y_true, ECIDS=False, ECIDS_cut=-0.337671, old_samples=False):
     LLH_tpr, LLH_fpr = [], []
     for wp in ['p_LHTight', 'p_LHMedium', 'p_LHLoose']:
         LLH_class0 = sample[wp][y_true==0]
