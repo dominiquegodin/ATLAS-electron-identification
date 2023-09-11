@@ -112,6 +112,8 @@ if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
+#args.train_cuts += ['(sample["p_LHValue"] >= -10)']
+#args.valid_cuts += ['(sample["p_LHValue"] >= -10)']
 args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
 args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
 args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
@@ -121,6 +123,7 @@ args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMa
 
 
 # PERFORMANCE FROM SAVED VALIDATION RESULTS
+#args.output_dir = '/nvme1/atlas/godin/e-ID_data' + '/' + args.output_dir
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     if args.input_dir in ['0.0-1.3', '1.3-1.6', '1.6-2.5']:
         eta_1, eta_2 = args.input_dir.split('-')
@@ -152,7 +155,11 @@ train_data = {'scalars':scalars, 'images':images}
 input_data = {**train_data, 'others':others}
 
 
-# SAMPLES SIZES
+# SAMPLES SIZES / AVOIDING MEMORY OVERLOAD
+if   args.images == 'ON': n_limit =  10e6
+elif args.tracks == 'ON': n_limit =  50e6
+else                    : n_limit = 100e6
+if max(args.n_train, args.n_valid) > n_limit: args.generator = 'ON'
 sample_size  = sum([len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files])
 args.n_train = [0, min(sample_size, args.n_train)]
 args.n_valid = [args.n_train[1], min(args.n_train[1]+args.n_valid, sample_size)]
