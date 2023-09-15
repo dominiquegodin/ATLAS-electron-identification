@@ -317,7 +317,7 @@ def sample_cuts(sample, labels, weights=None, cuts='', verbose='OFF'):
         if np.all(weights) != None: weights = weights[labels!=-1]
         labels = labels[labels!=-1]
         if verbose == 'ON':
-            print('Applying IFFtruth cuts -->', format(len(labels),'8d'), 'e conserved', end=' ')
+            print('Applying IFFtruth cuts -->', format(len(labels),'9d'), 'e conserved', end=' ')
             print('(' + format(100*len(labels)/length, '.2f') + ' %)')
     cut_list = [np.full_like(labels, True, dtype=bool)]
     for cut in cuts:
@@ -331,9 +331,9 @@ def sample_cuts(sample, labels, weights=None, cuts='', verbose='OFF'):
     if np.all(weights) != None: weights = weights[eval_cuts]
     sample = {key:sample[key][eval_cuts] for key in sample}
     if verbose == 'ON':
-        print('Applying selected cuts -->', format(len(labels),'8d') ,'e conserved', end=' ')
+        print('Applying selected cuts -->', format(len(labels),'9d') ,'e conserved', end=' ')
         print('(' + format(100*len(labels)/length,'.2f')+' %)')
-        if len(labels) < length: print('Applied cuts:', cuts[0]+' & ...')
+        #if len(labels) < length: print('Applied cuts:', cuts[0]+' & ...')
     return sample, labels, weights
 
 
@@ -427,7 +427,7 @@ def apply_t_scaler(sample, scaler, verbose='OFF'):
     return sample
 
 
-def sample_composition(sample):
+def sample_composition(sample, tag='valid'):
     MC_type, IFF_type = sample['p_TruthType']    , sample['p_iffTruth']
     MC_list, IFF_list = np.arange(max(MC_type)+1), np.arange(max(IFF_type)+1)
     ratios = np.array([ [np.sum(MC_type[IFF_type==IFF]==MC) for MC in MC_list] for IFF in IFF_list ])
@@ -435,7 +435,7 @@ def sample_composition(sample):
     ratios = np.round(1e4*ratios/len(MC_type))/100
     MC_empty, IFF_empty = np.where(np.sum(ratios, axis=0)==0)[0], np.where(np.sum(ratios, axis=1)==0)[0]
     MC_list,  IFF_list  = sorted(list(set(MC_list)-set(MC_empty))), sorted(list(set(IFF_list)-set(IFF_empty)))
-    print('IFFTRUTH AND TRUTHTYPE VALID SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
+    print('IFFTRUTH AND TRUTHTYPE '+tag.upper()+' SAMPLE COMPOSITION (', '\b'+str(len(MC_type)), 'e)')
     dash = (26+7*len(MC_list))*'-'
     print(dash, format('\n| IFF \ MC |','10s'), end='')
     for col in MC_list:
@@ -511,8 +511,8 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
             #pred_ratios = 100*np.mean(valid_probs, axis=0, dtype=np.float64)
             pred_ratios = [100*np.sum(valid_preds==n)/len(valid_preds) for n in range(n_etypes)]
         # Light Flavor Ratios
-        valid_ratios[-2] = valid_ratios[-2] + valid_ratios[-1]
-        valid_ratios[-1] = valid_ratios[-2]
+        #valid_ratios[-2] = valid_ratios[-2] + valid_ratios[-1]
+        #valid_ratios[-1] = valid_ratios[-2]
         return {'truth':valid_ratios, 'pred':pred_ratios, 'none':np.ones_like(valid_ratios)}
 
 

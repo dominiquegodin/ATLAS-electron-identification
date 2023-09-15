@@ -83,7 +83,7 @@ scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_d
            'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'            ,
            'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'          ,
            'p_TRTPID', 'p_numberOfInnermostPixelHits'                                                      ]
-#scalars = scalars + ['p_charge']
+scalars = scalars + ['p_charge']
 images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine' ,
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine' ,
@@ -116,8 +116,8 @@ else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
 #args.valid_cuts += ['(sample["p_LHValue"] >= -10)']
 args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
 args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
-args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
-args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
+#args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
+#args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
 #args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
 #args.valid_cuts += ['(sample["p_ptvarcone30" ]/sample["pt"] < 0.15)']
 
@@ -249,7 +249,7 @@ if args.n_epochs > 0:
         inputs['images'] = ['tracks']
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
                                                            n_classes, args.train_cuts)
-    sample_composition(train_sample); compo_matrix(valid_labels, train_labels); print() #;sys.exit()
+    sample_composition(train_sample, 'train'); compo_matrix(valid_labels, train_labels); print() #;sys.exit()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
                       train_weights, bins, args.output_dir) ;print() #;sys.exit()

@@ -4,7 +4,7 @@
 # SLURM OPTIONS (LPS or BELUGA)
 #---------------------------------------------------------------------
 #SBATCH --account=def-arguinj
-#SBATCH --time=06-00:00         #time limit (DD-HH:MM)
+#SBATCH --time=07-00:00         #time limit (DD-HH:MM)
 #SBATCH --nodes=1               #number of nodes
 ##SBATCH --mem=128G              #memory per node (on Beluga)
 #SBATCH --cpus-per-task=4       #number of CPU threads per node
