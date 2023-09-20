@@ -4,7 +4,7 @@
 # SLURM OPTIONS (LPS or BELUGA)
 #---------------------------------------------------------------------
 #SBATCH --account=def-arguinj
-#SBATCH --time=06-00:00         #time limit (DD-HH:MM)
+#SBATCH --time=07-00:00         #time limit (DD-HH:MM)
 #SBATCH --nodes=1               #number of nodes
 ##SBATCH --mem=128G              #memory per node (on Beluga)
 #SBATCH --cpus-per-task=4       #number of CPU threads per node
@@ -22,15 +22,18 @@ export SCRIPT_VAR
 if [[ $HOST_NAME == *atlas* ]]
 then
     # TRAINING ON LPS
-    if   [[ -d "/nvme1" ]]
-    then
+    if [[ -d "/nvme1" ]] ; then
 	PATHS=/lcg,/opt,/nvme1
     else
 	PATHS=/lcg,/opt
     fi
     SIF=/opt/tmp/godin/sing_images/tf-2.1.0-gpu-py3_sing-2.6.sif
-    #singularity shell      --bind $PATHS $SIF presampler.sh
-    singularity shell --nv --bind $PATHS $SIF classifier.sh $SBATCH_VAR $HOST_NAME $SCRIPT_VAR
+    if  [ -z ${PRESAMPLER+x} ] || [ $PRESAMPLER != True ]
+    then
+	singularity shell --nv --bind $PATHS $SIF classifier.sh $SBATCH_VAR $HOST_NAME $SCRIPT_VAR
+    else
+	singularity shell      --bind $PATHS $SIF presampler.sh
+    fi
 else
     # TRAINING ON BELUGA
     if [[ -n "$INPUT_PATH" ]]

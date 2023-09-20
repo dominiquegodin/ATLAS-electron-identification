@@ -66,19 +66,23 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
 
 
 # Using Slurm jobs manager system (LPS or Beluga)
-1) run classifier.sh script and send jobs to Slurm batch system (This will run the command in classifier.sh)
+1) Run classifier.sh and send task to Slurm Workload Manager (uses default host)
    ```
    sbatch sbatch.sh
    ```
- Sur LPS il peut être nécessaire de spécifier la machine à utiliser (certains fichiers d'entraînement sont uniquement disponible sur atlas16) :
+   Run classifier.sh on specific host on LPS (e.g. atlas16)
    ```
    sbatch -w atlas16 sbatch.sh
    ```
-2) send array jobs with ID 1 to 10 to Slurm batch system
+   Run presampler.sh on specific host on LPS (e.g. atlas16)
+   ```
+   sbatch -w atlas16 --export=PRESAMPLER=True sbatch.sh
+   ```
+2) Send array jobs with ID 1 to 10 to Slurm batch system
    ```
    sbatch --array=1-10 sbatch.sh
    ```
-2) report status of job
+2) Report status of job
    ```
    squeue
    ```
@@ -86,15 +90,15 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
    sview
    ```
-3) cancel job
+3) Cancel job
    ```
    scancel $job_id
    ```
-4) monitor jobs GPU usage at 2s interval
+4) Monitor jobs GPU usage at 2s interval
    ```
    srun --jobid $job_id --pty watch -n 2 nvidia-smi
    ```
-5) use Slurm interactively and request appropriate ressources on Beluga
+5) Use Slurm interactively and request appropriate ressources on Beluga
    ```
    salloc --time=00:30:00 --cpus-per-task=4 --gres=gpu:1 --mem=128G --x11 --account=def-arguinj
    ```
