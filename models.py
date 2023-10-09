@@ -28,10 +28,12 @@ def multi_CNN(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, scalars
             for layer in np.arange(len(CNN[shape]['maps'])):
                 if len(kernels[layer]) == 2:
                     outputs = Conv2D(n_maps[layer], kernels[layer], kernel_regularizer=regularizer)(outputs)
-                    outputs = MaxPooling2D(pools[layer], padding='same')                           (outputs)
+                    if np.prod(pools[layer]) > 1:
+                        outputs = MaxPooling2D(pools[layer], padding='same')                       (outputs)
                 if len(kernels[layer]) == 3:
                     outputs = Conv3D(n_maps[layer], kernels[layer], kernel_regularizer=regularizer)(outputs)
-                    outputs = MaxPooling3D(pools[layer], padding='same')                           (outputs)
+                    if np.prod(pools[layer]) > 1:
+                        outputs = MaxPooling3D(pools[layer], padding='same')                       (outputs)
                 if batchNorm: outputs = BatchNormalization()                                       (outputs)
                 outputs = LeakyReLU(alpha=0)                                                       (outputs)
                 outputs = Dropout(dropout)                                                         (outputs)

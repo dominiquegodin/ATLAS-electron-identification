@@ -4,12 +4,12 @@ import sys, os, h5py, pickle, time, itertools, warnings
 from   functools         import partial
 from   sklearn           import metrics
 from   scipy.spatial     import distance
-from   matplotlib        import pylab, colors as mcolors
+from   matplotlib        import pylab, colors as mcolors, font_manager
 from   matplotlib.ticker import MultipleLocator, FormatStrFormatter, AutoMinorLocator, FixedLocator
 from   matplotlib.lines  import Line2D
-import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-#import matplotlib.colors as colors
+#import matplotlib; matplotlib.use('Agg')
+#font_manager._get_font.cache_clear()
 #plt.rcParams['mathtext.fontset'] = 'cm'
 #Unicode characters in Linux: CTRL-SHIFT-u ($ϵ$, $ε$, $ϕ$, $φ$, $σ$, $ς$ $η$)
 
@@ -88,7 +88,7 @@ def plot_heatmaps(sample, labels, output_dir):
 
 def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, var,
                   density=True, separate_norm=False, log=True):
-    n_classes = max(labels)+1
+    n_classes = np.max(labels)+1
     plt.figure(figsize=(12,8)); pylab.grid(False); axes = plt.gca()
     # Axes parameters
     axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
@@ -447,7 +447,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
         if multiplots:
             sig, bkg = output_dir.split('/')[-1].split('vs')
             sig_dict = {'class_0':'Prompt Electron', 'class_01':'Prompt Electron + Charge Flip'}
-            bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavor',
+            bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavor', '45':'Light Flavor',
                         '4':'Light Flavor e/$\gamma$', '5':'Light Flavor Hadron', 'Bkg':'Combined Background'}
             plt.gca().add_artist(L)
             plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
@@ -534,9 +534,9 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS,
     if multiplots:
         for pkl_file in [name for name in os.listdir(output_dir) if '.pkl' in name]:
             os.remove(output_dir+'/'+pkl_file)
-        try: os.mkdir(output_dir+'/../ROC_curves')
-        except FileExistsError: pass
-        plt.savefig(output_dir+'/../ROC_curves/ROC_'+output_dir.split('class_')[-1]+'.png')
+    try: os.mkdir(output_dir+'/../ROC_curves')
+    except FileExistsError: pass
+    plt.savefig(output_dir+'/../ROC_curves/ROC_'+output_dir.split('class_')[-1]+'.png')
 
 
 def CNN_fpr(tpr, fpr, LLH_tpr):
@@ -1002,7 +1002,9 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
         start_time = time.time()
         if mode == 'random':
             for counter in np.arange(10000):
-                index = np.random.choice(np.where(labels==e_class)[0])
+                #index = np.random.choice(np.where(labels==e_class)[0])
+                rng = np.random.default_rng()
+                index = rng.choice(np.where(labels==e_class)[0])
                 image = abs(sample[key][index])
                 if np.max(image) !=0: break
             #print( e_class, key, index )
