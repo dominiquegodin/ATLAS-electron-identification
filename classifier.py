@@ -103,10 +103,10 @@ gen_cuts  = []
 channel_dict = {'Zee' :['361106'], 'ttbar':['410470'], 'Ztautau':['361108'], 'Wtaunu':['361102,361105'],
                 'JF17':['423300'], 'JF35' :['423302'], 'JF50'   :['423303'], 'Wenu'  :['361100,361103'],
                 'high-pt_PC': ['423107','423108','423109','423110','423111','423112']                  }
-channels = channel_dict['high-pt_PC']
-#channels = channel_dict['JF17'] + channel_dict['JF35'] + channel_dict['JF50'] + ['0']
+#channels = channel_dict['JF17'] + channel_dict['Zee'] + ['0']
 #gen_cuts += ['( ' + ''.join([   '(sample["mcChannelNumber"] == '+channels[0]+')']
 #                           +[' | (sample["mcChannelNumber"] == '+n+')' for n in channels[1:]]) + ' )']
+channels = channel_dict['high-pt_PC']
 gen_cuts += ['(sample["mcChannelNumber"] != '+n+')' for n in channels]
 if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
@@ -169,7 +169,7 @@ if args.n_eval[0] == args.n_eval[1]: args.n_eval = args.n_valid
 #print(args.n_train, args.n_eval, args.n_valid); sys.exit()
 
 
-# MODEL CREATION AND MULTI-GPU DISTRIBUTION
+# MODEL CREATION / MULTI-GPU DISTRIBUTION
 n_classes = args.n_etypes if args.multiclass=='ON' else 2
 sample = make_sample(data_files[0], [0,1], input_data, args.n_tracks, n_classes)[0]
 n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
@@ -208,10 +208,19 @@ args.t_scaler_in = args.output_dir+'/'+args.t_scaler_in; args.t_scaler_out = arg
 #            args.n_tracks, n_classes, args.valid_cuts, args.output_dir)
 
 
-# GENERATING VALIDATION SAMPLE AND LOADING PRE-TRAINED WEIGHTS
+# LOADIND PRE-TRAINED WEIGHTS
 if os.path.isfile(args.model_in):
     print('Loading pre-trained weights from', args.model_in, '\n')
-    model.load_weights(args.model_in)
+    try:
+        model.load_weights(args.model_in)
+    except ValueError:
+        model = tf.keras.models.load_model(args.model_in)
+        n_classes = model.output_shape[-1] if args.multiclass=='ON' else 2
+        print('PRE-TRAINED NETWORK ARCHITECTURE')
+        model.summary(); print()
+
+
+# GENERATING VALIDATION SAMPLE
 scaler, t_scaler = None, None
 if args.scaling and os.path.isfile(args.scaler_in):
     print('Loading quantile transform from', args.scaler_in, '\n')
@@ -225,7 +234,7 @@ valid_scaler   = None if args.generator=='ON' else scaler
 valid_t_scaler = None if args.generator=='ON' else t_scaler
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks,
                                               n_classes, args.valid_cuts, valid_scaler, valid_t_scaler)
-#sample_analysis(valid_sample, valid_labels, scalars, scaler, args.output_dir); sys.exit()
+#sample_analysis(valid_sample, valid_labels, scalars, scaler, args.generator, args.output_dir); sys.exit()
 #sample_composition(valid_sample); compo_matrix(valid_labels, n_etypes=args.n_etypes); sys.exit()
 
 
@@ -249,10 +258,10 @@ if args.n_epochs > 0:
         inputs['images'] = ['tracks']
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
                                                            n_classes, args.train_cuts)
-    sample_composition(train_sample, 'train'); compo_matrix(valid_labels, train_labels); print() #;sys.exit()
+    sample_composition(train_sample, 'train'); compo_matrix(valid_labels, train_labels); print() #; sys.exit()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
-                      train_weights, bins, args.output_dir) ;print() #;sys.exit()
+                      train_weights, bins, args.output_dir) ; print() #; sys.exit()
     if args.scaling:
         if not os.path.isfile(args.scaler_in):
             scaler = fit_scaler(train_sample, scalars, args.scaler_out)
@@ -297,7 +306,8 @@ else:
         valid_probs = model.predict(valid_gen, verbose=args.verbose)
     else:
         valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
-if args.plotting == 'ON' and training is not None: plot_history(training, args.output_dir)
+if args.plotting == 'ON' and training is not None:
+    plot_history(training, args.output_dir)
 bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels,
                         args.n_etypes, args.output_dir, args.plotting)
 if '.pkl' in args.results_out:
@@ -308,10 +318,7 @@ if '.pkl' in args.results_out:
         except IOError: print('FILE ACCESS CONFLICT FOR', removed_feature, '--> SKIPPING FILE ACCESS\n')
         feature_ranking(args.output_dir, args.results_out, scalars, images, groups=[])
     else:
-        if args.n_folds > 1 and False:
-            valid_data = (np.float16(valid_probs),)
-        else:
-            valid_keys = (set(valid_sample)-set(scalars)-set(images)) | set(others)
-            valid_data = ({key:valid_sample[key] for key in valid_keys}, valid_labels, valid_probs)
+        valid_keys = (set(valid_sample)-set(scalars)-set(images)) | set(others)
+        valid_data = ({key:valid_sample[key] for key in valid_keys}, valid_labels, valid_probs)
         pickle.dump(valid_data, open(args.results_out,'wb'), protocol=4)
     print('\nValidation results saved to:', args.results_out, '\n')

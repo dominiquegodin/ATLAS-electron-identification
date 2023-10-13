@@ -451,6 +451,38 @@ def sample_composition(sample, tag='valid'):
     print('   |  100 %  |\n' + dash + '\n')
 
 
+def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts):
+    print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
+    if valid_cuts != '':
+        print('\nVALIDATION CUTS:')
+        args_dict = {'valid_cuts':valid_cuts}
+        if len(valid_cuts) > 1:
+            for n in range(len(valid_cuts)): args_dict['valid_cuts ('+str(n+1)+')'] = valid_cuts[n]
+            args_dict.pop('valid_cuts')
+        print(tabulate(args_dict.items(), tablefmt='psql'), '\n')
+    valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
+    if len(valid_data) > 1: sample, labels, probs   = valid_data
+    else:                                  (probs,) = valid_data
+    n_e = min(len(probs), int(n_valid))
+    sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
+    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end='', flush=True)
+    # Light Flavor Ratios (classes 4 and 5 combined)
+    if n_etypes == 5 and probs.shape[-1] == 6:
+        labels = np.where(labels==5, 4, labels)
+    ratios = compo_matrix(labels, None, probs, n_etypes, verbose=False)
+    cut_list = [np.full_like(labels, True, dtype=bool)]
+    for cut in valid_cuts:
+        try   : cut_list.append(eval(cut))
+        except: pass
+    cuts = np.logical_and.reduce(cut_list)
+    sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
+    if len(labels) == n_e: print('')
+    else: print(' --> ('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
+    valid_results(sample, labels, probs, None, n_etypes, output_dir, plotting, ratios); print()
+    #multi_cuts(sample, labels, probs, output_dir); sys.exit()
+    #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
+
+
 def class_ratios(labels, n_etypes):
     def get_ratios(labels, n, return_dict):
         return_dict[n] = 100*np.sum(labels==n)/len(labels)
@@ -461,23 +493,25 @@ def class_ratios(labels, n_etypes):
     return [return_dict[n] for n in range(n_etypes)]
 
 
-def confusion_matrix(labels, preds, ratios):
+def confusion_matrix(labels, preds, ratios, n_etypes):
     def get_stat(labels, preds, ratios, classes, m, return_dict):
         selection = (preds==m)
-        return_dict[m] = [np.sum((selection)&(labels==n))/(ratios[n]) for n in classes]
-    classes = np.unique(labels)
-    #return 100*metrics.confusion_matrix(labels, preds, normalize='true').T
-    #return 100*np.array([[np.sum((preds==m)&(labels==n))/np.sum(labels==n) for n in classes] for m in classes])
+        return_dict[m] = [np.sum((selection)&(labels==n))/(ratios[n]) if ratios[n]!=0 else 0 for n in classes]
+    classes = np.arange(n_etypes)
+    #return metrics.confusion_matrix(labels, preds, normalize='true').T
+    #return np.array([[np.sum((preds==m)&(labels==n))/np.sum(labels==n) for n in classes] for m in classes])
     manager   = mp.Manager(); return_dict = manager.dict()
     arguments = [(labels, preds, ratios, classes, m, return_dict) for m in classes]
     processes = [mp.Process(target=get_stat, args=arg) for arg in arguments]
     for task in processes: task.start()
     for task in processes: task.join()
-    return 1e4*np.array([return_dict[m] for m in classes])/len(labels)
+    return 100*np.array([return_dict[m] for m in classes])/len(labels)
 
 
 def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=None, verbose=True):
-    if n_etypes is None: n_etypes = len(np.unique(np.append(valid_labels, train_labels)))
+    if n_etypes is None:
+        if train_labels is not None: n_etypes = len(np.unique(np.append(valid_labels, train_labels)))
+        else                       : n_etypes = len(np.unique(valid_labels))
     classes = ['CLASS '+str(n) for n in range(n_etypes)]
     valid_ratios = class_ratios(valid_labels, n_etypes)
     train_ratios = class_ratios(train_labels, n_etypes) if train_labels is not None else n_etypes*['n/a']
@@ -489,7 +523,7 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
     else:
         valid_preds = np.argmax(valid_probs, axis=1) if valid_probs is not None else valid_labels
         if verbose:
-            matrix = confusion_matrix(valid_labels, valid_preds, valid_ratios)
+            matrix = 100*confusion_matrix(valid_labels, valid_preds, valid_ratios, n_etypes)
             pred_ratios = matrix @ valid_ratios / 100
             classes = ['CLASS '+str(n) for n in range(n_etypes)]
             if n_etypes > 2:
@@ -510,32 +544,178 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
         else:
             #pred_ratios = 100*np.mean(valid_probs, axis=0, dtype=np.float64)
             pred_ratios = [100*np.sum(valid_preds==n)/len(valid_preds) for n in range(n_etypes)]
-        # Light Flavor Ratios
-        #valid_ratios[-2] = valid_ratios[-2] + valid_ratios[-1]
-        #valid_ratios[-1] = valid_ratios[-2]
         return {'truth':valid_ratios, 'pred':pred_ratios, 'none':np.ones_like(valid_ratios)}
 
 
-def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts):
-    print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
-    valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
-    if len(valid_data) > 1: sample, labels, probs   = valid_data
-    else:                                  (probs,) = valid_data
-    n_e = min(len(probs), int(n_valid))
-    sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end='', flush=True)
-    ratios = compo_matrix(labels, None, probs, n_etypes, verbose=False)
-    cut_list = [np.full_like(labels, True, dtype=bool)]
-    for cut in valid_cuts:
-        try   : cut_list.append(eval(cut))
-        except: pass
-    cuts = np.logical_and.reduce(cut_list)
-    sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
-    if len(labels) == n_e: print('')
-    else: print(' --> ('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
-    valid_results(sample, labels, probs, None, n_etypes, output_dir, plotting, ratios); print()
-    #multi_cuts(sample, labels, probs, output_dir); sys.exit()
-    #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
+def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=None, verbose=False):
+    n_classes = probs.shape[1]
+    def class_weights(sig_list, ratios, optimal_bkg):
+        weights = np.ones(n_classes) if ratios is None else ratios.copy()
+        if optimal_bkg != 'bkg':
+            for n in range(n_classes):
+                if n not in sig_list and n != optimal_bkg: weights[n] = 0
+        return np.array(weights)
+    if n_classes > 2:
+        """ Multi-class discriminant """
+        bkg_list = list(set(np.arange(n_classes))-set(sig_list))
+        bkg = bkg_list if bkg=='bkg' else [int(n) for n in str(bkg)]
+        if verbose: print_dict[1] += 'SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
+        #for n in list(np.arange(1, n_classes))+['bkg']: print(n, class_weights(sig_list, ratios, n))
+        weights = class_weights(sig_list, ratios, 'bkg')                              #Optimal combined background
+        #weights = class_weights(sig_list, ratios, 'bkg' if bkg==bkg_list else bkg[0]) #Optimal individual classes
+        sig_cut = np.logical_or.reduce([labels==n for n in sig_list])
+        bkg_cut = np.logical_or.reduce([labels==n for n in bkg     ])
+        all_cut = np.logical_or(sig_cut, bkg_cut)
+        sample = {key:sample[key][all_cut] for key in sample}
+        labels = np.where(sig_cut, 0, 1)[all_cut]
+        #sig_probs = np.add.reduce([weights[n]*probs[:,n] for n in sig_list])[all_cut]
+        #bkg_probs = np.add.reduce([weights[n]*probs[:,n] for n in bkg_list])[all_cut]
+        sig_probs = (probs[:,sig_list]@weights[sig_list])[all_cut]
+        bkg_probs = (probs[:,bkg_list]@weights[bkg_list])[all_cut]
+        sig_probs = np.where(sig_probs!=bkg_probs, sig_probs, 0.5)
+        bkg_probs = np.where(sig_probs!=bkg_probs, bkg_probs, 0.5)
+        probs = (np.vstack([sig_probs,bkg_probs])/(sig_probs+bkg_probs)).T
+    else:
+        """ Background separation for binary classification """
+        if bkg == 'bkg': return sample, labels, probs
+        if verbose: print_dict[1] += 'SIGNAL = {0} VS BACKGROUND = {'+str(bkg)+'}\n'
+        multi_labels = make_labels(sample, n_classes=n_etypes)
+        cuts = np.logical_or(multi_labels==0, multi_labels==bkg)
+        sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
+    return sample, labels, probs
+
+
+def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg, ratios, return_dict,
+                  threshold, LF_cuts=None, sep_bkg=True, ECIDS=True):
+    # Multi-discriminants
+    #_, _, prob  = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg,
+    #                                          ratios=[17.4375,0.,0.,0.,12.7207,67.1977])
+    #LF_cuts = prob[:,0] > threshold
+    sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios, verbose=True)
+    if plotting == 'ON':
+        output_dir += '/'+'class_'+''.join([str(n) for n in sig_list])+'vs'+str(bkg).title()
+        if not os.path.isdir(output_dir): os.mkdir(output_dir)
+        #for iter_tuple in itertools.product([False,True], ['CNN2LLH','CNN2CNN']):
+        #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
+        #if bkg == 'bkg': performance_plots(sample, labels, probs[:,0], output_dir)
+        ECIDS = ECIDS and bkg==1
+        arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
+        processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
+        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg and bkg=='bkg', bkg)
+        #processes += [mp.Process(target=plot_discriminant, args=arguments)]
+        for job in processes: job.start()
+        for job in processes: job.join()
+    else:
+        compo_matrix(labels, None, probs)
+        print_performance(labels, probs)
+    return_dict[bkg] = print_dict
+
+
+def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plotting,
+                  valid_ratios=None, sep_bkg=True, diff_plots=False, threshold=None):
+    global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
+    # Light Flavor Ratios (classes 4 and 5 combined)
+    if n_etypes == 5 and probs.shape[-1] == 6:
+        labels = np.where(labels==5, 4, labels)
+        probs  = np.concatenate([probs[:,:4], probs[:,4:5]+probs[:,5:6]], axis=1)
+    ratios = compo_matrix(labels, train_labels, probs, n_etypes) ; print(print_dict[2])
+    if valid_ratios is not None: ratios = valid_ratios
+    """ Plotting efficiciency ratios mesh grid """
+    #ratio_plots(sample, labels, probs, n_etypes, output_dir)
+    for sig_list in [[0]]:#,[0,1]]:
+        # Multi-discriminants
+        #first_cut_ratios = [17.4375,0.,0.,0.,12.7207,67.1977]
+        #_, new_labels, new_probs = make_discriminant(sample, labels, probs, n_etypes,
+        #                                     sig_list, 'bkg', ratios=first_cut_ratios)
+        #_, tpr, thresholds = metrics.roc_curve(new_labels, new_probs[:,0], pos_label=0)
+        #sig_eff=0.99 ; threshold = thresholds[np.argmin(abs(tpr-sig_eff))]
+        bkg_list = ['bkg'] + list(set(np.unique(labels))-set(sig_list)) if sep_bkg else ['bkg']
+        # Light Flavor Ratios (classes 4 and 5 combined)
+        if sep_bkg and len({4,5}&set(bkg_list)) != 0: bkg_list += [45]
+        manager   = mp.Manager(); return_dict = manager.dict()
+        arguments = [(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg,
+                      ratios['truth'], return_dict, threshold) for bkg in bkg_list]
+        processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
+        for job in processes: job.start()
+        for job in processes: job.join()
+    #bkg_list  = {sig_list:['bkg'] + list(set(np.unique(labels))-set(sig_list)) if sep_bkg else ['bkg']
+    #             for sig_list in [(0,),(0,1)][:1]}
+    #manager   = mp.Manager(); return_dict = manager.dict()
+    #arguments = [(sample, labels, probs, n_etypes, plotting, output_dir, list(sig_list), bkg,
+    #              ratios['truth'], return_dict, threshold) for sig_list in bkg_list for bkg in bkg_list[sig_list]]
+    #processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
+    #for job in processes: job.start()
+    #for job in processes: job.join()
+    """ Background rejection extraction for feature ranking """
+    if plotting == 'OFF':
+        for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
+        return [int(return_dict[bkg][3].split()[-1]) for bkg in bkg_list]
+    """ Differential plots """
+    if plotting == 'ON' and diff_plots:
+        eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
+        pt_boundaries   = [10, 20, 30, 40, 60, 100, 200, 500]
+        eta, pt         = sample['eta'], sample['pt']
+        eta_bin_indices = get_bin_indices(eta, eta_boundaries)
+        pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
+        plot_distributions_KM(labels, eta, 'eta', output_dir=output_dir)
+        plot_distributions_KM(labels, pt , 'pt' , output_dir=output_dir)
+        tmp_llh      = sample['p_LHValue']
+        tmp_llh_pair = np.zeros(len(tmp_llh))
+        prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
+        print('\nEvaluating differential performance in eta')
+        differential_plots(sample, labels, probs, eta_boundaries,
+                           eta_bin_indices, varname='eta', output_dir=output_dir)
+        print('\nEvaluating differential performance in pt')
+        differential_plots(sample, labels, probs, pt_boundaries,
+                           pt_bin_indices,  varname='pt',  output_dir=output_dir)
+        differential_plots(sample, labels, prob_LLH   , pt_boundaries,
+                           pt_bin_indices,  varname='pt',  output_dir=output_dir, evalLLH=True)
+
+
+def print_performance(labels, probs, sig_eff=[90, 80, 70]):
+    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
+    fpr, tpr    = fpr[::-2][::-1], tpr[::-2][::-1] #for linear interpolation
+    for val in sig_eff:
+        print_dict[3] += 'BACKGROUND REJECTION AT '+str(val)+'%: '
+        print_dict[3] += format(np.nan_to_num(1/fpr[np.argwhere(tpr>=val/100)[0]][0]),'>6.0f')+'\n'
+
+
+def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_files, n_valid,
+                input_data, n_tracks, valid_cuts, model, generator='OFF', verbose=1):
+    print('########################################################################'  )
+    print('##### STARTING '+str(n_folds)+'-FOLD CROSS-VALIDATION ################################'  )
+    print('########################################################################\n')
+    from plots_DG import valid_accuracy
+    n_classes    = max(valid_labels)+1
+    valid_probs  = np.full(valid_labels.shape + (n_classes,), -1.)
+    event_number = valid_sample['eventNumber']
+    for fold_number in np.arange(1, n_folds+1):
+        print('FOLD '+str(fold_number)+'/'+str(n_folds), 'EVALUATION')
+        weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
+        scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
+        print('Loading pre-trained weights from', weight_file)
+        model.load_weights(weight_file); start_time = time.time()
+        indices =               np.where(event_number%n_folds==fold_number-1)[0]
+        labels  =           valid_labels[event_number%n_folds==fold_number-1]
+        sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
+        if scalars != [] and os.path.isfile(scaler_file):
+            print('Loading scalars scaler from', scaler_file)
+            scaler = pickle.load(open(scaler_file, 'rb'))
+            sample = apply_scaler(sample, scalars, scaler, verbose='ON')
+        print('\033[FCLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
+        if generator == 'ON':
+            valid_cuts = '(sample["eventNumber"]%'+str(n_folds)+'=='+str(fold_number-1)+')'
+            valid_gen  = Batch_Generator(data_files, n_valid, input_data, n_tracks, n_classes,
+                                         batch_size=20000, cuts=valid_cuts, scaler=scaler)
+            probs = model.predict(valid_gen, workers=4, verbose=verbose)
+        else: probs = model.predict(sample, batch_size=20000, verbose=verbose)
+        print('FOLD '+str(fold_number)+'/'+str(n_folds)+' ACCURACY: ', end='')
+        print(format(100*valid_accuracy(labels, probs), '.2f'), end='')
+        print(' % (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
+        #for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
+        for n in np.arange(n_classes): np.put(valid_probs[:,n], indices, probs[:,n])
+    print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
+    return valid_probs
 
 
 def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, index=6, multi=False):
@@ -615,172 +795,6 @@ def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, in
     #              for bkg in list(range(1,ROC_values[0].shape[1]-1))+['bkg']]
     #for job in processes: job.start()
     #for job in processes: job.join()
-
-
-def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=None, verbose=False):
-    n_classes = probs.shape[1]
-    def class_weights(sig_list, ratios, optimal_bkg):
-        weights = np.ones(n_classes) if ratios is None else ratios.copy()
-        if optimal_bkg != 'bkg':
-            for n in range(n_classes):
-                if n not in sig_list and n != optimal_bkg: weights[n] = 0
-        return np.array(weights)
-    if n_classes > 2:
-        """ Multi-class discriminant """
-        bkg_list = list(set(np.arange(n_classes))-set(sig_list))
-        bkg = bkg_list if bkg=='bkg' else [int(n) for n in str(bkg)]
-        if verbose: print_dict[1] += 'SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
-        #for n in list(np.arange(1, n_classes))+['bkg']: print(n, class_weights(sig_list, ratios, n))
-        weights = class_weights(sig_list, ratios, 'bkg')                              #Optimal combined background
-        #weights = class_weights(sig_list, ratios, 'bkg' if bkg==bkg_list else bkg[0]) #Optimal individual classes
-        sig_cut = np.logical_or.reduce([labels==n for n in sig_list])
-        bkg_cut = np.logical_or.reduce([labels==n for n in bkg     ])
-        all_cut = np.logical_or(sig_cut, bkg_cut)
-        sample = {key:sample[key][all_cut] for key in sample}
-        labels = np.where(sig_cut, 0, 1)[all_cut]
-        #sig_probs = np.add.reduce([weights[n]*probs[:,n] for n in sig_list])[all_cut]
-        #bkg_probs = np.add.reduce([weights[n]*probs[:,n] for n in bkg_list])[all_cut]
-        sig_probs = (probs[:,sig_list]@weights[sig_list])[all_cut]
-        bkg_probs = (probs[:,bkg_list]@weights[bkg_list])[all_cut]
-        sig_probs = np.where(sig_probs!=bkg_probs, sig_probs, 0.5)
-        bkg_probs = np.where(sig_probs!=bkg_probs, bkg_probs, 0.5)
-        probs = (np.vstack([sig_probs,bkg_probs])/(sig_probs+bkg_probs)).T
-    else:
-        """ Background separation for binary classification """
-        if bkg == 'bkg': return sample, labels, probs
-        if verbose: print_dict[1] += 'SIGNAL = {0} VS BACKGROUND = {'+str(bkg)+'}\n'
-        multi_labels = make_labels(sample, n_classes=n_etypes)
-        cuts = np.logical_or(multi_labels==0, multi_labels==bkg)
-        sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
-    return sample, labels, probs
-
-
-def print_performance(labels, probs, sig_eff=[90, 80, 70]):
-    fpr, tpr, _ = metrics.roc_curve(labels, probs[:,0], pos_label=0)
-    fpr, tpr    = fpr[::-2][::-1], tpr[::-2][::-1] #for linear interpolation
-    for val in sig_eff:
-        print_dict[3] += 'BACKGROUND REJECTION AT '+str(val)+'%: '
-        print_dict[3] += format(np.nan_to_num(1/fpr[np.argwhere(tpr>=val/100)[0]][0]),'>6.0f')+'\n'
-
-
-def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg, ratios, return_dict,
-                  threshold, LF_cuts=None, sep_bkg=True, ECIDS=True):
-    # Multi-discriminants
-    #_, _, prob  = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg,
-    #                                          ratios=[17.4375,0.,0.,0.,12.7207,67.1977])
-    #LF_cuts = prob[:,0] > threshold
-    sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios, verbose=True)
-    if plotting == 'ON':
-        output_dir += '/'+'class_'+''.join([str(n) for n in sig_list])+'vs'+str(bkg).title()
-        if not os.path.isdir(output_dir): os.mkdir(output_dir)
-        #for iter_tuple in itertools.product([False,True], ['CNN2LLH','CNN2CNN']):
-        #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
-        #if bkg == 'bkg': performance_plots(sample, labels, probs[:,0], output_dir)
-        ECIDS = ECIDS and bkg==1
-        arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
-        processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg and bkg=='bkg', bkg)
-        processes += [mp.Process(target=plot_discriminant, args=arguments)]
-        for job in processes: job.start()
-        for job in processes: job.join()
-    else:
-        compo_matrix(labels, None, probs)
-        print_performance(labels, probs)
-    return_dict[bkg] = print_dict
-
-
-def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plotting,
-                  valid_ratios=None, sep_bkg=True, diff_plots=False, threshold=None):
-    global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
-    ratios = compo_matrix(labels, train_labels, probs, n_etypes); print(print_dict[2])
-    if valid_ratios is not None: ratios = valid_ratios
-    """ Plotting efficiciency ratios mesh grid """
-    #ratio_plots(sample, labels, probs, n_etypes, output_dir)
-    for sig_list in [[0]]:#,[0,1]]:
-        # Multi-discriminants
-        #first_cut_ratios = [17.4375,0.,0.,0.,12.7207,67.1977]
-        #_, new_labels, new_probs = make_discriminant(sample, labels, probs, n_etypes,
-        #                                     sig_list, 'bkg', ratios=first_cut_ratios)
-        #_, tpr, thresholds = metrics.roc_curve(new_labels, new_probs[:,0], pos_label=0)
-        #sig_eff=0.99 ; threshold = thresholds[np.argmin(abs(tpr-sig_eff))]
-        bkg_list = ['bkg'] + list(set(np.unique(labels))-set(sig_list)) if sep_bkg else ['bkg']
-        #if sep_bkg and n_etypes == 6: bkg_list += [45]
-        manager   = mp.Manager(); return_dict = manager.dict()
-        arguments = [(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg,
-                      ratios['truth'], return_dict, threshold) for bkg in bkg_list]
-        processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
-        for job in processes: job.start()
-        for job in processes: job.join()
-    #bkg_list  = {sig_list:['bkg'] + list(set(np.unique(labels))-set(sig_list)) if sep_bkg else ['bkg']
-    #             for sig_list in [(0,),(0,1)][:1]}
-    #manager   = mp.Manager(); return_dict = manager.dict()
-    #arguments = [(sample, labels, probs, n_etypes, plotting, output_dir, list(sig_list), bkg,
-    #              ratios['truth'], return_dict, threshold) for sig_list in bkg_list for bkg in bkg_list[sig_list]]
-    #processes = [mp.Process(target=print_results, args=arg) for arg in arguments]
-    #for job in processes: job.start()
-    #for job in processes: job.join()
-    """ Background rejection extraction for feature ranking """
-    if plotting == 'OFF':
-        for bkg in bkg_list: print("".join(list(return_dict[bkg].values())))
-        return [int(return_dict[bkg][3].split()[-1]) for bkg in bkg_list]
-    """ Differential plots """
-    if plotting == 'ON' and diff_plots:
-        eta_boundaries  = [-1.6, -0.8, 0, 0.8, 1.6]
-        pt_boundaries   = [10, 20, 30, 40, 60, 100, 200, 500]
-        eta, pt         = sample['eta'], sample['pt']
-        eta_bin_indices = get_bin_indices(eta, eta_boundaries)
-        pt_bin_indices  = get_bin_indices(pt , pt_boundaries)
-        plot_distributions_KM(labels, eta, 'eta', output_dir=output_dir)
-        plot_distributions_KM(labels, pt , 'pt' , output_dir=output_dir)
-        tmp_llh      = sample['p_LHValue']
-        tmp_llh_pair = np.zeros(len(tmp_llh))
-        prob_LLH     = np.stack((tmp_llh,tmp_llh_pair),axis=-1)
-        print('\nEvaluating differential performance in eta')
-        differential_plots(sample, labels, probs, eta_boundaries,
-                           eta_bin_indices, varname='eta', output_dir=output_dir)
-        print('\nEvaluating differential performance in pt')
-        differential_plots(sample, labels, probs, pt_boundaries,
-                           pt_bin_indices,  varname='pt',  output_dir=output_dir)
-        differential_plots(sample, labels, prob_LLH   , pt_boundaries,
-                           pt_bin_indices,  varname='pt',  output_dir=output_dir, evalLLH=True)
-
-
-def cross_valid(valid_sample, valid_labels, scalars, output_dir, n_folds, data_files, n_valid,
-                input_data, n_tracks, valid_cuts, model, generator='OFF', verbose=1):
-    print('########################################################################'  )
-    print('##### STARTING '+str(n_folds)+'-FOLD CROSS-VALIDATION ################################'  )
-    print('########################################################################\n')
-    from plots_DG import valid_accuracy
-    n_classes    = max(valid_labels)+1
-    valid_probs  = np.full(valid_labels.shape + (n_classes,), -1.)
-    event_number = valid_sample['eventNumber']
-    for fold_number in np.arange(1, n_folds+1):
-        print('FOLD '+str(fold_number)+'/'+str(n_folds), 'EVALUATION')
-        weight_file = output_dir+'/model_' +str(fold_number)+'.h5'
-        scaler_file = output_dir+'/scaler_'+str(fold_number)+'.pkl'
-        print('Loading pre-trained weights from', weight_file)
-        model.load_weights(weight_file); start_time = time.time()
-        indices =               np.where(event_number%n_folds==fold_number-1)[0]
-        labels  =           valid_labels[event_number%n_folds==fold_number-1]
-        sample  = {key:valid_sample[key][event_number%n_folds==fold_number-1] for key in valid_sample}
-        if scalars != [] and os.path.isfile(scaler_file):
-            print('Loading scalars scaler from', scaler_file)
-            scaler = pickle.load(open(scaler_file, 'rb'))
-            sample = apply_scaler(sample, scalars, scaler, verbose='ON')
-        print('\033[FCLASSIFIER:', weight_file.split('/')[-1], 'class predictions for', len(labels), 'e')
-        if generator == 'ON':
-            valid_cuts = '(sample["eventNumber"]%'+str(n_folds)+'=='+str(fold_number-1)+')'
-            valid_gen  = Batch_Generator(data_files, n_valid, input_data, n_tracks, n_classes,
-                                         batch_size=20000, cuts=valid_cuts, scaler=scaler)
-            probs = model.predict(valid_gen, workers=4, verbose=verbose)
-        else: probs = model.predict(sample, batch_size=20000, verbose=verbose)
-        print('FOLD '+str(fold_number)+'/'+str(n_folds)+' ACCURACY: ', end='')
-        print(format(100*valid_accuracy(labels, probs), '.2f'), end='')
-        print(' % (', '\b'+format(time.time() - start_time, '2.1f'), '\b'+' s)\n')
-        #for n in np.arange(len(indices)): valid_probs[indices[n],:] = probs[n,:]
-        for n in np.arange(n_classes): np.put(valid_probs[:,n], indices, probs[:,n])
-    print('MERGING ALL FOLDS AND PREDICTING CLASSES ...')
-    return valid_probs
 
 
 def verify_sample(sample):
@@ -893,7 +907,8 @@ def class_channels(sample, labels, output_dir, col=1, reverse=True, composition=
                    disable_numparse=True, colalign=['left','right']+['right' for n in classes])); sys.exit()
 
 
-def sample_analysis(sample, labels, scalars, scaler_file, output_dir):
+def sample_analysis(sample, labels, scalars, scaler_file, generator, output_dir):
+    if generator == 'ON': sys.exit()
     #verify_sample(sample); sys.exit()
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
