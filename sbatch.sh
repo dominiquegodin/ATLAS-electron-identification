@@ -36,15 +36,20 @@ then
     fi
 else
     # TRAINING ON BELUGA
-    if [[ -n "$INPUT_PATH" ]]
-    then
-	echo "COPYING DATA FILES TO LOCAL NODE"
-	cp -r /project/def-arguinj/shared/e-ID_data/{0.0-1.3,1.3-1.6,1.6-2.5,0.0-2.5} $INPUT_PATH
-    fi
-    module load singularity/3.6
-    PATHS=/project/def-arguinj,$INPUT_PATH
+    module load apptainer/1.1
+    PATHS=/project/def-arguinj,/scratch/dgodin,$INPUT_PATH
     SIF=/project/def-arguinj/shared/sing_images/tf-2.1.0-gpu-py3_sing-3.5.sif
-    singularity shell --nv --bind $PATHS $SIF < classifier.sh $SBATCH_VAR $HOST_NAME $INPUT_PATH
+    if  [ -z ${PRESAMPLER+x} ] || [ $PRESAMPLER != True ]
+    then
+        if [[ -n "$INPUT_PATH" ]]
+        then
+            echo "COPYING DATA FILES TO LOCAL NODE"
+            cp -r /project/def-arguinj/shared/e-ID_data/{0.0-2.5_mc,0.0-2.5_LFdata17-18} $INPUT_PATH
+        fi
+        singularity shell --nv --bind $PATHS $SIF < classifier.sh $SBATCH_VAR $HOST_NAME $INPUT_PATH
+    else
+        singularity shell      --bind $PATHS $SIF < presampler.sh
+    fi
 fi
 
 mkdir -p outputs/log_files
