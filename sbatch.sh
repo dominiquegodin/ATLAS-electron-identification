@@ -37,7 +37,7 @@ then
 else
     # TRAINING ON BELUGA
     module load apptainer/1.1
-    PATHS=/project/def-arguinj,/scratch/dgodin,$INPUT_PATH
+    PATHS=/project/def-arguinj,$INPUT_PATH
     SIF=/project/def-arguinj/shared/sing_images/tf-2.1.0-gpu-py3_sing-3.5.sif
     if  [ -z ${PRESAMPLER+x} ] || [ $PRESAMPLER != True ]
     then
