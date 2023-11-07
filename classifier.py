@@ -20,7 +20,6 @@ parser.add_argument( '--n_valid'        , default =  1e6,  type = float )
 parser.add_argument( '--batch_size'     , default =  1e4,  type = float )
 parser.add_argument( '--n_epochs'       , default =  100,  type = int   )
 parser.add_argument( '--n_etypes'       , default =    6,  type = int   )
-parser.add_argument( '--multiclass'     , default = 'ON'                )
 parser.add_argument( '--n_tracks'       , default =    5,  type = int   )
 parser.add_argument( '--bkg_ratio'      , default =    5,  type = float )
 parser.add_argument( '--n_folds'        , default =    1,  type = int   )
@@ -43,7 +42,6 @@ parser.add_argument( '--t_scaling'      , default = 'OFF'               )
 parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
 parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
-#parser.add_argument( '--metrics'        , default = 'accuracy_1'      )
 parser.add_argument( '--host_name'      , default = 'lps'               )
 parser.add_argument( '--input_path'     , default = ''                  )
 parser.add_argument( '--input_dir'      , default = '0.0-2.5_mc'        )
@@ -169,10 +167,9 @@ if args.n_eval[0] == args.n_eval[1]: args.n_eval = args.n_valid
 
 
 # MODEL CREATION / MULTI-GPU DISTRIBUTION
-n_classes = args.n_etypes if args.multiclass=='ON' else 2
-sample = make_sample(data_files[0], [0,1], input_data, args.n_tracks, n_classes)[0]
+sample = make_sample(data_files[0], [0,1], input_data, args.n_tracks, args.n_etypes)[0]
 n_gpus = min(args.n_gpus, len(tf.config.experimental.list_physical_devices('GPU')))
-model  = create_model(n_classes, sample, args.NN_type, args.FCN_neurons, CNN,
+model  = create_model(args.n_etypes, sample, args.NN_type, args.FCN_neurons, CNN,
                       args.l2, args.dropout, train_data, n_gpus)
 train_batch_size = args.batch_size                 #* max(1,n_gpus)
 valid_batch_size = max(args.batch_size, int(20e3)) #* max(1,n_gpus)
@@ -204,7 +201,7 @@ args.model_in    = args.output_dir+'/'+args.model_in   ; args.model_out    = arg
 args.scaler_in   = args.output_dir+'/'+args.scaler_in  ; args.scaler_out   = args.output_dir+'/'+args.scaler_out
 args.t_scaler_in = args.output_dir+'/'+args.t_scaler_in; args.t_scaler_out = args.output_dir+'/'+args.t_scaler_out
 #plot_inputs(args.input_path, args.host_name, input_data, args.n_valid,
-#            args.n_tracks, n_classes, args.valid_cuts, args.output_dir)
+#            args.n_tracks, args.n_etypes, args.valid_cuts, args.output_dir)
 
 
 # LOADIND PRE-TRAINED WEIGHTS
@@ -213,10 +210,9 @@ if os.path.isfile(args.model_in):
     try:
         model.load_weights(args.model_in)
     except ValueError:
-        model = tf.keras.models.load_model(args.model_in)
-        n_classes = model.output_shape[-1] if args.multiclass=='ON' else 2
         print('PRE-TRAINED NETWORK ARCHITECTURE')
-        model.summary(); print()
+        model = tf.keras.models.load_model(args.model_in)
+        model.summary(); print() #print(model.output_shape)
 
 
 # GENERATING VALIDATION SAMPLE
@@ -232,7 +228,7 @@ valid_scaler   = None if args.generator=='ON' else scaler
 valid_t_scaler = None if args.generator=='ON' else t_scaler
 print('VALIDATION SAMPLE: loading', np.diff(args.n_valid)[0], 'electron-candidates')
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks,
-                                              n_classes, args.valid_cuts, valid_scaler, valid_t_scaler)
+                                              args.n_etypes, args.valid_cuts, valid_scaler, valid_t_scaler)
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.generator, args.output_dir); sys.exit()
 #sample_composition(valid_sample); compo_matrix(valid_labels, n_etypes=args.n_etypes); sys.exit()
 
@@ -256,7 +252,7 @@ if args.n_epochs > 0:
     if args.t_scaling and not os.path.isfile(args.t_scaler_in) and 'tracks' in images and args.generator == 'ON':
         inputs['images'] = ['tracks']
     train_sample, train_labels, weight_idx = merge_samples(data_files, args.n_train, inputs, args.n_tracks,
-                                                           n_classes, args.train_cuts)
+                                                           args.n_etypes, args.train_cuts)
     sample_composition(train_sample, 'train'); compo_matrix(valid_labels, train_labels); print() #; sys.exit()
     train_weights, bins = get_sample_weights(train_sample, train_labels, args.weight_type, args.bkg_ratio, hist='pt')
     sample_histograms(valid_sample, valid_labels, train_sample, train_labels, args.n_etypes,
@@ -276,9 +272,9 @@ if args.n_epochs > 0:
     if args.generator == 'ON':
         del(train_sample)
         if np.all(train_weights) != None: train_weights = gen_weights(args.n_train, weight_idx, train_weights)
-        train_gen = Batch_Generator(data_files, args.n_train, input_data, args.n_tracks, n_classes,
+        train_gen = Batch_Generator(data_files, args.n_train, input_data, args.n_tracks, args.n_etypes,
                                     train_batch_size, args.train_cuts, scaler, t_scaler, train_weights, shuffle='ON')
-        eval_gen  = Batch_Generator(data_files, args.n_eval , input_data, args.n_tracks, n_classes,
+        eval_gen  = Batch_Generator(data_files, args.n_eval , input_data, args.n_tracks, args.n_etypes,
                                     valid_batch_size, args.valid_cuts, scaler, t_scaler, shuffle='OFF')
         training  = model.fit( train_gen, validation_data=eval_gen, max_queue_size=100*max(1,n_gpus),
                                callbacks=callbacks, workers=1, epochs=args.n_epochs, verbose=args.verbose )
@@ -300,7 +296,7 @@ if args.n_folds > 1:
 else:
     print('VALIDATING ON SAMPLE', args.n_valid)
     if args.generator == 'ON':
-        valid_gen   = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, n_classes,
+        valid_gen   = Batch_Generator(data_files, args.n_valid, input_data, args.n_tracks, args.n_etypes,
                                       valid_batch_size, args.valid_cuts, scaler, t_scaler, shuffle='OFF')
         valid_probs = model.predict(valid_gen, verbose=args.verbose)
     else:

@@ -188,11 +188,6 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
             except KeyError:
                 if 'fine' in key: sample[key] = np.zeros((idx[1]-idx[0],)+(56,11))
                 else            : sample[key] = np.zeros((idx[1]-idx[0],)+( 7,11))
-        #for key in set(images)-{'tracks'}:
-        #    if key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
-        #        images_fine = sample[key+'_fine']
-        #        sample[key] = [np.sum(images_fine[:,8*n:8*n+8,:], axis=1)[:,np.newaxis,:] for n in range(7)]
-        #        sample[key] = np.concatenate(sample[key], axis=1)
         if 'tracks' in scalars+images:
             n_tracks    = min(n_tracks, data[prefix+'tracks'].shape[1])
             tracks_data = data[prefix+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
@@ -208,7 +203,7 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
     return sample, labels
 
 
-def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
+def make_labels(sample, n_classes, data_LF=True, match_to_vertex=False):
     iffTruth           = 'p_iffTruth'
     TruthType          = 'p_TruthType'
     firstEgMotherPdgId = 'p_firstEgMotherPdgId'
@@ -559,7 +554,7 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
     classes = ['CLASS '+str(n) for n in range(n_etypes)]
     train_ratios = class_ratios(train_labels, n_etypes) if train_labels is not None else n_etypes*['n/a']
     valid_ratios = class_ratios(valid_labels, n_etypes)
-    #valid_ratios = [17.43, 0.53, 0.56, 1.54, 79.94]
+    #valid_ratios = [17.42, 0.523, 0.559, 1.532, 79.966]
     if valid_probs is None:
         print('+---------------------------------------+\n| CLASS DISTRIBUTIONS'+19*' '+'|')
         headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)']
