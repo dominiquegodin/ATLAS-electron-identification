@@ -190,11 +190,9 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
                 else            : sample[key] = np.zeros((idx[1]-idx[0],)+( 7,11))
         #for key in set(images)-{'tracks'}:
         #    if key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
-        #        energy_fine   = np.sum(sample[key+'_fine'], axis=(1,2))
-        #        energy_coarse = np.sum(sample[key]        , axis=(1,2))
-        #        energy_fine  [energy_coarse == 0] = 0.
-        #        energy_coarse[energy_coarse == 0] = 1.
-        #        sample[key] *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
+        #        images_fine = sample[key+'_fine']
+        #        sample[key] = [np.sum(images_fine[:,8*n:8*n+8,:], axis=1)[:,np.newaxis,:] for n in range(7)]
+        #        sample[key] = np.concatenate(sample[key], axis=1)
         if 'tracks' in scalars+images:
             n_tracks    = min(n_tracks, data[prefix+'tracks'].shape[1])
             tracks_data = data[prefix+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
@@ -210,7 +208,7 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
     return sample, labels
 
 
-def make_labels(sample, n_classes, match_to_vertex=False):
+def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
     iffTruth           = 'p_iffTruth'
     TruthType          = 'p_TruthType'
     firstEgMotherPdgId = 'p_firstEgMotherPdgId'
@@ -222,22 +220,52 @@ def make_labels(sample, n_classes, match_to_vertex=False):
     labels[ sample[iffTruth] ==  3                                                   ] = 1
     labels[ sample[iffTruth] ==  5                                                   ] = 2
     labels[(sample[iffTruth] ==  8) | (sample[iffTruth ] ==  9)                      ] = 3
-    labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  1)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
     #labels[(sample[iffTruth] ==  1)] = 6 #KnowUnknown class
     if n_classes == 2:
         labels[labels >= 2] = 1
-    if n_classes == 4:
-        labels[labels >= 4] = -1
     if n_classes == 5:
         #labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
         labels[labels == 5] = 4                      #light flavor = egamma + hadrons
-        labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
+        if data_LF:
+            labels[labels == 4] = -1
+            labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
+
+    '''
+    if n_classes == 2:
+        labels = np.full_like(sample[iffTruth], -1)
+        labels[(sample[iffTruth] ==  0) & (sample[TruthType] ==  0)] = 0
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 1
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 1
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 1
+        #labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 0
+        #labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 0
+        #labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 0
+        #event_number = sample['eventNumber']
+        #labels[(event_number%2 == 1) & (labels == 0)] = 1
+    '''
+    if n_classes == 3:
+        labels = np.full_like(sample[iffTruth], -1)
+        labels[(sample[iffTruth] ==  0) & (sample[TruthType] ==  0)] = 0
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 1
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 1
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 2
+    if n_classes == 8:
+        labels = np.full_like(sample[iffTruth], -1)
+        labels[(sample[iffTruth] ==  2) & (sample[firstEgMotherPdgId]*sample[charge] < 0)] = 0
+        labels[(sample[iffTruth] ==  2) & (sample[firstEgMotherPdgId]*sample[charge] > 0)] = 1
+        labels[ sample[iffTruth] ==  3                                                   ] = 1
+        labels[ sample[iffTruth] ==  5                                                   ] = 2
+        labels[ sample[iffTruth] ==  8                                                   ] = 3
+        labels[ sample[iffTruth] ==  9                                                   ] = 4
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 5
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 6
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 7
+
     if match_to_vertex:
         labels[sample[vertexIndex] == -999] = -1
-    #labels[labels == -1] = 4
     return np.int8(labels)
 
 
@@ -452,8 +480,8 @@ def sample_composition(sample, tag='valid'):
 
 
 def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts):
-    print('\nLOADING VALIDATION RESULTS FROM', output_dir+'/'+results_in)
-    if valid_cuts != '':
+    print('\nLOADING VALIDATION RESULTS FROM:', output_dir+'/'+results_in)
+    if len(valid_cuts) >= 1:
         print('\nVALIDATION CUTS:')
         args_dict = {'valid_cuts':valid_cuts}
         if len(valid_cuts) > 1:
@@ -466,9 +494,25 @@ def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts):
     n_e = min(len(probs), int(n_valid))
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end='', flush=True)
+
     # Light Flavor Ratios (classes 4 and 5 combined)
     if n_etypes == 5 and probs.shape[-1] == 6:
         labels = np.where(labels==5, 4, labels)
+    if n_etypes == 5 and probs.shape[-1] == 8:
+        labels = np.where(labels==4, 3, labels)
+        labels = np.where(labels==5, 4, labels)
+        labels = np.where(labels==6, 4, labels)
+        labels = np.where(labels==7, 4, labels)
+    if n_etypes == 6 and probs.shape[-1] == 8:
+        labels = np.where(labels==5, 5, labels)
+        labels = np.where(labels==6, 5, labels)
+        labels = np.where(labels==7, 5, labels)
+    if n_etypes == 7 and probs.shape[-1] == 8:
+        labels = np.where(labels==4, 3, labels)
+        labels = np.where(labels==5, 4, labels)
+        labels = np.where(labels==6, 5, labels)
+        labels = np.where(labels==7, 6, labels)
+
     ratios = compo_matrix(labels, None, probs, n_etypes, verbose=False)
     cut_list = [np.full_like(labels, True, dtype=bool)]
     for cut in valid_cuts:
@@ -493,19 +537,19 @@ def class_ratios(labels, n_etypes):
     return [return_dict[n] for n in range(n_etypes)]
 
 
-def confusion_matrix(labels, preds, ratios, n_etypes):
-    def get_stat(labels, preds, ratios, classes, m, return_dict):
-        selection = (preds==m)
-        return_dict[m] = [np.sum((selection)&(labels==n))/(ratios[n]) if ratios[n]!=0 else 0 for n in classes]
+def confusion_matrix(labels, preds, n_etypes):
+    def get_stat(labels, preds, classes, m, return_dict):
+        selection = (preds==m) ; n_e = [np.sum(labels==n) for n in classes]
+        return_dict[m] = [np.sum((selection)&(labels==n))/n_e[n] if n_e[n]!=0 else 0 for n in classes]
     classes = np.arange(n_etypes)
     #return metrics.confusion_matrix(labels, preds, normalize='true').T
     #return np.array([[np.sum((preds==m)&(labels==n))/np.sum(labels==n) for n in classes] for m in classes])
     manager   = mp.Manager(); return_dict = manager.dict()
-    arguments = [(labels, preds, ratios, classes, m, return_dict) for m in classes]
+    arguments = [(labels, preds, classes, m, return_dict) for m in classes]
     processes = [mp.Process(target=get_stat, args=arg) for arg in arguments]
     for task in processes: task.start()
     for task in processes: task.join()
-    return 100*np.array([return_dict[m] for m in classes])/len(labels)
+    return np.array([return_dict[m] for m in classes])
 
 
 def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=None, verbose=True):
@@ -513,8 +557,9 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
         if train_labels is not None: n_etypes = len(np.unique(np.append(valid_labels, train_labels)))
         else                       : n_etypes = len(np.unique(valid_labels))
     classes = ['CLASS '+str(n) for n in range(n_etypes)]
-    valid_ratios = class_ratios(valid_labels, n_etypes)
     train_ratios = class_ratios(train_labels, n_etypes) if train_labels is not None else n_etypes*['n/a']
+    valid_ratios = class_ratios(valid_labels, n_etypes)
+    #valid_ratios = [17.43, 0.53, 0.56, 1.54, 79.94]
     if valid_probs is None:
         print('+---------------------------------------+\n| CLASS DISTRIBUTIONS'+19*' '+'|')
         headers = ['CLASS #', 'TRAIN (%)', 'VALID (%)']
@@ -523,7 +568,7 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
     else:
         valid_preds = np.argmax(valid_probs, axis=1) if valid_probs is not None else valid_labels
         if verbose:
-            matrix = 100*confusion_matrix(valid_labels, valid_preds, valid_ratios, n_etypes)
+            matrix = 100*confusion_matrix(valid_labels, valid_preds, n_etypes)
             pred_ratios = matrix @ valid_ratios / 100
             classes = ['CLASS '+str(n) for n in range(n_etypes)]
             if n_etypes > 2:
@@ -544,6 +589,10 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
         else:
             #pred_ratios = 100*np.mean(valid_probs, axis=0, dtype=np.float64)
             pred_ratios = [100*np.sum(valid_preds==n)/len(valid_preds) for n in range(n_etypes)]
+        # Light Flavor Ratios (classes 4 and 5 combined)
+        #if n_etypes == 6:
+        #    valid_ratios[4] = valid_ratios[5] + valid_ratios[4]
+        #    valid_ratios[5] = valid_ratios[4]
         return {'truth':valid_ratios, 'pred':pred_ratios, 'none':np.ones_like(valid_ratios)}
 
 
@@ -585,8 +634,8 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=Non
     return sample, labels, probs
 
 
-def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg, ratios, return_dict,
-                  threshold, LF_cuts=None, sep_bkg=True, ECIDS=True):
+def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg,
+                  ratios, return_dict, threshold, LF_cuts=None, sep_bkg=True, ECIDS=True):
     # Multi-discriminants
     #_, _, prob  = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg,
     #                                          ratios=[17.4375,0.,0.,0.,12.7207,67.1977])
@@ -601,7 +650,7 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg and bkg=='bkg', bkg)
+        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg and bkg=='bkg' and n_etypes>2, bkg)
         #processes += [mp.Process(target=plot_discriminant, args=arguments)]
         for job in processes: job.start()
         for job in processes: job.join()
@@ -614,10 +663,19 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
 def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plotting,
                   valid_ratios=None, sep_bkg=True, diff_plots=False, threshold=None):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
+
     # Light Flavor Ratios (classes 4 and 5 combined)
     if n_etypes == 5 and probs.shape[-1] == 6:
-        labels = np.where(labels==5, 4, labels)
-        probs  = np.concatenate([probs[:,:4], probs[:,4:5]+probs[:,5:6]], axis=1)
+        probs  = np.hstack([probs[:,:4], (probs[:,4]+probs[:,5])[:,None]])
+    if n_etypes == 5 and probs.shape[-1] == 8:
+        probs  = np.hstack([probs[:,:3], (probs[:,3]+probs[:,4])[:,None],
+                            (probs[:,5]+probs[:,6]+probs[:,7])[:,None]])
+    if n_etypes == 6 and probs.shape[-1] == 8:
+        probs  = np.hstack([probs[:,:5], (probs[:,5]+probs[:,6]+probs[:,7])[:,None]])
+    if n_etypes == 7 and probs.shape[-1] == 8:
+        probs  = np.hstack([probs[:,:3], (probs[:,3]+probs[:,4])[:,None],
+                            probs[:,5][:,None], probs[:,6][:,None], probs[:,7][:,None]])
+
     ratios = compo_matrix(labels, train_labels, probs, n_etypes) ; print(print_dict[2])
     if valid_ratios is not None: ratios = valid_ratios
     """ Plotting efficiciency ratios mesh grid """
@@ -629,9 +687,10 @@ def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plo
         #                                     sig_list, 'bkg', ratios=first_cut_ratios)
         #_, tpr, thresholds = metrics.roc_curve(new_labels, new_probs[:,0], pos_label=0)
         #sig_eff=0.99 ; threshold = thresholds[np.argmin(abs(tpr-sig_eff))]
-        bkg_list = ['bkg'] + list(set(np.unique(labels))-set(sig_list)) if sep_bkg else ['bkg']
-        # Light Flavor Ratios (classes 4 and 5 combined)
-        if sep_bkg and len({4,5}&set(bkg_list)) != 0: bkg_list += [45]
+        #bkg_list = ['bkg'] + list(set(np.unique(labels))-set(sig_list)) if sep_bkg and n_etypes>2 else ['bkg']
+        bkg_list = ['bkg']
+        if sep_bkg and n_etypes >  2: bkg_list += list(set(np.unique(labels))-set(sig_list))
+        if sep_bkg and n_etypes == 6: bkg_list += [45]
         manager   = mp.Manager(); return_dict = manager.dict()
         arguments = [(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg,
                       ratios['truth'], return_dict, threshold) for bkg in bkg_list]
@@ -904,7 +963,8 @@ def class_channels(sample, labels, output_dir, col=1, reverse=True, composition=
     class_dict = {0:'Prompt', 1:'CF', 2:'PC', 3:'HF', 4:'LF' if len(classes)<=5 else 'LF e/ɣ', 5:'LF Had'}
     headers = ['Processes', '%  '] + [format(class_dict[n],'>6s')+' (%)' for n in classes]
     print(tabulate(channel_rows[::-1] if reverse else channel_rows, headers=headers, tablefmt='psql', floatfmt='.2f',
-                   disable_numparse=True, colalign=['left','right']+['right' for n in classes])); sys.exit()
+                   disable_numparse=True, colalign=['left','right']+['right' for n in classes]))
+    print(); sys.exit()
 
 
 def sample_analysis(sample, labels, scalars, scaler_file, generator, output_dir):
@@ -912,7 +972,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, generator, output_dir)
     #verify_sample(sample); sys.exit()
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
-    #print_channels(sample, labels)
+    print_channels(sample, labels)
     #class_channels(sample, labels, output_dir)
     # DISTRIBUTION HEATMAPS
     #from plots_DG import plot_heatmaps
@@ -972,27 +1032,19 @@ def feature_ranking(output_dir, results_out, scalars, images, groups):
 
 def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, integers, file_key, n_tasks, index):
     idx = index*batch_size, (index+1)*batch_size
-    #print(index, index%n_tasks, utils.shuffle(np.arange(n_tasks),random_state=sum_e)[index%n_tasks], idx, sum_e)
-    #return
     with h5py.File(h5_file, 'r') as data:
         images  = list(set(images  ) & set(data[file_key]))
         tracks  = list(set(tracks  ) & set(data[file_key]))
         scalars = list(set(scalars ) & set(data[file_key]))
         int_val = list(set(integers) & set(data[file_key]))
-
-        #bad_idx = []
-        #for n in range(idx[0],idx[1]):
-        #    try   : variable = data[file_key]['em_barrel_Lr0'][n]
-        #    except: bad_idx += [n]
-        #print(bad_idx)
-        #print(len(bad_idx))
-        #return
-
         sample = {key:data[file_key][key][idx[0]:idx[1]] for key in images+tracks+scalars+int_val}
     for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
     for key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
-        try: sample[key+'_fine'] = sample[key]
-        except KeyError: pass
+        try:
+            if sample[key].shape[1:] != (7,11):
+                sample[key+'_fine'] = sample[key]
+        except KeyError:
+            pass
     for key in images        : sample[key] = resize_images(sample[key])
     for key in images+scalars: sample[key] = np.float16(np.clip(sample[key],-5e4,5e4))
     try: sample['p_TruthType']   = sample.pop('p_truthType')
@@ -1029,14 +1081,17 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
             data[key][sum_e:sum_e+batch_size,...] = utils.shuffle(sample[key], random_state=0)
 
 
-def resize_images(images, target_shape=(7,11)):
-    if images.shape[1:] != target_shape:
-        energy_fine   = np.sum(images, axis=(1,2))
-        images        = transform.resize(images, ((len(images),)+target_shape))
-        energy_coarse = np.sum(images, axis=(1,2))
-        energy_fine  [energy_coarse == 0] = 0.
-        energy_coarse[energy_coarse == 0] = 1.
-        images *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
+def resize_images(images):
+    if   images.shape[1:] == (56,11):
+        images = [np.sum(images[:,8*n:8*n+8,:], axis=1)[:,np.newaxis,:] for n in range(7)]
+        images = np.concatenate(images, axis=1)
+    #elif images.shape[1:] != (7,11)
+    #    energy_fine   = np.sum(images, axis=(1,2))
+    #    images        = transform.resize(images, ((len(images),)+target_shape))
+    #    energy_coarse = np.sum(images, axis=(1,2))
+    #    energy_fine  [energy_coarse <= 1e-6] = 0.
+    #    energy_coarse[energy_coarse <= 1e-6] = 1.
+    #    images *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
     return images
 
 
@@ -1071,16 +1126,6 @@ def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
         return np.vstack([tracks, np.zeros((max(0, max_tracks-len(tracks)), tracks.shape[1]))])
 
 
-def get_truth_m(sample, new=True, m_e=0.511, max_eta=4.9):
-    truth_eta = np.float64(np.vectorize(min)(abs(sample['p_truth_eta']), max_eta))
-    try:             truth_e = np.float64(sample['p_truth_E' ])
-    except KeyError: truth_e = np.float64(sample['p_truth_e' ])
-    truth_pt  = np.float64(sample['p_truth_pt'])
-    truth_s   = truth_e**2 - (truth_pt*np.cosh(truth_eta))**2
-    if new: return np.where(truth_eta == max_eta, -1, np.sqrt(np.vectorize(max)(m_e**2, truth_s)))
-    else:   return np.where(truth_eta == max_eta, -1, np.sign(truth_s)*np.sqrt(abs(truth_s)) )
-
-
 def merge_presamples(output_dir, output_file):
     h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'e-ID_' in h5_file and '.h5' in h5_file]
     #h5_files = [h5_file for h5_file in os.listdir(output_dir) if 'myTag' in h5_file and '.h5' in h5_file]
@@ -1112,11 +1157,12 @@ def get_idx(size, start_value=0, n_sets=5):
 
 def mix_datafiles(input_path='', input_dir='', temp_dir='temp_dir', n_tasks=10, replace_LF=False):
     data_files = get_dataset(input_path, input_dir) ; n_files = len(data_files)
+    #for data_file in  data_files: print(data_file)
+    #sys.exit()
     if replace_LF:
         LF_path  = '/nvme1/atlas/godin/e-ID_data/LFdata/LFdata_17-18'
         LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
-        #for index in range(len(data_files)):
-        #    print(data_files[index], LF_files[index])
+        #for index in range(len(data_files)): print(data_files[index], LF_files[index])
         #sys.exit()
     else:
         LF_files = None
@@ -1141,7 +1187,8 @@ def file_mixing(h5_file, LF_files, index, output_dir):
         source_size = len(list(LF_data.values())[0])
         target_size = np.sum(MC_criteria)
         # Light flavor indices from data file
-        LF_idx = np.random.choice(source_size, target_size, replace=source_size<target_size)
+        rng = np.random.default_rng()
+        LF_idx = rng.choice(source_size, target_size, replace=source_size<target_size)
     for key in features:
         attribute = 'w' if key==features[0] else 'a'
         data_in  = MC_data[key][:]
@@ -1160,10 +1207,9 @@ def file_mixing(h5_file, LF_files, index, output_dir):
         else                   : data_out[key][:] = utils.shuffle(data_in[:], random_state=index)
 
 
-def mix_presamples(input_path, output_dir, temp_dir='temp_dir', n_files=20, n_tasks=2):
+def mix_presamples(input_path, output_dir, temp_dir='temp_dir', n_files=20, n_tasks=5):
     data_files = get_dataset(input_path, temp_dir)
-    #for data_file in data_files:
-    #    print(data_file)
+    #for data_file in data_files: print(data_file)
     #sys.exit()
     output_dir = data_files[0].split(temp_dir)[0] + output_dir
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
@@ -1180,6 +1226,7 @@ def mix_presamples(input_path, output_dir, temp_dir='temp_dir', n_files=20, n_ta
     import shutil; shutil.rmtree( data_files[0].split(temp_dir)[0] + temp_dir )
 def mix_samples(data_files, idx_list, file_idx, out_idx, output_dir):
     features = list(set().union(*[h5py.File(h5_file,'r').keys() for h5_file in data_files]))
+    features = list(set(features)-{'p_passWVeto','p_trigMatches','p_passZVeto','p_trigMatches_pTbin','p_met'})
     features = utils.shuffle(features, random_state=out_idx)
     for key in features:
         sample_list = []

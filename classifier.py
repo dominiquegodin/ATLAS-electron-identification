@@ -22,13 +22,13 @@ parser.add_argument( '--n_epochs'       , default =  100,  type = int   )
 parser.add_argument( '--n_etypes'       , default =    6,  type = int   )
 parser.add_argument( '--multiclass'     , default = 'ON'                )
 parser.add_argument( '--n_tracks'       , default =    5,  type = int   )
-parser.add_argument( '--bkg_ratio'      , default =    4,  type = float )
+parser.add_argument( '--bkg_ratio'      , default =    5,  type = float )
 parser.add_argument( '--n_folds'        , default =    1,  type = int   )
 parser.add_argument( '--n_gpus'         , default =    1,  type = int   )
 parser.add_argument( '--verbose'        , default =    1,  type = int   )
 parser.add_argument( '--patience'       , default =   10,  type = int   )
 parser.add_argument( '--sbatch_var'     , default =    0,  type = int   )
-parser.add_argument( '--l2'             , default = 1e-7,  type = float )
+parser.add_argument( '--l2'             , default = 1e-6,  type = float )
 parser.add_argument( '--dropout'        , default =  0.1,  type = float )
 parser.add_argument( '--FCN_neurons'    , default = [200,200], type = int, nargs='+')
 parser.add_argument( '--weight_type'    , default = 'none'              )
@@ -106,8 +106,7 @@ channel_dict = {'Zee' :['361106'], 'ttbar':['410470'], 'Ztautau':['361108'], 'Wt
 #channels = channel_dict['JF17'] + channel_dict['Zee'] + ['0']
 #gen_cuts += ['( ' + ''.join([   '(sample["mcChannelNumber"] == '+channels[0]+')']
 #                           +[' | (sample["mcChannelNumber"] == '+n+')' for n in channels[1:]]) + ' )']
-channels = channel_dict['high-pt_PC']
-gen_cuts += ['(sample["mcChannelNumber"] != '+n+')' for n in channels]
+gen_cuts += ['(sample["mcChannelNumber"] != '+n+')' for n in channel_dict['high-pt_PC']]
 if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
@@ -156,9 +155,9 @@ input_data = {**train_data, 'others':others}
 
 
 # SAMPLES SIZES / AVOIDING MEMORY OVERLOAD
-if   args.images == 'ON': n_limit =  10e6
-elif args.tracks == 'ON': n_limit =  50e6
-else                    : n_limit = 100e6
+if   args.images == 'ON': n_limit =   10e6
+elif args.tracks == 'ON': n_limit =   50e6
+else                    : n_limit = 1000e6
 if max(args.n_train, args.n_valid) > n_limit: args.generator = 'ON'
 sample_size  = sum([len(h5py.File(data_file,'r')['eventNumber']) for data_file in data_files])
 args.n_train = [0, min(sample_size, args.n_train)]
@@ -188,10 +187,10 @@ if args.NN_type == 'CNN':
         print(format(str(shape),'>8s')+':', str(CNN[shape]))
 print('\nPROGRAM ARGUMENTS:')
 args_dict = vars(args).copy()
-if len(args.train_cuts) > 1:
+if len(args.train_cuts) >= 1:
     for n in range(len(args.train_cuts)): args_dict['train_cuts ('+str(n+1)+')'] = args.train_cuts[n]
     args_dict.pop('train_cuts')
-if len(args.valid_cuts) > 1:
+if len(args.valid_cuts) >= 1:
     for n in range(len(args.valid_cuts)): args_dict['valid_cuts ('+str(n+1)+')'] = args.valid_cuts[n]
     args_dict.pop('valid_cuts')
 print(tabulate(args_dict.items(), tablefmt='psql'))
@@ -228,10 +227,10 @@ if args.scaling and os.path.isfile(args.scaler_in):
 if args.t_scaling and os.path.isfile(args.t_scaler_in):
     print('Loading quantile transform from', args.t_scaler_in, '\n')
     t_scaler = pickle.load(open(args.t_scaler_in, 'rb'))
-print('VALIDATION SAMPLE: loading', np.diff(args.n_valid)[0], 'electron-candidates')
 inputs = {'scalars':scalars, 'images':[], 'others':others} if args.generator == 'ON' else input_data
 valid_scaler   = None if args.generator=='ON' else scaler
 valid_t_scaler = None if args.generator=='ON' else t_scaler
+print('VALIDATION SAMPLE: loading', np.diff(args.n_valid)[0], 'electron-candidates')
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks,
                                               n_classes, args.valid_cuts, valid_scaler, valid_t_scaler)
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.generator, args.output_dir); sys.exit()
