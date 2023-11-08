@@ -528,9 +528,9 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
     if multiplots:
         for pkl_file in [name for name in os.listdir(output_dir) if '.pkl' in name]:
             os.remove(output_dir+'/'+pkl_file)
-        try: os.mkdir(output_dir+'/../ROC_curves')
-        except FileExistsError: pass
-        plt.savefig(output_dir+'/../ROC_curves/ROC_'+output_dir.split('class_')[-1]+'.png')
+    try: os.mkdir(output_dir+'/../ROC_curves')
+    except FileExistsError: pass
+    plt.savefig(output_dir+'/../ROC_curves/ROC_'+output_dir.split('class_')[-1]+'.png')
 
 
 def CNN_fpr(tpr, fpr, LLH_tpr):

@@ -203,7 +203,7 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
     return sample, labels
 
 
-def make_labels(sample, n_classes, data_LF=True, match_to_vertex=False):
+def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
     iffTruth           = 'p_iffTruth'
     TruthType          = 'p_TruthType'
     firstEgMotherPdgId = 'p_firstEgMotherPdgId'
@@ -219,34 +219,15 @@ def make_labels(sample, n_classes, data_LF=True, match_to_vertex=False):
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
     #labels[(sample[iffTruth] ==  1)] = 6 #KnowUnknown class
+    if data_LF:
+        labels[(labels == 4) | (labels == 5)]                     = -1
+        labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
     if n_classes == 2:
         labels[labels >= 2] = 1
     if n_classes == 5:
         #labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
         labels[labels == 5] = 4                      #light flavor = egamma + hadrons
-        if data_LF:
-            labels[labels == 4] = -1
-            labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
 
-    '''
-    if n_classes == 2:
-        labels = np.full_like(sample[iffTruth], -1)
-        labels[(sample[iffTruth] ==  0) & (sample[TruthType] ==  0)] = 0
-        labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 1
-        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 1
-        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 1
-        #labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 0
-        #labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 0
-        #labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 0
-        #event_number = sample['eventNumber']
-        #labels[(event_number%2 == 1) & (labels == 0)] = 1
-    '''
-    if n_classes == 3:
-        labels = np.full_like(sample[iffTruth], -1)
-        labels[(sample[iffTruth] ==  0) & (sample[TruthType] ==  0)] = 0
-        labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 1
-        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 1
-        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 2
     if n_classes == 8:
         labels = np.full_like(sample[iffTruth], -1)
         labels[(sample[iffTruth] ==  2) & (sample[firstEgMotherPdgId]*sample[charge] < 0)] = 0
@@ -490,7 +471,6 @@ def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts):
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
     print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end='', flush=True)
 
-    # Light Flavor Ratios (classes 4 and 5 combined)
     if n_etypes == 5 and probs.shape[-1] == 6:
         labels = np.where(labels==5, 4, labels)
     if n_etypes == 5 and probs.shape[-1] == 8:
@@ -632,8 +612,8 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=Non
 def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg,
                   ratios, return_dict, threshold, LF_cuts=None, sep_bkg=True, ECIDS=True):
     # Multi-discriminants
-    #_, _, prob  = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg,
-    #                                          ratios=[17.4375,0.,0.,0.,12.7207,67.1977])
+    #_, _, prob  = make_discriminant(sample, labels, probs, n_etypes, ig_list, bkg,
+    #                                ratios=[17.43,0.,0.,0.,12.72,67.19])
     #LF_cuts = prob[:,0] > threshold
     sample, labels, probs = make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios, verbose=True)
     if plotting == 'ON':
@@ -659,7 +639,6 @@ def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plo
                   valid_ratios=None, sep_bkg=True, diff_plots=False, threshold=None):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
 
-    # Light Flavor Ratios (classes 4 and 5 combined)
     if n_etypes == 5 and probs.shape[-1] == 6:
         probs  = np.hstack([probs[:,:4], (probs[:,4]+probs[:,5])[:,None]])
     if n_etypes == 5 and probs.shape[-1] == 8:
@@ -679,7 +658,7 @@ def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plo
         # Multi-discriminants
         #first_cut_ratios = [17.4375,0.,0.,0.,12.7207,67.1977]
         #_, new_labels, new_probs = make_discriminant(sample, labels, probs, n_etypes,
-        #                                     sig_list, 'bkg', ratios=first_cut_ratios)
+        #                                             sig_list, 'bkg', ratios=first_cut_ratios)
         #_, tpr, thresholds = metrics.roc_curve(new_labels, new_probs[:,0], pos_label=0)
         #sig_eff=0.99 ; threshold = thresholds[np.argmin(abs(tpr-sig_eff))]
         #bkg_list = ['bkg'] + list(set(np.unique(labels))-set(sig_list)) if sep_bkg and n_etypes>2 else ['bkg']

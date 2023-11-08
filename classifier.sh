@@ -1,10 +1,10 @@
 # SINGLE TRAINING
-python classifier.py  --n_train=180e6 --n_eval=100e6 --n_valid=100e6 --batch_size=1e4 --n_epochs=100 \
-                      --n_etypes=6 --input_dir=0.0-2.5 --weight_type=match2class --bkg_ratio=4       \
-                      --multiclass=ON --model_in='' --scaler_in='' --host_name=${HOST_NAME}          \
-                      --output_dir=outputs/test --results_out=valid_results.pkl                      \
-                      --scalars=ON --tracks=ON --images=ON --plotting=ON --generator=ON --n_gpus=1
-exit
+python classifier.py  --n_train=190e6 --n_valid=100e6 --batch_size=1e4 --n_epochs=100 --n_etypes=6 \
+                      --weight_type=match2class --model_in='' --scaler_in=''                       \
+                      --host_name=${HOST_NAME} --input_path=${INPUT_PATH} --input_dir=0.0-2.5      \
+                      --output_dir=outputs/test --results_out=valid_results.pkl                    \
+                      --scalars=ON --tracks=ON --images=ON --plotting=ON --generator=ON
+return 2> /dev/null; exit
 
 
 ################################################################################################################

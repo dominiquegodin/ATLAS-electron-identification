@@ -62,10 +62,10 @@ args = parser.parse_args()
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_eval', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
 if args.weight_type not in ['bkg_ratio', 'flattening', 'match2class', 'match2max', 'none']:
-    print('\nweight_type', args.weight_type, 'not recognized --> resetting it to none')
+    print('\nWeight type', args.weight_type, 'not recognized --> setting it to none')
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
-    print('\nERROR: weights file required with n_epochs < 1 --> aborting\n'); sys.exit()
+    print('\nERROR: no valid model file\n'); sys.exit()
 
 
 # CNN PARAMETERS
@@ -109,10 +109,9 @@ if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
-#args.train_cuts += ['(sample["p_LHValue"] >= -10)']
-#args.valid_cuts += ['(sample["p_LHValue"] >= -10)']
 args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
 args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
+#args.train_cuts += ['(sample["p_LHValue"] >= -10)']
 #args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
 #args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
 #args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
@@ -120,17 +119,12 @@ args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
 
 
 # PERFORMANCE FROM SAVED VALIDATION RESULTS
-#args.output_dir = '/nvme1/atlas/godin/e-ID_data' + '/' + args.output_dir
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
-    if args.input_dir in ['0.0-1.3', '1.3-1.6', '1.6-2.5']:
-        eta_1, eta_2 = args.input_dir.split('-')
-        valid_cuts   = '(abs(sample["eta"]) >= '+str(eta_1)+') & (abs(sample["eta"]) <= '+str(eta_2)+')'
-        if args.valid_cuts == '': args.valid_cuts  = valid_cuts
-        else                    : args.valid_cuts  = valid_cuts + '& ('+args.valid_cuts+')'
     class_eff = validation(args.output_dir, args.results_in, args.plotting,
                            args.n_valid, args.n_etypes, args.valid_cuts)
-elif args.results_in != '': print('\nOption --results_in not matching any file --> aborting\n')
-if   args.results_in != '': sys.exit()
+elif args.results_in != '':
+    print('\nERROR: no valid results_in file\n')
+if args.results_in != '': sys.exit()
 
 
 # TRAINING DATA
