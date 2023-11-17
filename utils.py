@@ -215,18 +215,33 @@ def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
     labels[ sample[iffTruth] ==  3                                                   ] = 1
     labels[ sample[iffTruth] ==  5                                                   ] = 2
     labels[(sample[iffTruth] ==  8) | (sample[iffTruth ] ==  9)                      ] = 3
+    labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  1)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
     #labels[(sample[iffTruth] ==  1)] = 6 #KnowUnknown class
     if data_LF:
-        labels[(labels == 4) | (labels == 5)]                     = -1
-        labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
+        labels[(labels == 4) | (labels == 5)]                      = -1
+        labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] =  4
     if n_classes == 2:
         labels[labels >= 2] = 1
     if n_classes == 5:
         #labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
         labels[labels == 5] = 4                      #light flavor = egamma + hadrons
+
+    '''
+    if n_classes == 2:
+        labels = np.full_like(sample[iffTruth], -1)
+        labels[(sample[iffTruth] ==  0) & (sample[TruthType] ==  0)] = 0
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 1
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 1
+        labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 1
+        #labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)] = 0
+        #labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)] = 0
+        #labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)] = 0
+        #event_number = sample['eventNumber']
+        #labels[(event_number%2 == 1) & (labels == 0)] = 1
+    '''
 
     if n_classes == 8:
         labels = np.full_like(sample[iffTruth], -1)
