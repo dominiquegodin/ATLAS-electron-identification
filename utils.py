@@ -6,7 +6,7 @@ import os, sys, h5py, pickle, time, itertools, warnings
 from   sklearn  import metrics, utils, preprocessing
 from   tabulate import tabulate
 from   skimage  import transform
-from   plots_DG import var_histogram, plot_discriminant, plot_ROC_curves
+from   plots_DG import var_histogram, plot_discriminant, plot_ROC_curves, plot_suppression
 from   plots_DG import ratio_plots, performance_ratio, performance_plots, plot_classes
 from   plots_KM import plot_distributions_KM, differential_plots
 
@@ -44,7 +44,7 @@ def get_class_weight(labels, bkg_ratio):
 
 
 def get_sample_weights(sample, labels, weight_type=None, bkg_ratio=None, hist='2d', ref_class=0, density=False):
-    if weight_type not in ['bkg_ratio', 'flattening', 'match2class', 'match2max']: return None, None
+    if weight_type not in ['bkg_ratio', 'flat', 'match2class', 'match2max']: return None, None
     pt = sample['pt']; eta = abs(sample['eta']); n_classes = max(labels)+1
     n_bins   = 100; base = (np.max(pt)/np.min(pt))**(1/n_bins)
     pt_bins  = [np.min(pt)*base**n for n in np.arange(n_bins+1)]
@@ -73,7 +73,7 @@ def get_sample_weights(sample, labels, weight_type=None, bkg_ratio=None, hist='2
         if   weight_type == 'bkg_ratio':
             total_ref = hist_ref * max(1, np.sum(hist_bkg)/np.sum(hist_ref)/ratio)
             total_bkg = hist_bkg * max(1, np.sum(hist_ref)/np.sum(hist_bkg)*ratio)
-        elif weight_type == 'flattening':
+        elif weight_type == 'flat':
             total_ref = np.ones(hist_ref.shape) * max(np.max(hist_ref), np.max(hist_bkg)/ratio)
             total_bkg = np.ones(hist_bkg.shape) * max(np.max(hist_bkg), np.max(hist_ref)*ratio)
         elif weight_type == 'match2class':
@@ -188,6 +188,19 @@ def make_sample(data_file, idx, input_data, n_tracks, n_classes, verbose='OFF', 
             except KeyError:
                 if 'fine' in key: sample[key] = np.zeros((idx[1]-idx[0],)+(56,11))
                 else            : sample[key] = np.zeros((idx[1]-idx[0],)+( 7,11))
+        '''
+        if len(images) != 0:
+        #    energy = sum([np.maximum(sample[key], 0) for key in set(images)-{'tracks'} if 'fine' not in key])
+        #    energy = np.sum(energy, axis=(1,2))
+        #    energy = np.where(energy==0, 1, energy)
+        #    for key in set(images)-{'tracks'}:
+        #        sample[key] = np.maximum(sample[key],0) / energy[:,np.newaxis,np.newaxis]
+            energy = sum([sample[key] for key in set(images)-{'tracks'} if 'fine' not in key])
+            energy = np.sum(energy, axis=(1,2))
+            energy = np.where(energy==0, 1, energy)
+            for key in set(images)-{'tracks'}:
+                sample[key] = sample[key] / energy[:,np.newaxis,np.newaxis]
+        '''
         if 'tracks' in scalars+images:
             n_tracks    = min(n_tracks, data[prefix+'tracks'].shape[1])
             tracks_data = data[prefix+'tracks'][idx[0]:idx[1]][:,:n_tracks,:]
@@ -219,7 +232,6 @@ def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
     labels[(sample[iffTruth] == 10) & (sample[TruthType] ==  4)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 16)                      ] = 4
     labels[(sample[iffTruth] == 10) & (sample[TruthType] == 17)                      ] = 5
-    #labels[(sample[iffTruth] ==  1)] = 6 #KnowUnknown class
     if data_LF:
         labels[(labels == 4) | (labels == 5)]                      = -1
         labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] =  4
@@ -228,6 +240,7 @@ def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
     if n_classes == 5:
         #labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
         labels[labels == 5] = 4                      #light flavor = egamma + hadrons
+        #labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
 
     '''
     if n_classes == 2:
@@ -637,6 +650,7 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         #for iter_tuple in itertools.product([False,True], ['CNN2LLH','CNN2CNN']):
         #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
         #if bkg == 'bkg': performance_plots(sample, labels, probs[:,0], output_dir)
+        #if bkg == 'bkg': plot_suppression (sample, labels, probs[:,0], output_dir)
         ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
@@ -961,7 +975,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, generator, output_dir)
     #verify_sample(sample); sys.exit()
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
-    print_channels(sample, labels)
+    #print_channels(sample, labels)
     #class_channels(sample, labels, output_dir)
     # DISTRIBUTION HEATMAPS
     #from plots_DG import plot_heatmaps
@@ -974,7 +988,10 @@ def sample_analysis(sample, labels, scalars, scaler_file, generator, output_dir)
                #'lar_endcap_Lr0', 'lar_endcap_Lr1'    ,  'lar_endcap_Lr2',  'lar_endcap_Lr3',
                                  'tile_barrel_Lr1'   , 'tile_barrel_Lr2', 'tile_barrel_Lr3'
                ]
-    cal_images(sample, labels, layers, output_dir, mode='mean', scale='free', soft=False)
+    cal_images(sample, labels, layers, output_dir, mode='mean', scale='layer', soft=False)
+    #for run_number in range(50):
+    #    cal_images(sample, labels, layers, output_dir, run_number, mode='random', scale='layer', soft=False)
+    sys.exit()
 
 
 def feature_removal(scalars, images, groups, index):
@@ -1027,15 +1044,21 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
         scalars = list(set(scalars ) & set(data[file_key]))
         int_val = list(set(integers) & set(data[file_key]))
         sample = {key:data[file_key][key][idx[0]:idx[1]] for key in images+tracks+scalars+int_val}
-    for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
+
+    #for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
     for key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
         try:
             if sample[key].shape[1:] != (7,11):
                 sample[key+'_fine'] = sample[key]
+                images += [key+'_fine']
         except KeyError:
             pass
-    for key in images        : sample[key] = resize_images(sample[key])
+
+    for key in [key for key in images if 'fine' not in key]: sample[key] = resize_images(sample[key])
+    sample['p_cal_energy'] = get_energy([sample[key] for key in images if 'fine' not in key])
+    for key in images: sample[key] = sample[key]/sample['p_cal_energy'][:,np.newaxis,np.newaxis]
     for key in images+scalars: sample[key] = np.float16(np.clip(sample[key],-5e4,5e4))
+
     try: sample['p_TruthType']   = sample.pop('p_truthType')
     except KeyError: pass
     try: sample['p_TruthOrigin'] = sample.pop('p_truthOrigin')
@@ -1071,17 +1094,17 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
 
 
 def resize_images(images):
-    if   images.shape[1:] == (56,11):
+    if images.shape[1:] == (56,11):
         images = [np.sum(images[:,8*n:8*n+8,:], axis=1)[:,np.newaxis,:] for n in range(7)]
         images = np.concatenate(images, axis=1)
-    #elif images.shape[1:] != (7,11)
-    #    energy_fine   = np.sum(images, axis=(1,2))
-    #    images        = transform.resize(images, ((len(images),)+target_shape))
-    #    energy_coarse = np.sum(images, axis=(1,2))
-    #    energy_fine  [energy_coarse <= 1e-6] = 0.
-    #    energy_coarse[energy_coarse <= 1e-6] = 1.
-    #    images *= np.expand_dims(energy_fine/energy_coarse, axis=(1,2))
     return images
+
+
+def get_energy(images):
+    #energy = sum([sample[key] for key in images if 'fine' not in key])
+    #energy = np.sum(energy, axis=(1,2))
+    energy = np.sum(sum(images), axis=(1,2))
+    return np.where(energy==0, 1, energy)
 
 
 def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
@@ -1092,7 +1115,8 @@ def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
     tracks_z0   =         sample[p+'tracks_z0' ][idx]
     tracks_dphi = np.where(tracks_dphi < -np.pi, tracks_dphi + 2*np.pi, tracks_dphi )
     tracks_dphi = np.where(tracks_dphi >  np.pi, tracks_dphi - 2*np.pi, tracks_dphi )
-    tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
+    #tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
+    tracks      = [tracks_p/sample['p_cal_energy'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
     p_tracks    = ['p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof',
                    'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0']
     if p == 'p_':
