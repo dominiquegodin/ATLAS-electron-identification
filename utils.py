@@ -3,12 +3,14 @@ import numpy             as np
 import multiprocessing   as mp
 import matplotlib.pyplot as plt
 import os, sys, h5py, pickle, time, itertools, warnings
-from   sklearn  import metrics, utils, preprocessing
-from   tabulate import tabulate
-from   skimage  import transform
-from   plots_DG import var_histogram, plot_discriminant, plot_ROC_curves, plot_suppression
-from   plots_DG import ratio_plots, performance_ratio, performance_plots, plot_classes
-from   plots_KM import plot_distributions_KM, differential_plots
+from   sklearn   import metrics, utils, preprocessing
+from   scipy     import interpolate
+from   functools import partial
+from   tabulate  import tabulate
+from   skimage   import transform
+from   plots_DG  import var_histogram, plot_discriminant, plot_ROC_curves, plot_suppression
+from   plots_DG  import ratio_plots, performance_ratio, performance_plots, plot_classes
+from   plots_KM  import plot_distributions_KM, differential_plots
 
 
 #################################################################################
@@ -241,7 +243,6 @@ def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
         #labels[labels >= 1] = labels[labels >= 1] -1 #signal = electron + chargeflip
         labels[labels == 5] = 4                      #light flavor = egamma + hadrons
         #labels[(sample[iffTruth] == 0) & (sample[TruthType] == 0)] = 4
-
     '''
     if n_classes == 2:
         labels = np.full_like(sample[iffTruth], -1)
@@ -255,7 +256,6 @@ def make_labels(sample, n_classes, data_LF=False, match_to_vertex=False):
         #event_number = sample['eventNumber']
         #labels[(event_number%2 == 1) & (labels == 0)] = 1
     '''
-
     if n_classes == 8:
         labels = np.full_like(sample[iffTruth], -1)
         labels[(sample[iffTruth] ==  2) & (sample[firstEgMotherPdgId]*sample[charge] < 0)] = 0
@@ -491,13 +491,13 @@ def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts):
         if len(valid_cuts) > 1:
             for n in range(len(valid_cuts)): args_dict['valid_cuts ('+str(n+1)+')'] = valid_cuts[n]
             args_dict.pop('valid_cuts')
-        print(tabulate(args_dict.items(), tablefmt='psql'), '\n')
+        print(tabulate(args_dict.items(), tablefmt='psql'))
     valid_data = pickle.load(open(output_dir+'/'+results_in, 'rb'))
     if len(valid_data) > 1: sample, labels, probs   = valid_data
     else:                                  (probs,) = valid_data
     n_e = min(len(probs), int(n_valid))
     sample, labels, probs = {key:sample[key][:n_e] for key in sample}, labels[:n_e], probs[:n_e]
-    print('GENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end='', flush=True)
+    print('\nGENERATING PERFORMANCE RESULTS FOR', n_e, 'ELECTRONS', end='', flush=True)
 
     if n_etypes == 5 and probs.shape[-1] == 6:
         labels = np.where(labels==5, 4, labels)
@@ -637,6 +637,81 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=Non
     return sample, labels, probs
 
 
+def get_bins(var, var_bins=None, max_bins=100, min_bin_count=100, logspace=True, deco=True):
+    if not deco: return [np.min(var), np.max(var)]
+    if var_bins is None:
+        if logspace: var_bins = np.logspace(np.log10(np.min(var)), np.log10(np.max(var)), num=max_bins)
+        else       : var_bins = np.linspace(         np.min(var) ,          np.max(var) , num=max_bins)
+    while True:
+        var_idx = np.clip(np.digitize(var, var_bins), 1, len(var_bins)-1) - 1
+        for idx in range(len(var_bins)-1)[::-1]:
+            if np.sum(var_idx==idx) < max(2, min_bin_count):
+                var_bins = np.delete(var_bins, idx)
+                break
+        if idx == 0: return var_bins
+def cum_distribution(x):
+    values, counts = np.unique(x, return_counts=True)
+    if 0 not in values: values, counts = np.r_[0, values], np.r_[0, counts]
+    if 1 not in values: values, counts = np.r_[values, 1], np.r_[counts, 0]
+    return interpolate.interp1d(values, np.cumsum(counts)/len(x), fill_value=(0,1), bounds_error=False)
+def bin_deco(y_true, sample, X_loss, deco='2d', multithreading=True):
+    if deco not in ['eta','pt','2d']: return
+    def get_pt_bins(mass, pt, deco, m_range):
+        return get_bins(pt[np.logical_and(mass>=m_range[0], mass<m_range[1])], deco=False if deco=='eta' else True)
+    def get_loss(X_loss, bkg_loss, m_idx_bkg, pt_idx_bkg, m_idx, pt_idx, multithreading, m):
+        for n in range(np.max(pt_idx[m])+1):
+            cdf = cum_distribution(bkg_loss[np.logical_and(m_idx_bkg==m, pt_idx_bkg[m]==n)])
+            indices = np.where(np.logical_and(m_idx==m, pt_idx[m]==n))[0]
+            X_loss[indices] = cdf(X_loss[indices])
+        if not multithreading: return X_loss
+    def get_digits(pt_var, bins):
+        return np.clip(np.digitize(pt_var, bins), 1, max(len(bins)-1,1)) - 1
+    bkg_mass, bkg_pt, bkg_loss = sample['eta'][y_true==1], sample['pt'][y_true==1], X_loss[y_true==1]
+    m_bins    = get_bins(bkg_mass, deco=False if deco=='pt' else True)
+    m_idx_bkg = get_digits(bkg_mass   , m_bins)
+    m_idx     = get_digits(sample['eta'], m_bins)
+    if multithreading:
+        with mp.pool.ThreadPool() as pool:
+            pt_bins    = pool.map(partial(get_pt_bins, bkg_mass, bkg_pt, deco), zip(m_bins[:-1], m_bins[1:]))
+            pt_idx_bkg = pool.map(partial(get_digits, bkg_pt      ), pt_bins)
+            pt_idx     = pool.map(partial(get_digits, sample['pt']), pt_bins)
+            func_args  = (X_loss, bkg_loss, m_idx_bkg, pt_idx_bkg, m_idx, pt_idx, multithreading)
+            pool.map(partial(get_loss, *func_args), np.arange(len(pt_idx)))
+    else:
+        pt_bins    = [get_pt_bins(bkg_mass, bkg_pt, deco, m_range) for m_range in zip(m_bins[:-1], m_bins[1:])]
+        pt_idx_bkg = [get_digits(bkg_pt      , bins) for bins in pt_bins]
+        pt_idx     = [get_digits(sample['pt'], bins) for bins in pt_bins]
+        for m in range(len(pt_idx)):
+            X_loss = get_loss(X_loss, bkg_loss, m_idx_bkg, pt_idx_bkg, m_idx, pt_idx, multithreading, m)
+    return X_loss
+def pt_deco(y_true, X_pt, X_loss, pt_bins=None, deco_type='bkg', multithreading=True):
+    class_label = 0 if deco_type=='sig' else 1
+    pt, loss = X_pt[y_true==class_label], X_loss[y_true==class_label]
+    if pt_bins is None: pt_bins = get_bins(pt, deco=True)
+    #pt_idx = np.clip(np.digitize(  pt, pt_bins), 1, len(pt_bins)-1) - 1
+    #cdf_list = [cum_distribution(loss[pt_idx==idx]) for idx in range(len(pt_bins)-1)]
+    #pt_idx = np.clip(np.digitize(X_pt, pt_bins), 1, len(pt_bins)-1) - 1
+    #start_time = time.time()
+    #for idx in range(len(pt_bins)-1): X_loss[pt_idx==idx] = cdf_list[idx](X_loss[pt_idx==idx])
+    #print(format(time.time() - start_time, '2.1f')+' s')
+    def get_loss(X_loss, loss, pt_idx_bkg, pt_idx, multithreading, idx):
+        cdf = cum_distribution(loss[pt_idx_bkg==idx])
+        X_loss[pt_idx==idx] = cdf(X_loss[pt_idx==idx])
+        if not multithreading: return X_loss
+    pt_idx_bkg = np.clip(np.digitize(  pt, pt_bins), 1, len(pt_bins)-1) - 1
+    pt_idx     = np.clip(np.digitize(X_pt, pt_bins), 1, len(pt_bins)-1) - 1
+    start_time = time.time()
+    if multithreading:
+        with mp.pool.ThreadPool() as pool:
+            func_args = (X_loss, loss, pt_idx_bkg, pt_idx, multithreading)
+            pool.map(partial(get_loss, *func_args), np.arange(len(pt_bins)-1))
+    else:
+        for idx in range(len(pt_bins)-1):
+            X_loss = get_loss(X_loss, loss, pt_idx_bkg, pt_idx, multithreading, idx)
+    print(format(time.time() - start_time, '2.1f')+' s')
+    return X_loss
+
+
 def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_list, bkg,
                   ratios, return_dict, threshold, LF_cuts=None, sep_bkg=True, ECIDS=True):
     # Multi-discriminants
@@ -649,8 +724,10 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
         #for iter_tuple in itertools.product([False,True], ['CNN2LLH','CNN2CNN']):
         #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
-        #if bkg == 'bkg': performance_plots(sample, labels, probs[:,0], output_dir)
-        #if bkg == 'bkg': plot_suppression (sample, labels, probs[:,0], output_dir)
+        #if bkg == 'bkg':
+        #    #performance_plots(sample, labels, probs[:,0], output_dir)
+        #    probs[:,0] = pt_deco(labels, sample['pt'], probs[:,0])
+        #    plot_suppression(sample, labels, probs[:,0], output_dir)
         ECIDS = ECIDS and bkg==1
         arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
@@ -1044,21 +1121,18 @@ def presample(h5_file, output_dir, batch_size, sum_e, images, tracks, scalars, i
         scalars = list(set(scalars ) & set(data[file_key]))
         int_val = list(set(integers) & set(data[file_key]))
         sample = {key:data[file_key][key][idx[0]:idx[1]] for key in images+tracks+scalars+int_val}
-
-    #for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
     for key in ['em_barrel_Lr1', 'em_endcap_Lr1']:
         try:
             if sample[key].shape[1:] != (7,11):
-                sample[key+'_fine'] = sample[key]
+                sample[key+'_fine'] = sample[key].copy()
                 images += [key+'_fine']
         except KeyError:
             pass
-
     for key in [key for key in images if 'fine' not in key]: sample[key] = resize_images(sample[key])
     sample['p_cal_energy'] = get_energy([sample[key] for key in images if 'fine' not in key])
-    for key in images: sample[key] = sample[key]/sample['p_cal_energy'][:,np.newaxis,np.newaxis]
+    for key in images: sample[key] = sample[key]/(sample['p_e'][:, np.newaxis, np.newaxis])
+    #for key in images: sample[key] = sample[key]/sample['p_cal_energy'][:,np.newaxis,np.newaxis]
     for key in images+scalars: sample[key] = np.float16(np.clip(sample[key],-5e4,5e4))
-
     try: sample['p_TruthType']   = sample.pop('p_truthType')
     except KeyError: pass
     try: sample['p_TruthOrigin'] = sample.pop('p_truthOrigin')
@@ -1101,10 +1175,9 @@ def resize_images(images):
 
 
 def get_energy(images):
-    #energy = sum([sample[key] for key in images if 'fine' not in key])
-    #energy = np.sum(energy, axis=(1,2))
     energy = np.sum(sum(images), axis=(1,2))
-    return np.where(energy==0, 1, energy)
+    #return np.where(energy==0, 1, energy)
+    return energy
 
 
 def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
@@ -1115,17 +1188,16 @@ def get_tracks(sample, idx, max_tracks=20, p='p_', make_scalars=False):
     tracks_z0   =         sample[p+'tracks_z0' ][idx]
     tracks_dphi = np.where(tracks_dphi < -np.pi, tracks_dphi + 2*np.pi, tracks_dphi )
     tracks_dphi = np.where(tracks_dphi >  np.pi, tracks_dphi - 2*np.pi, tracks_dphi )
-    #tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
-    tracks      = [tracks_p/sample['p_cal_energy'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
+    tracks      = [tracks_p/sample['p_e'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
+    #tracks      = [tracks_p/sample['p_cal_energy'][idx], tracks_deta, tracks_dphi, tracks_d0, tracks_z0]
     p_tracks    = ['p_tracks_charge' , 'p_tracks_vertex' , 'p_tracks_chi2'   , 'p_tracks_ndof',
                    'p_tracks_pixhits', 'p_tracks_scthits', 'p_tracks_trthits', 'p_tracks_sigmad0']
     if p == 'p_':
         for key in p_tracks:
             try: tracks += [sample[key][idx]]
             except KeyError: tracks += [np.zeros(sample['p_tracks_charge'][idx].shape)]
-    tracks      = np.float16(np.vstack(tracks).T)
-    tracks      = tracks[np.isfinite(np.sum(abs(tracks), axis=1))][:max_tracks,:]
-    #tracks      = np.float16(np.clip(np.vstack(tracks).T,-5e4,5e4))[:max_tracks,:]
+    tracks = np.float16(np.clip(np.vstack(tracks).T,-5e4,5e4))
+    tracks = tracks[np.isfinite(np.sum(abs(tracks), axis=1))][:max_tracks,:]
     if p == 'p_' and make_scalars:
         tracks_means = np.mean(tracks,axis=0) if len(tracks)!=0 else tracks.shape[1]*[0]
         qd0Sig       = sample['p_charge'][idx] * sample['p_d0'][idx] / sample['p_sigmad0'][idx]
@@ -1173,7 +1245,7 @@ def mix_datafiles(input_path='', input_dir='', temp_dir='temp_dir', n_tasks=10, 
     #for data_file in  data_files: print(data_file)
     #sys.exit()
     if replace_LF:
-        LF_path  = '/nvme1/atlas/godin/e-ID_data/LFdata/LFdata_17-18'
+        LF_path  = '/nvme1/atlas/godin/e-ID_data/LFdata/LFdata_15'
         LF_files = sorted([LF_path+'/'+h5_file for h5_file in os.listdir(LF_path) if 'e-ID_' in h5_file])
         #for index in range(len(data_files)): print(data_files[index], LF_files[index])
         #sys.exit()
@@ -1210,8 +1282,8 @@ def file_mixing(h5_file, LF_files, index, output_dir):
             # Replacing light flavor MC
             data_in[MC_idx] = np.take(LF_data[key], LF_idx, axis=0)
             # Labelling light flavor data
-            if key == 'p_iffTruth' : data_in = np.where(MC_criteria, 10, data_in )
-            if key == 'p_TruthType': data_in = np.where(MC_criteria,  1, data_in )
+            if key == 'p_iffTruth' : data_in = np.where(MC_criteria, 10, data_in)
+            if key == 'p_TruthType': data_in = np.where(MC_criteria,  1, data_in)
         dtype  = np.int32 if data_in.dtype=='int32' else np.float16
         chunks = (2000,) + data_in.shape[1:]
         data_out.create_dataset(key, data_in.shape, dtype=dtype, compression='lzf', chunks=chunks)
