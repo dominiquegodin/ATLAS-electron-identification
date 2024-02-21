@@ -48,9 +48,12 @@ def get_class_weight(labels, bkg_ratio):
 def get_sample_weights(sample, labels, weight_type=None, bkg_ratio=None, hist='2d', ref_class=0, density=False):
     if weight_type not in ['bkg_ratio', 'flat', 'match2class', 'match2max']: return None, None
     pt = sample['pt']; eta = abs(sample['eta']); n_classes = max(labels)+1
-    n_bins   = 100; base = (np.max(pt)/np.min(pt))**(1/n_bins)
-    pt_bins  = [np.min(pt)*base**n for n in np.arange(n_bins+1)]
-    pt_bins[-1]  = max( pt_bins[-1], max( pt)) + 1e-3
+    #n_bins   = 100; base = (np.max(pt)/np.min(pt))**(1/n_bins)
+    #pt_bins  = [np.min(pt)*base**n for n in np.arange(n_bins+1)]
+    #pt_bins[-1]  = max( pt_bins[-1], max( pt)) + 1e-3
+    pt_bins = get_bins(pt, var_bins=None, max_bins=101, min_bin_count=1, logspace=True, offset=1e-3)
+    for n in np.unique(labels):
+        pt_bins = get_bins(pt[labels==n], var_bins=pt_bins, max_bins=101, min_bin_count=1, logspace=True)
     n_bins   = 50; step = np.max(eta)/n_bins
     eta_bins = np.arange(np.min(eta), np.max(eta)+step, step)
     eta_bins[-1] = max(eta_bins[-1], max(eta)) + 1e-3
@@ -637,78 +640,36 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=Non
     return sample, labels, probs
 
 
-def get_bins(var, var_bins=None, max_bins=100, min_bin_count=100, logspace=True, deco=True):
-    if not deco: return [np.min(var), np.max(var)]
+def get_bins(var, var_bins=None, max_bins=100, min_bin_count=100, logspace=True, offset=0):
     if var_bins is None:
-        if logspace: var_bins = np.logspace(np.log10(np.min(var)), np.log10(np.max(var)), num=max_bins)
-        else       : var_bins = np.linspace(         np.min(var) ,          np.max(var) , num=max_bins)
+        min_var, max_var = np.min(np.float64(var)), np.max(np.float64(var))
+        if logspace: var_bins = np.logspace(np.log10(min_var), np.log10(max_var), num=max_bins)
+        else       : var_bins = np.linspace(         min_var ,          max_var , num=max_bins)
+        var_bins[0], var_bins[-1] = min_var, max_var+offset
     while True:
         var_idx = np.clip(np.digitize(var, var_bins), 1, len(var_bins)-1) - 1
-        for idx in range(len(var_bins)-1)[::-1]:
-            if np.sum(var_idx==idx) < max(2, min_bin_count):
+        for idx in range(1,len(var_bins)-1)[::-1]:
+            if np.sum(var_idx==idx) < max(0, min_bin_count):
                 var_bins = np.delete(var_bins, idx)
                 break
-        if idx == 0: return var_bins
+        if idx == 1: return var_bins
 def cum_distribution(x):
     values, counts = np.unique(x, return_counts=True)
     if 0 not in values: values, counts = np.r_[0, values], np.r_[0, counts]
     if 1 not in values: values, counts = np.r_[values, 1], np.r_[counts, 0]
     return interpolate.interp1d(values, np.cumsum(counts)/len(x), fill_value=(0,1), bounds_error=False)
-def bin_deco(y_true, sample, X_loss, deco='2d', multithreading=True):
-    if deco not in ['eta','pt','2d']: return
-    def get_pt_bins(mass, pt, deco, m_range):
-        return get_bins(pt[np.logical_and(mass>=m_range[0], mass<m_range[1])], deco=False if deco=='eta' else True)
-    def get_loss(X_loss, bkg_loss, m_idx_bkg, pt_idx_bkg, m_idx, pt_idx, multithreading, m):
-        for n in range(np.max(pt_idx[m])+1):
-            cdf = cum_distribution(bkg_loss[np.logical_and(m_idx_bkg==m, pt_idx_bkg[m]==n)])
-            indices = np.where(np.logical_and(m_idx==m, pt_idx[m]==n))[0]
-            X_loss[indices] = cdf(X_loss[indices])
-        if not multithreading: return X_loss
-    def get_digits(pt_var, bins):
-        return np.clip(np.digitize(pt_var, bins), 1, max(len(bins)-1,1)) - 1
-    bkg_mass, bkg_pt, bkg_loss = sample['eta'][y_true==1], sample['pt'][y_true==1], X_loss[y_true==1]
-    m_bins    = get_bins(bkg_mass, deco=False if deco=='pt' else True)
-    m_idx_bkg = get_digits(bkg_mass   , m_bins)
-    m_idx     = get_digits(sample['eta'], m_bins)
-    if multithreading:
-        with mp.pool.ThreadPool() as pool:
-            pt_bins    = pool.map(partial(get_pt_bins, bkg_mass, bkg_pt, deco), zip(m_bins[:-1], m_bins[1:]))
-            pt_idx_bkg = pool.map(partial(get_digits, bkg_pt      ), pt_bins)
-            pt_idx     = pool.map(partial(get_digits, sample['pt']), pt_bins)
-            func_args  = (X_loss, bkg_loss, m_idx_bkg, pt_idx_bkg, m_idx, pt_idx, multithreading)
-            pool.map(partial(get_loss, *func_args), np.arange(len(pt_idx)))
-    else:
-        pt_bins    = [get_pt_bins(bkg_mass, bkg_pt, deco, m_range) for m_range in zip(m_bins[:-1], m_bins[1:])]
-        pt_idx_bkg = [get_digits(bkg_pt      , bins) for bins in pt_bins]
-        pt_idx     = [get_digits(sample['pt'], bins) for bins in pt_bins]
-        for m in range(len(pt_idx)):
-            X_loss = get_loss(X_loss, bkg_loss, m_idx_bkg, pt_idx_bkg, m_idx, pt_idx, multithreading, m)
-    return X_loss
-def pt_deco(y_true, X_pt, X_loss, pt_bins=None, deco_type='bkg', multithreading=True):
-    class_label = 0 if deco_type=='sig' else 1
-    pt, loss = X_pt[y_true==class_label], X_loss[y_true==class_label]
-    if pt_bins is None: pt_bins = get_bins(pt, deco=True)
-    #pt_idx = np.clip(np.digitize(  pt, pt_bins), 1, len(pt_bins)-1) - 1
-    #cdf_list = [cum_distribution(loss[pt_idx==idx]) for idx in range(len(pt_bins)-1)]
-    #pt_idx = np.clip(np.digitize(X_pt, pt_bins), 1, len(pt_bins)-1) - 1
-    #start_time = time.time()
-    #for idx in range(len(pt_bins)-1): X_loss[pt_idx==idx] = cdf_list[idx](X_loss[pt_idx==idx])
-    #print(format(time.time() - start_time, '2.1f')+' s')
-    def get_loss(X_loss, loss, pt_idx_bkg, pt_idx, multithreading, idx):
+def pt_deco(y_true, X_pt, X_loss, pt_bins=None, deco='bkg'):
+    def get_loss(X_loss, loss, pt_idx_bkg, pt_idx, idx):
         cdf = cum_distribution(loss[pt_idx_bkg==idx])
         X_loss[pt_idx==idx] = cdf(X_loss[pt_idx==idx])
-        if not multithreading: return X_loss
+    class_label = 0 if deco=='sig' else 1
+    pt, loss = X_pt[y_true==class_label], X_loss[y_true==class_label]
+    if pt_bins is None: pt_bins = get_bins(pt, min_bin_count=100)
     pt_idx_bkg = np.clip(np.digitize(  pt, pt_bins), 1, len(pt_bins)-1) - 1
     pt_idx     = np.clip(np.digitize(X_pt, pt_bins), 1, len(pt_bins)-1) - 1
-    start_time = time.time()
-    if multithreading:
-        with mp.pool.ThreadPool() as pool:
-            func_args = (X_loss, loss, pt_idx_bkg, pt_idx, multithreading)
-            pool.map(partial(get_loss, *func_args), np.arange(len(pt_bins)-1))
-    else:
-        for idx in range(len(pt_bins)-1):
-            X_loss = get_loss(X_loss, loss, pt_idx_bkg, pt_idx, multithreading, idx)
-    print(format(time.time() - start_time, '2.1f')+' s')
+    with mp.pool.ThreadPool() as pool:
+        func_args = (X_loss, loss, pt_idx_bkg, pt_idx)
+        pool.map(partial(get_loss, *func_args), np.arange(len(pt_bins)-1))
     return X_loss
 
 
@@ -724,15 +685,18 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
         #for iter_tuple in itertools.product([False,True], ['CNN2LLH','CNN2CNN']):
         #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
-        #if bkg == 'bkg':
-        #    #performance_plots(sample, labels, probs[:,0], output_dir)
-        #    probs[:,0] = pt_deco(labels, sample['pt'], probs[:,0])
-        #    plot_suppression(sample, labels, probs[:,0], output_dir)
-        ECIDS = ECIDS and bkg==1
-        arguments  = [(sample, labels, probs[:,0], output_dir, ROC_type, ECIDS, LF_cuts) for ROC_type in [1]]
+        #if bkg == 'bkg': probs[:,0] = pt_deco(labels, sample['pt'], probs[:,0], deco='bkg')
+        arguments  = [(sample, labels, probs[:,0], output_dir, ECIDS and bkg==1, LF_cuts)]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
-        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg and bkg=='bkg' and n_etypes>2, bkg)
+        #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg, bkg)
         #processes += [mp.Process(target=plot_discriminant, args=arguments)]
+        if bkg == 'bkg' and False:
+            arguments  = [(sample, labels, probs[:,0]         , output_dir, var,truth)
+                          for var,truth in itertools.product(['eta','pt'],[0,1])]
+            #arguments += [(sample, labels, sample['p_LHValue'], output_dir, var,truth)
+            #              for var,truth in itertools.product(['eta','pt'],[0,1])]
+            processes += [mp.Process(target=plot_suppression, args=arg) for arg in arguments]
+            #processes += [mp.Process(target=performance_plots, args=(sample, labels, probs[:,0], output_dir))]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -744,7 +708,6 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
 def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plotting,
                   valid_ratios=None, sep_bkg=True, diff_plots=False, threshold=None):
     global print_dict; print_dict = {n:'' for n in [1,2,3]}; print()
-
     if n_etypes == 5 and probs.shape[-1] == 6:
         probs  = np.hstack([probs[:,:4], (probs[:,4]+probs[:,5])[:,None]])
     if n_etypes == 5 and probs.shape[-1] == 8:
@@ -755,7 +718,6 @@ def valid_results(sample, labels, probs, train_labels, n_etypes, output_dir, plo
     if n_etypes == 7 and probs.shape[-1] == 8:
         probs  = np.hstack([probs[:,:3], (probs[:,3]+probs[:,4])[:,None],
                             probs[:,5][:,None], probs[:,6][:,None], probs[:,7][:,None]])
-
     ratios = compo_matrix(labels, train_labels, probs, n_etypes) ; print(print_dict[2])
     if valid_ratios is not None: ratios = valid_ratios
     """ Plotting efficiciency ratios mesh grid """
@@ -893,7 +855,7 @@ def multi_cuts(sample, labels, probs, output_dir, input_file=None, step=0.05, in
         sample = {key:sample[key][cut] for key in sample}; labels = labels[cut]
         ROC_values  = [get_pr(labels, disc[cut]) for disc in disc_list]
         output_dir += '/'+'class_0_vs_'+str(bkg); ROC_type = 2; ECIDS = bkg==1
-        plot_ROC_curves(sample, labels, None, output_dir, ROC_type, ECIDS, ROC_values)
+        plot_ROC_curves(sample, labels, None, output_dir, ECIDS, ROC_values)
     input_file = 'pos_rates_step-0.05_mono2.pkl'
     if input_file == None:
         start_time = time.time()

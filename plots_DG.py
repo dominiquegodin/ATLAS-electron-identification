@@ -90,17 +90,17 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
                   density=True, separate_norm=False, log=True):
     n_classes = np.max(labels)+1
     plt.figure(figsize=(12,8)); pylab.grid(False); axes = plt.gca()
-    axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
+    axes.tick_params(which='minor', direction='in', length=4, width=1, colors='black',
                      bottom=True, top=True, left=True, right=True)
-    axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
+    axes.tick_params(which='major', direction='in', length=7, width=3, colors='black',
                      bottom=True, top=True, left=True, right=True)
-    axes.tick_params(axis="both", pad=8, labelsize=18)
+    axes.tick_params(axis="both", pad=8, labelsize=22)
     for axis in ['top', 'bottom', 'left', 'right']:
-        axes.spines[axis].set_linewidth(1.5)
+        axes.spines[axis].set_linewidth(3)
         axes.spines[axis].set_color('black')
     if var == 'pt':
         variable = sample[var]
-        plt.xlabel('$E_\mathrm{T}$ (GeV)', fontsize=30, loc='right')
+        plt.xlabel('$E_\mathrm{T}$ (GeV)', fontsize=30, loc='center')
         if bins == None or len(bins[var]) <= 2:
             #bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
             bins = np.arange(np.min(variable), 102)
@@ -109,7 +109,7 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
         if log:
             separate_norm=False
             if n_classes == 2: plt.xlim(4.5, 5000); plt.ylim(1e-5,1e2); plt.xscale('log'); plt.yscale('log')
-            else             : plt.xlim(4.5, 5000); plt.ylim(1e-8,1e0); plt.xscale('log'); plt.yscale('log')
+            else             : plt.xlim(4.5, 5000); plt.ylim(1e-6,2e1); plt.xscale('log'); plt.yscale('log')
             plt.xticks( [4.5,10,100,1000,5000], [4.5,'$10^1$','$10^2$','$10^3$',r'$5\!\times\!10^3$'] )
             #plt.yticks(np.logspace(-8,0,9))
         else:
@@ -122,7 +122,7 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
             axes.yaxis.set_minor_locator(AutoMinorLocator(5))
     if var == 'eta':
         variable = abs(sample[var])
-        plt.xlabel('$|\eta|$', fontsize=30, loc='right')
+        plt.xlabel('$|\eta|$', fontsize=30, loc='center')
         if bins == None or len(bins[var]) <= 2:
             #bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
             step = 0.05; bins = np.arange(0, 2.5+step, step)
@@ -137,100 +137,106 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
             #plt.yticks(np.arange(0, 100, 10))
             axes.yaxis.set_minor_locator(AutoMinorLocator(5))
         else:
-            pylab.ylim(1e-3, 2e0)
+            pylab.ylim(1e-1, 1.5e2)
             plt.yscale('log')
     #bins[-1] = max(bins[-1], max(variable)+1e-3)
     label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
                   4:'Light Flavor e$\;\!/\;\!\gamma$', 5:'Light Flavor Hadron', 'bkg':'Background'}
     if n_etypes <= 5: label_dict[4] = 'Light Flavor'
-
     if n_etypes == 8:
         label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion',
                       3:'Heavy Flavor B Hadron', 4:'Heavy Flavor C Hadron', 5:'Light Flavor e',
                       6:'Light Flavor $\gamma$', 7:'Light Flavor Hadron', 'bkg':'Background'}
-
-    color_dict = {0:'tab:blue'  , 1:'tab:orange', 2:'tab:green', 3:'tab:red',
-                  4:'tab:purple', 5:'tab:brown' , 6:'tab:pink' , 7:'tab:cyan'}
-    #if prefix == 'train':
-    #    color_dict = {0:'tab:blue', 1:'tab:orange', 2:'tab:orange', 3:'tab:orange', 4:'tab:purple', 5:'tab:orange'}
+    color_dict = {0:'tab:orange', 1:'tab:cyan' , 2:'tab:green', 3:'tab:red',
+                  4:'tab:purple', 5:'tab:brown', 6:'tab:pink' , 7:'tab:olive'}
+    if prefix == 'train':
+        #color_dict = {0:'tab:blue', 1:'tab:orange', 2:'tab:orange', 3:'tab:orange', 4:'tab:orange', 5:'tab:orange'}
+        color_dict = {0:'tab:orange', 1:'tab:blue', 2:'tab:blue', 3:'tab:blue', 4:'tab:blue', 5:'tab:blue'}
+    alpha = [0.1,0.1,0,0,0,0] if prefix=='train' else [0.08]*len(color_dict)
     if n_classes == 2: label_dict[1] = 'Background'
     if np.all(weights) == None: weights = np.ones(len(variable))
     h = np.zeros((len(bins)-1,n_classes))
     for n in np.arange(n_classes):
         class_values  =  variable[labels==n]
         class_weights =   weights[labels==n]
-        class_weights =  class_weights/(np.sum(class_weights) if separate_norm else len(variable))
-        #class_weights =* 100
+        class_weights =  class_weights/(np.sum(class_weights) if separate_norm else np.sum(weights))
+        class_weights *= 100
         if density:
             indices        = np.searchsorted(bins, class_values, side='right')
             class_weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
         #pylab.hist(class_values, bins, histtype='step', weights=class_weights, color=color_dict[n],
         #           label=label_dict[n]+' ('+format(100*len(class_values)/len(variable),'.1f')+'%)', lw=2)[0]
-        pylab.hist(class_values, bins, histtype='step', weights=class_weights,
-                   color=color_dict[n], label=label_dict[n], lw=3)[0]
-    #plt.ylabel('Distribution density (%)' if density else 'Distribution (%)', fontsize=25)
-    plt.ylabel('Fraction of Candidates'+(' (GeV$^{-1}$)' if var=='pt' else ''), fontsize=25, loc='top')
+        #pylab.hist(class_values, bins=bins, histtype='step', weights=class_weights,
+        #           color=color_dict[n], label=label_dict[n], lw=3)[0]
+        h = pylab.hist(class_values, bins=bins, weights=class_weights, lw=3, fill=True, histtype='step', zorder=1,
+                   label=label_dict[n], edgecolor=color_dict[n],
+                   facecolor=mcolors.to_rgba(color_dict[n])[:-1]+(alpha[n],))
+    plt.ylabel('Probability Density (%)' if density else 'Probability Distribution (%)', fontsize=26)
+    #plt.ylabel('Fraction of Candidates'+(' (GeV$^{-1}$)' if var=='pt' else ''), fontsize=25, loc='top')
     loc, ncol = ('upper right',2) if var=='pt' else ('upper right',2)
     # Create new legend handles with existing colors
     handles, labels = axes.get_legend_handles_labels()
-    new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
-    plt.legend(handles=new_handles, labels=labels, loc=loc, fontsize=16, columnspacing=1.,
-               frameon=True, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
+    #new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
+    new_handles = [patches.Patch(edgecolor=color_dict[n], facecolor=mcolors.to_rgba(color_dict[n])[:-1]+(0.1,),
+                                 fill=True, lw=3) for n in range(n_classes)]
+    plt.legend(handles=new_handles, labels=labels, loc=loc, fontsize=17, columnspacing=1.,
+               frameon=False, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
     # Adding ATLAS messaging
-    xpos, ha = (0.01, 'left') if var=='pt' else (0.02, 'left')
-    plt.text(xpos, 0.95, r'$\bf ATLAS$ Simulation Preliminary', {'color':'black', 'fontsize':17.5},
-             va='center', ha=ha, transform=axes.transAxes, zorder=20)
-    plt.text(xpos, 0.91, r'$\sqrt{s}=$13$\,$TeV', {'color':'black', 'fontsize':17.5},
-             va='center', ha=ha, transform=axes.transAxes, zorder=20)
-    plt.subplots_adjust(left=0.1, top=0.97, bottom=0.12, right=0.95)
+    #xpos, ha = (0.01, 'left') if var=='pt' else (0.02, 'left')
+    #plt.text(xpos, 0.95, r'$\bf ATLAS$ Simulation Preliminary', {'color':'black', 'fontsize':17.5},
+    #         va='center', ha=ha, transform=axes.transAxes, zorder=20)
+    #plt.text(xpos, 0.91, r'$\sqrt{s}=$13$\,$TeV', {'color':'black', 'fontsize':17.5},
+    #         va='center', ha=ha, transform=axes.transAxes, zorder=20)
+    plt.subplots_adjust(left=0.105, top=0.985, bottom=0.12, right=0.955)
     file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
     print('Saving', prefix, 'sample', format(var,'3s'), 'distributions to:', file_name)
     plt.savefig(file_name)
 
 
-def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=False, bkg='bkg'):
+def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=False, bkg='bkg', base=np.e):
     from utils import make_labels
+    sep_bkg and bkg=='bkg' and n_etypes>2
     label_dict = {0:'Prompt Electron', 1:'Charge Flip',  2:'Photon Conversion', 3:'Heavy Flavor',
                   4:'Light Flavor e$\;\!/\;\!\gamma$' , 45:'Light Flavor'     , 5:'Light Flavor Hadron',
                   'bkg':'Background'}
     if n_etypes <= 5: label_dict[4] = 'Light Flavor'
     #label_dict = {0:'Electron & charge flip'         , 1:'Photon conversion'    ,   2  :'Heavy flavor',
     #              3:'Light flavor (e$^\pm$/$\gamma$)', 4:'Light flavor (hadron)', 'bkg':'Background'}
-    color_dict = {0:'tab:blue'    , 1:'tab:orange'   ,  2:'tab:green'   ,   3  :'tab:red'   ,
-                  4:'tab:purple'  , 5:'tab:brown'    , 45:'tab:purple'  , 'bkg':'tab:orange'}
-    if separation:
+    color_dict = {0:'tab:orange', 1:'tab:cyan' ,  2:'tab:green' ,   3  :'tab:red' ,
+                  4:'tab:purple', 5:'tab:brown', 45:'tab:purple', 'bkg':'tab:blue'}
+    if sep_bkg:
         label_dict.pop('bkg')
         n_classes = n_etypes
     else:
-        label_dict={0:'Signal'   , 1:label_dict[bkg]}
-        color_dict={0:'tab:blue' , 1:color_dict[bkg]}
+        label_dict={0:label_dict[0], 1:label_dict[bkg]}
+        color_dict={0:color_dict[0], 1:color_dict[bkg]}
         n_classes = 2
-    def logit(x, delta=1e-16):
-        x = np.clip(np.float64(x), delta, 1-delta)
-        return np.log10(x) - np.log10(1-x)
-    def inverse_logit(x):
-        return 1/(1+10**(-x))
+    def logit(x, base=10, delta=np.float128(1e-18)):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            return (np.log(x) - np.log(1-x))/np.log(base)
+    def inverse_logit(x, base=10):
+        return 1/(1+base**(-x))
     def print_JSD(P, Q, idx, color, text):
         plt.text(0.945, 1.01-3*idx/100, 'JSD$_{0,\!'+text+'}$:',
                  {'color':'black', 'fontsize':10}, va='center', ha='right', transform=axes.transAxes)
         plt.text(0.990, 1.01-3*idx/100, format(distance.jensenshannon(P, Q), '.3f'),
                  {'color':color  , 'fontsize':10}, va='center', ha='right', transform=axes.transAxes)
-    def class_histo(y_true, y_prob, bins, colors, logit, density=False):
+    def class_histo(y_true, y_prob, bins, colors, logit, density=True):
         h = np.full((len(bins)-1,n_classes), 0.)
-        if separation: class_labels = make_labels(sample, n_classes)
+        if sep_bkg: class_labels = make_labels(sample, n_classes)
         else         : class_labels = y_true
         for n in np.unique(class_labels):
             class_probs   = y_prob[class_labels==n]
-            #class_weights = len(class_probs)*[100/len(y_true)]
-            class_weights = len(class_probs)*[1/len(y_true)]
-            #class_weights = len(class_probs)*[100/len(class_probs)]
+            #class_weights = len(class_probs)*[1/len(y_true)]
+            class_weights = len(class_probs)*[1/len(class_probs)]
             if density:
                 indices        = np.searchsorted(bins, class_probs, side='right')
-                bin_widths     = np.diff(inverse_logit(bins)) if logit else np.diff(bins)
+                bin_widths     = np.diff(bins)
                 class_weights /= np.take(bin_widths, np.minimum(indices, len(bins)-1)-1)
             h[:,n] = pylab.hist(class_probs, bins=bins, label=label_dict[n], histtype='step',
                                 edgecolor=colors[n], facecolor=mcolors.to_rgba(colors[n])[:-1]+(0.1,),
-                                weights=class_weights, log=True, lw=3, fill=True)[0]
+                                weights=class_weights, log=True, lw=3, fill=True, clip_on=True, zorder=1)[0]
         if False:
             if n_classes == 2: colors = len(colors)*['black']
             for n in set(label_dict)-set([0]):
@@ -244,21 +250,21 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
                 print_JSD(h[:,0], h[:,n], n, colors[n], str(n))
             if n_classes > 2:
                 print_JSD(h[:,0], np.sum(h[:,1:], axis=1), n_classes, 'black', '\mathrm{bkg}')
-        axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
-                         bottom=True, top=True, left=True, right=True)
-        axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
-                         bottom=True, top=True, left=True, right=True)
-        axes.tick_params(axis="both", pad=8, labelsize=18)
+        axes.tick_params(which='minor', direction='in', length=4, width=1.5, colors='black',
+                         bottom=True, top=True, left=True, right=True, zorder=20)
+        axes.tick_params(which='major', direction='in', length=7, width=3, colors='black',
+                         bottom=True, top=True, left=True, right=True, zorder=20)
+        axes.tick_params(axis="both", pad=6, labelsize=20)
         for axis in ['top', 'bottom', 'left', 'right']:
-            axes.spines[axis].set_linewidth(1.5)
+            axes.spines[axis].set_linewidth(3)
             axes.spines[axis].set_color('black')
-        #plt.xlabel('$p_{\operatorname{sig}}$ (%)', fontsize=30)
-        plt.xlabel('$\mathcal{D}$ (%)'     , fontsize=30, loc='right')
-        plt.ylabel('Fraction of Candidates', fontsize=25, loc='top')
+        plt.xlabel('$\mathcal{D}$'      , fontsize=30, loc='center', labelpad=-6 if logit else 2)
+        plt.ylabel('Probability Density', fontsize=26, loc='center')
         # Create new legend handles with existing colors
         handles, labels = axes.get_legend_handles_labels()
         new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
-        ncol = 2 if separation else 1
+        ncol = 2 if sep_bkg else 1
+        #ncol = 2
         new_handles = None
         plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16, columnspacing=1.,
                    frameon=False, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
@@ -271,32 +277,124 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, separation=F
         #         {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
     plt.figure(figsize=(12,16))
     plt.subplot(2, 1, 1); pylab.grid(False); axes = plt.gca()
-    pylab.xlim(0,100); pylab.ylim(1e-7 if n_classes>2 else 1e-6, 1e0)
-    plt.xticks(np.arange(0,101,step=10))
-    #pylab.xlim(0,10); pylab.ylim(1e-2 if n_classes>2 else 1e-2, 1e2)
-    #plt.xticks(np.arange(0,11,step=1))
-    bin_step = 0.5; bins = np.arange(0, 100+bin_step, bin_step)
-    class_histo(y_true, 100*y_prob, bins, color_dict, logit=False)
+    pylab.xlim(0,1); pylab.ylim(1e-5 if n_classes>2 else 1e-3, 1e2)
+    plt.xticks(np.arange(0,1.01,step=0.1), [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1])
+    bin_step = 0.005; bins = np.arange(0, 1+bin_step, bin_step)
+    class_histo(y_true, y_prob, bins, color_dict, logit=False)
     plt.subplot(2, 1, 2); pylab.grid(False); axes = plt.gca()
-    x_min=-12; x_max=6; pylab.xlim(x_min, x_max); pylab.ylim(1e-6 if n_classes>2 else 1e-5, 1e-1)
+    #x_min=-12; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-5 if n_classes>2 else 1e-5, 1e0)
+    x_min=-5; x_max=9; pylab.xlim(x_min, x_max); pylab.ylim(1e-5 if n_classes>2 else 1e-5, 1e0)
+    #x_min=-11; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-3 if n_classes>2 else 1e-3, 1e2)
     pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     pos += [0.5]           + [1-10**float(n)      for n in np.arange(-1,-x_max-1,-1)]
-    lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min+2,0)     ]
-    lab += [1,10,50,90,99] + ['99.'+n*'9'         for n in np.arange(1,x_max-1)     ]
+    #lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min+2,0)     ]
+    #lab += [1,10,50,90,99] + ['99.'+n*'9'         for n in np.arange(1,x_max-1)     ]
+    lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min,0)     ]
+    lab += [0.5] + ['$1\:\!\!\!-\:\!\!\!10^{'+ str(-n) +'}$'  for n in np.arange(1,x_max+1)   ]
+    #if x_max-x_min+1 > 15:
+    #    for n in range(1,x_max-x_min+1, 2): lab[n] = ''
     #x_min=-10; x_max=-1; pylab.xlim(x_min, x_max); pylab.ylim(1e-2 if n_classes>2 else 1e-4, 1e2)
     #pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     #lab  =                   ['$10^{'+str(n)+'}$' for n in np.arange(x_min+2,0)     ] + [1,10]
     #lab += ['0.50   '] + ['$1\!-\!10^{'+str(n)+'}$' for n in np.arange(-1,-x_max-1,-1)]
-    plt.xticks(logit(np.array(pos)), lab, rotation=20)
-    bin_step = 0.1; bins = np.arange(x_min-1, x_max+1, bin_step)
-    y_prob = logit(y_prob)
+    plt.xticks(logit(np.array(pos),base), lab, rotation=25)
+    bins = np.arange(x_min-1, x_max+1+0.1, 0.1)
+    pos, x_min, x_max = [val*np.log(10)/np.log(base) for val in [bins, x_min, x_max]]
+    bins = np.linspace(pos[0], pos[-1], num=len(bins))
+    y_prob = logit(y_prob,base)
     class_histo(y_true, y_prob, bins, color_dict, logit=True)
-    plt.subplots_adjust(top=0.99, bottom=0.07, left=0.1, right=0.95, hspace=0.2)
+    plt.subplots_adjust(top=0.99, bottom=0.07, left=0.105, right=0.95, hspace=0.2)
     file_name = output_dir+'/discriminant.png'
     print('Saving discriminant plot to:', file_name); plt.savefig(file_name)
 
 
-def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_cuts=None, multiplots=False):
+def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
+                     sig_eff=[90,80,70], density=True, LLH_wp=False):
+    from utils import get_bins
+    font_manager._get_font.cache_clear()
+    fpr, tpr, thresholds = metrics.roc_curve(y_true, y_prob, pos_label=0)
+    fpr, tpr, thresholds = 100*fpr[fpr!=0], 100*tpr[fpr!=0], thresholds[fpr!=0]
+    if LLH_wp: sig_eff = 100*np.array(LLH_rates(sample, y_true)[1][::-1]) # getting LLH wp efficiencies
+    D_cuts = {100:np.min(y_prob), **{val:thresholds[np.argmin(abs(tpr-val))] for val in sig_eff}}
+    color_dict = dict(zip(D_cuts.keys(), ['tab:'+color for color in ['blue','orange','green','red']]))
+    plt.figure(figsize=(12,8)); pylab.grid(False); ax = plt.gca()
+    ax.tick_params(which='minor', direction='in', length=4, width=1, colors='black',
+                   bottom=True, top=True, left=True, right=True, zorder=20)
+    ax.tick_params(which='major', direction='in', length=7, width=3, colors='black',
+                   bottom=True, top=True, left=True, right=True, zorder=20)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(3)
+        ax.spines[axis].set_color('black')
+    ax.tick_params(axis="both", pad=10, labelsize=22)
+    if var == 'eta': bins = np.linspace(0, 2.5, 51)
+    if var == 'pt' : bins = get_bins(sample[var], max_bins=101, min_bin_count=0)
+    var_uncut = np.abs(sample[var]) if var=='eta' else sample[var]
+    if LLH_wp:
+        wps = ['Inclusive', 'p_LHLoose', 'p_LHMedium', 'p_LHTight']
+        color_dict = dict(zip(wps, ['tab:'+color for color in ['blue','orange','green','red']]))
+        for wp in wps:
+            if wp == 'Inclusive': var_cut = (var_uncut[y_true==truth])
+            else                : var_cut = (var_uncut[y_true==truth])[sample[wp][y_true==truth]!=0]
+            bins = get_bins(var_cut, bins, min_bin_count=10)
+        for wp in wps:
+            if wp == 'Inclusive': var_cut = (var_uncut[y_true==truth])
+            else                : var_cut = (var_uncut[y_true==truth])[sample[wp][y_true==truth]!=0]
+            weights = np.ones_like(var_cut)/len(var_uncut[y_true==truth])
+            #bins    = get_bins(var_cut, bins, min_bin_count=10)
+            if density:
+                indices  = np.searchsorted(bins, var_cut, side='right')
+                weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+            alpha = 0.15 if wp=='p_LHTight' else 0.1
+            pylab.hist(var_cut, bins=bins, weights=weights, lw=3, fill=True, histtype='step', zorder=1,
+                       label=wp.split('p_')[-1],
+                       edgecolor=color_dict[wp], facecolor=mcolors.to_rgba(color_dict[wp])[:-1]+(alpha,))
+    else:
+        for eff,cut in D_cuts.items():
+            var_cut = (var_uncut[y_true==truth])[y_prob[y_true==truth]>=cut]
+            bins = get_bins(var_cut, bins, min_bin_count=10)
+        for eff,cut in D_cuts.items():
+            var_cut = (var_uncut[y_true==truth])[y_prob[y_true==truth]>=cut]
+            weights = np.ones_like(var_cut)/len(var_uncut[y_true==truth])
+            #bins    = get_bins(var_cut, bins, min_bin_count=10)
+            if density:
+                indices  = np.searchsorted(bins, var_cut, side='right')
+                weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+            alpha = 0.15 if eff==sig_eff[-1] else 0.1
+            pylab.hist(var_cut, bins=bins, weights=weights, lw=3, fill=True, histtype='step', zorder=1,
+                       label='$ϵ_{\operatorname{sig}}=$'+('' if eff==100 else '$\,\,$')+format(int(eff),'3d')+'$\,$%',
+                       edgecolor=color_dict[eff], facecolor=mcolors.to_rgba(color_dict[eff])[:-1]+(alpha,))
+    if var == 'eta':
+        plt.xlim(0, 2.5)
+        ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+        if truth==0:
+            #plt.ylim(0,10)
+            plt.ylim(0,0.6)
+            ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        if truth==1:
+            #plt.ylim(1e-3,1e3)
+            plt.ylim(1e-5,1e1)
+            plt.yscale('log')
+        xlabel = '$|\eta|$'
+    if var == 'pt':
+        plt.xscale('log'); plt.yscale('log')
+        plt.xlim(4.5, 5000)
+        plt.xticks( [4.5,10,100,1000,5000], [4.5,'$10^1$','$10^2$','$10^3$',r'$5\!\times\!10^3$'] )
+        #if truth==0: plt.ylim(1e-5,1e0)
+        #if truth==1: plt.ylim(1e-8,1e2)
+        if truth==0: plt.ylim(1e-6,1e-1)
+        if truth==1: plt.ylim(1e-10,1e0)
+        xlabel = '$E_\mathrm{T}$ (GeV)'
+    plt.xlabel(xlabel               , fontsize=30, loc='center')
+    plt.ylabel('Probability Density', fontsize=26, loc='center', labelpad=-2 if plt.yticks()[0][0]<1e-9 else 0)
+    ncol = 2 if var=='eta' else 1
+    plt.legend(loc='upper right', fontsize=20, facecolor=None, frameon=False, ncol=ncol)
+    plt.subplots_adjust(left=0.11, top=0.97, bottom=0.12, right=0.95)
+    tag = 'LLHwp' if LLH_wp else 'LLHval' if np.min(y_prob) < 0 else 'CNN'
+    file_name = output_dir+'/'+var+'-'+('sig' if truth==0 else 'bkg')+'_supp-'+tag+'.png'
+    print('Saving suppression  plot to:', file_name); plt.savefig(file_name)
+
+
+def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, ROC_type=1, multiplots=False):
     font_manager._get_font.cache_clear()
     LLH_fpr, LLH_tpr = LLH_rates(sample, y_true, ECIDS)
     if first_cuts is None: first_cuts = np.full_like(y_true, True, dtype=bool)
@@ -318,13 +416,14 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
     epsilon = 'ϵ' #'\epsilon'
     sig_eff, bkg_eff = '$'+epsilon+'_{\operatorname{sig}}$', '$'+epsilon+'_{\operatorname{bkg}}$'
     fig = plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
-    axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
-                     bottom=True, top=True, left=True, right=True)
-    axes.tick_params(which='major', direction='in', length=10, width=1.5, colors='black',
-                     bottom=True, top=True, left=True, right=True)
-    axes.tick_params(axis="both", pad=8, labelsize=18)
+    axes.tick_params(which='minor', direction='in', length=4, width=1, colors='black',
+                     bottom=True, top=True, left=True, right=True, zorder=20)
+    axes.tick_params(which='major', direction='in', length=7, width=3, colors='black',
+                     bottom=True, top=True, left=True, right=True, zorder=20)
+    axes.tick_params(axis='x', pad=10, labelsize=22)
+    axes.tick_params(axis='y', pad=7 , labelsize=22)
     for axis in ['top', 'bottom', 'left', 'right']:
-        axes.spines[axis].set_linewidth(1.5)
+        axes.spines[axis].set_linewidth(3)
         axes.spines[axis].set_color('black')
     if ROC_type == 1:
         pylab.grid(False, which="both")
@@ -332,14 +431,17 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
         if fpr[np.argwhere(tpr >= x_min/100)[0]] != 0:
             y_max = 10*np.ceil( 1/min(np.append(fpr[tpr >= x_min/100], min(LLH_fpr)))/10 )
             if y_max > 200: y_max = 100*(np.ceil(y_max/100))
-            y_max *= 1.2
+            y_max *= 1.
         else:
             y_max = 1000*np.ceil(max(1/fpr)/1000)
 
-        #x_min = 50
-        #y_max = 1*np.ceil( 1/np.min(fpr[tpr >= x_min/100])/1 )
-        #plt.text(0.5, 0.9, 'AUC: '+format(metrics.auc(fpr,tpr),'.4f'), {'color':'black','fontsize':20},
-        #         va='center', ha='center', transform=axes.transAxes)
+        '''
+        x_min = 50
+        y_max = 1*np.ceil( 1/np.min(fpr[tpr >= x_min/100])/1 )
+        #y_max = np.ceil(max(1/np.min(fpr[tpr >= x_min/100]), 1/np.max(fpr[tpr <= x_min/100])))
+        plt.text(0.5, 0.9, 'AUC: '+format(metrics.auc(fpr,tpr),'.4f'), {'color':'black','fontsize':20},
+                 va='center', ha='center', transform=axes.transAxes)
+        '''
 
         plt.xlim([x_min, 100]); plt.ylim([1, y_max])
         def interpolation(tpr, fpr, value):
@@ -368,9 +470,9 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
         yticks = plt.yticks()[0]
         axes.yaxis.set_ticks( np.append([1], yticks[1:]) )
         axes.yaxis.set_minor_locator(FixedLocator(np.arange(yticks[1]/5, yticks[-1], yticks[1]/5 )))
-        plt.xlabel(sig_eff+' (%)', fontsize=30, loc='right')
-        plt.ylabel('1/'+bkg_eff  , fontsize=30, loc='top')
-        P, = plt.plot(100*tpr, 1/fpr, color='tab:blue', lw=3, zorder=10)
+        plt.xlabel(sig_eff+' (%)', fontsize=30, loc='center')
+        plt.ylabel('1/'+bkg_eff  , fontsize=30, loc='center')
+        P, = plt.plot(100*tpr, 1/fpr, color='tab:blue', lw=3, zorder=10, clip_on=True)
         n_sig, n_bkg = np.sum(y_true==0), np.sum(y_true==1)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
@@ -384,7 +486,8 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
                 file_path += '/' + output_dir.split('/')[-1] + '/pos_rates.pkl'
                 fpr, tpr = pickle.load(open(file_path, 'rb')).values()
                 fpr, tpr = fpr[fpr!=0], tpr[fpr!=0]
-                P, = plt.plot(100*tpr, 1/fpr, color=color, lw=2 if color=='dimgray' else 3, ls=ls, zorder=10)
+                P, = plt.plot(100*tpr, 1/fpr, color=color, lw=2 if color=='dimgray' else 3,
+                              ls=ls, zorder=10, clip_on=True)
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore')
                     lim_inf = 1/( fpr + np.sqrt(fpr/n_bkg) )
@@ -409,14 +512,28 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
             #leg_labels = ['With Charge', 'Without Charge']
             #file_paths = ['outputs/6c_180m/HLV+tracks+images_no-coarse-Lr1']
             #leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images', 'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images (no coarse Lr1\'s)']
-            file_paths = [path+'/'+file_tag for path in file_paths]
+
+            color_list = ['tab:blue', 'tab:orange', 'tab:orange']
+            linestyles = [(0,(5, 1)), '-', (0,(5, 1))]
+            file_paths = ['outputs/Last_results/new_images/test_match2class/bkg_deco',
+                          'outputs/Last_results/new_images/test_match2class/sig_deco']
+            #leg_labels = [r'MC  $\,\rightarrow$Data', r'Data$\rightarrow$Data']
+            leg_labels = ['No Deco', 'Bkg Deco', 'Sig Deco']
+            #leg_labels = ['Truth Ratios', 'MC Sample Ratios', 'Predicted Ratios']
+            #leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images' + r' (MC  $\,\rightarrow$Data)'  ,
+            #              'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images' + r' (Data$\rightarrow$Data)',
+            #              'HLV'                                   + r' (MC  $\,\rightarrow$Data)'  ,
+            #              'HLV'                                   + r' (Data$\rightarrow$Data)']
+
+            #file_paths = [path+'/'+file_tag for path in file_paths]
             Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,color_list,linestyles)]
             anchor = (1.,0.59) if ECIDS else (1.,0.77)
-            L = plt.legend(Ps, leg_labels, loc='upper right', bbox_to_anchor=anchor, fontsize=17,
+            L = plt.legend(Ps, leg_labels, loc='upper right', bbox_to_anchor=anchor, fontsize=19,
                            ncol=1, frameon=False, facecolor=None, framealpha=1); L.set_zorder(10)
         if best_fpr != 0 and False:
             plt.scatter( 100*best_tpr, 1/best_fpr, s=40, marker='D', c='tab:blue',
                          label="{0:<15s} {1:>3.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
+
         #'''
         for n in np.arange(len(LLH_scores)):
             if LLH_scores[n] is None: continue
@@ -437,23 +554,24 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
         plt.legend(loc='upper right', fontsize=16.5 if ECIDS else 17, frameon=False,
                    handletextpad=0., facecolor=None, framealpha=1).set_zorder(10)
         #'''
+
         if multiplots:
             sig, bkg = output_dir.split('/')[-1].split('vs')
             sig_dict = {'class_0':'Prompt Electron', 'class_01':'Prompt Electron + Charge Flip'}
             bkg_dict = {'1':'Charge Flip', '2':'Photon Conversion', '3':'Heavy Flavor', '45':'Light Flavor',
                         '4':'Light Flavor e/$\gamma$', '5':'Light Flavor Hadron', 'Bkg':'Combined Background'}
             plt.gca().add_artist(L)
-            plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
-                     {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-            if   file_tag == '0-5000GeV'   : text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV'
+            #plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
+            #         {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+            if   file_tag ==  '0-5000GeV': text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV'
             elif file_tag == '15-5000GeV': text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}>$15$\,$GeV'
             else                         : text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}$ inclusive'
-            plt.text(0.02, 0.895, text, {'color':'black', 'fontsize':18},
-                     va='center', ha='left', transform=axes.transAxes, zorder=20)
-            plt.text(0.02, 0.84, r'Sig : '+sig_dict[sig],
-                     {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-            plt.text(0.02, 0.785, r'Bkg: '+bkg_dict[bkg],
-                     {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+            #plt.text(0.02, 0.895, text, {'color':'black', 'fontsize':18},
+            #         va='center', ha='left', transform=axes.transAxes, zorder=20)
+            #plt.text(0.02, 0.84, r'Sig : '+sig_dict[sig],
+            #         {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
+            #plt.text(0.02, 0.785, r'Bkg: '+bkg_dict[bkg],
+            #         {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
     if ROC_type == 2:
         plt.xlim([0.6, 1]); plt.ylim([0.9, 1-1e-4])
         plt.xticks([0.6, 0.7, 0.8, 0.9, 1], [60, 70, 80, 90, 100])
@@ -522,8 +640,8 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ROC_type, ECIDS, first_c
                      label="{0:<10s} {1:>5.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
         plt.legend(loc='lower center', fontsize=15, numpoints=3)
     file_name = output_dir+'/ROC_'+output_dir.split('class_')[-1]+('_'+str(ROC_type) if ROC_type!=1 else '')+'.png'
-    if plt.ylim()[1] >= 1e5: fig.subplots_adjust(left=0.135, top=0.97, bottom=0.12, right=0.94)
-    else                   : fig.subplots_adjust(left=0.12 , top=0.97, bottom=0.12, right=0.94)
+    if plt.ylim()[1] >= 1e5: fig.subplots_adjust(left=0.135, top=0.98, bottom=0.12, right=0.94)
+    else                   : fig.subplots_adjust(left=0.135, top=0.98, bottom=0.12, right=0.94)
     print('Saving ROC curve    plot to:', file_name); plt.savefig(file_name)
     if multiplots:
         for pkl_file in [name for name in os.listdir(output_dir) if '.pkl' in name]:
@@ -676,7 +794,7 @@ def CNNvsLLH(sample, y_true, y_prob, output_dir, var, wp, ECIDS, isolation=False
         FIG.align_labels()
         file_name = output_dir+'/'+Type+'_'+var+'_'+wp+'.png'
         FIG.subplots_adjust(left=0.11, right=0.97, bottom=0.10, top=0.98, hspace=0.1)
-        print('Saving performance    plot to:', file_name); FIG.savefig(file_name)
+        print('Saving performance  plot to:', file_name); FIG.savefig(file_name)
 
 
 def performance_ratio(sample, y_true, y_prob, bkg, output_dir, eta_inclusive, output_tag='CNN2LLH'):
@@ -942,7 +1060,7 @@ def combine_ROC_curves(output_dir, cuts=''):
         return_dict[idx] = fpr, tpr, threshold, LLH_fpr, LLH_tpr
     manager  = mp.Manager(); return_dict = manager.dict()
     idx_list = [1, 2, 3, 4]
-    names    = ['no weight', 'flattening', 'match2s', 'match2max']
+    names    = ['no weight', 'flat', 'match2s', 'match2max']
     colors   = ['tab:blue', 'tab:orange', 'tab:green', 'tab:brown']
     lines    = ['-', '-', '-', '-', '--', '--']
     processes = [mp.Process(target=mp_roc, args=(idx, output_dir, return_dict)) for idx in idx_list]
@@ -990,13 +1108,12 @@ def combine_ROC_curves(output_dir, cuts=''):
     '''
 
 
-def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', soft=False):
+def cal_images(sample, labels, layers, output_dir, run_number=-1, mode='random', scale='free', soft=False):
     import multiprocessing as mp
     def get_image(sample, labels, e_class, key, mode, image_dict):
         start_time = time.time()
         if mode == 'random':
             for counter in np.arange(10000):
-                #index = np.random.choice(np.where(labels==e_class)[0])
                 rng = np.random.default_rng()
                 index = rng.choice(np.where(labels==e_class)[0])
                 image = abs(sample[key][index])
@@ -1016,19 +1133,21 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
     print('PLOTTING CALORIMETER IMAGES (mode='+mode+', scale='+str(scale)+')')
     for job in processes: job.start()
     for job in processes: job.join()
-    file_name = output_dir+'/cal_images.png'
+    if run_number >= 0: file_name = output_dir+'/cal_images_'+'{:=02}'.format(run_number)+'.png'
+    else              : file_name = output_dir+'/cal_images.png'
     print('SAVING IMAGES TO:', file_name, '\n')
     if   len(layers) == 7: figsize = (18,13)
     elif len(layers) == 8: figsize = (18,15)
     elif len(layers) == 9: figsize = (18,15.5)
     else                 : figsize = (18,21)
-    if len(classes) == 2:  figsize = (7,14)
+    #if len(classes) == 2:  figsize = (7,14)
+    if len(classes) == 2:  figsize = (9.5,11.5)
     fig = plt.figure(figsize=figsize)
     for e_class in classes:
         for key in layers:
-            #image_dict[(e_class,key)] -= min(0,np.min(image_dict[(e_class,key)]))
+            image_dict[(e_class,key)] -= min(0,np.min(image_dict[(e_class,key)])) - 1e-8
             #image_dict[(e_class,key)]  = np.abs(image_dict[(e_class,key)])
-            image_dict[(e_class,key)] = np.maximum(1e-8,image_dict[(e_class,key)])
+            #image_dict[(e_class,key)] = np.maximum(1e-8,image_dict[(e_class,key)])
         if scale == 'class':
             vmin = min([np.min(image_dict[(e_class,key)]) for key in layers])
             vmax = max([np.max(image_dict[(e_class,key)]) for key in layers])
@@ -1039,14 +1158,19 @@ def cal_images(sample, labels, layers, output_dir, mode='random', scale='free', 
             if scale == 'free':
                 vmin = np.min(image_dict[(e_class,key)])
                 vmax = np.max(image_dict[(e_class,key)])
+            if run_number >= 0:
+                if   key == 'em_barrel_Lr0'     : vmax =  1.0/100
+                elif key == 'em_barrel_Lr1_fine': vmax =  2.5/100
+                elif key == 'em_barrel_Lr2'     : vmax = 20.0/100
+                elif key == 'em_barrel_Lr3'     : vmax =  0.2/100
             plot_image(image_dict[(e_class,key)], classes, e_class, layers, key, vmin, vmax, soft)
     wspace = -0.1; hspace = 0.4
     #fig.subplots_adjust(left=0.02, top=0.97, bottom=0.05, right=0.98, hspace=hspace, wspace=wspace)
     fig.subplots_adjust(left=0.02, top=0.96, bottom=0.05, right=0.99, hspace=hspace, wspace=wspace)
-    fig.savefig(file_name); sys.exit()
+    fig.savefig(file_name); plt.close()
 
 
-def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False):
+def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=True):
     image, vmin, vmax = 100*image, 100*vmin, 100*vmax
     class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavor',
                   4:'Light Flavor e/$\gamma$', 5:'Light Flavor Hadron', 6:'KnownUnknown'}
@@ -1073,7 +1197,7 @@ def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False
     #title   = layer_dict[key]+'\n('+class_dict[e_class]+')'
     if plot_idx-1 < n_classes: title = class_dict[e_class] + '\n' + layer_dict[key]
     else                     : title = layer_dict[key]
-    #title = layer_dict[key]
+    title = layer_dict[key]
     limits  = [-0.1375, 0.1375, -0.0875, 0.0875]
     x_label = '$\phi$'                             if e_layer   == n_layers-1 else ''
     x_ticks = [limits[0],-0.05,0.05,limits[1]]     if e_layer   == n_layers-1 else []
@@ -1128,7 +1252,8 @@ def plot_inputs(input_path, host_name, input_data, n_e, n_tracks, n_classes, gen
     font_manager._get_font.cache_clear()
     from utils import get_dataset, merge_samples, sample_composition, compo_matrix
     mc_input   = '0.0-2.5_mc'
-    data_input = 'LFdata/LFdata_17-18'
+    #data_input = 'LFdata/LFdata_17-18'
+    data_input = 'Zee+JF17+data'
     mc_files   = get_dataset(input_path,   mc_input, host_name)
     data_files = get_dataset(input_path, data_input, host_name)
     ne_mc   = [n_e[0], min(n_e[1], sum([len(h5py.File(n,'r')['eventNumber']) for n in   mc_files]))]
@@ -1136,11 +1261,40 @@ def plot_inputs(input_path, host_name, input_data, n_e, n_tracks, n_classes, gen
     print('\nLoading sample [', format(str(ne_mc[0])  ,'>8s')+', '+format(str(ne_mc[1])  ,'>8s'), end=']')
     print(' from', mc_files[0].split('/')[-2], flush=True)
     mc_sample  , mc_labels  , _ = merge_samples(  mc_files, ne_mc  , input_data, n_tracks, n_classes  , cuts=gen_cuts)
-    sample_composition(  mc_sample); compo_matrix(  mc_labels, n_etypes=n_classes); print()
+    #sample_composition(  mc_sample); compo_matrix(  mc_labels, n_etypes=n_classes); print()
     print(  'Loading sample [', format(str(ne_data[0]),'>8s')+', '+format(str(ne_data[1]),'>8s'), end=']')
     print(' from', data_files[0].split('/')[-2], flush=True)
     data_sample, data_labels, _ = merge_samples(data_files, ne_data, input_data, n_tracks, n_classes=5, cuts=gen_cuts)
-    sample_composition(data_sample); compo_matrix(data_labels, n_etypes=5); print()
+    #sample_composition(data_sample); compo_matrix(data_labels, n_etypes=5); print()
+
+
+    mc_channels = mc_sample['mcChannelNumber']
+    mc_eventNum = mc_sample['eventNumber']
+    mc_values, mc_counts, mc_indices = np.unique(mc_eventNum, return_counts=True, return_inverse=True)
+    data_channels = data_sample['mcChannelNumber']
+    data_eventNum = data_sample['eventNumber'][data_channels==0]
+    data_values, data_counts = np.unique(data_eventNum, return_counts=True)
+    common_numbers  = list(set(mc_values) & set(data_values))
+    mc_idx   = np.where(mc_eventNum==140519427)
+    data_idx = np.where(data_eventNum==140519427)
+    #print(mc_idx, data_idx)
+    #for key in mc_sample:
+    #    print(key, mc_sample[key][mc_idx], data_sample[key][data_channels==423300][data_idx])
+    #sys.exit()
+    if len(common_numbers) == 0: sys.exit()
+    #common_channels = np.concatenate([mc_channels[mc_eventNum==n] for n in common_numbers])
+    #common_channels, counts = np.unique(common_channels, return_counts=True)
+    condition = np.in1d(mc_eventNum, common_numbers)
+    common_channels, counts = np.unique(mc_channels[condition], return_counts=True)
+    print('\nMC Intersection:', format(100*len(common_numbers)/len(data_values),'.2f'), '%\n')
+    for n in range(len(common_channels)):
+        print(common_channels[n], '-->', format(100*counts[n]/np.sum(counts),'5.2f'), '%')
+    print('\nMC Class Contamination')
+    common_classes, counts = np.unique(mc_labels[condition], return_counts=True)
+    for n in range(len(common_classes)):
+        print(format(common_classes[n],'2d'), '-->', format(100*counts[n]/np.sum(counts),'5.2f'), '%')
+    sys.exit()
+
 
     #selections = LFmc_downsampling(data_sample, mc_sample, mc_labels)
     #mc_sample = {key:val[selections] for key,val in mc_sample.items()}
@@ -1149,10 +1303,10 @@ def plot_inputs(input_path, host_name, input_data, n_e, n_tracks, n_classes, gen
     channels = mc_sample['mcChannelNumber']
     channel_dict = {'Zee':361106, 'ttbar':410470, 'JF17':423300, 'JF35':423302, 'JF50':423303, 'misc':361108}
     mc_selections = [
-        {'label':'LF e/$\gamma$ (mc)', 'cut':(mc_labels==4) & (channels==channel_dict['misc']), 'color':'tab:purple'},
-        {'label':'LF Hadron (mc)'    , 'cut':(mc_labels==5) & (channels==channel_dict['misc']), 'color':'tab:brown' },
-        #{'label':'LF e/$\gamma$ (mc)', 'cut':(mc_labels==4), 'color':'tab:purple'},
-        #{'label':'LF Hadron (mc)'    , 'cut':(mc_labels==5), 'color':'tab:brown' },
+        #{'label':'LF e/$\gamma$ (mc)', 'cut':(mc_labels==4) & (channels==channel_dict['JF17']), 'color':'tab:purple'},
+        #{'label':'LF Hadron (mc)'    , 'cut':(mc_labels==5) & (channels==channel_dict['JF17']), 'color':'tab:brown' },
+        {'label':'LF e/$\gamma$ (mc)', 'cut':(mc_labels==4), 'color':'tab:purple'},
+        {'label':'LF Hadron (mc)'    , 'cut':(mc_labels==5), 'color':'tab:brown' },
         ]
     sig_sample  = {key.split('p_')[-1]:val[mc_labels==0] for key,val in mc_sample.items()}
     mc_samples  = {key.split('p_')[-1]:[val[n['cut']] for n in mc_selections] for key,val in mc_sample.items()}
@@ -1199,8 +1353,8 @@ def plot_inputs(input_path, host_name, input_data, n_e, n_tracks, n_classes, gen
             dec_num = re.findall(r'\d+\.\d+'          , cut)
             gen_cuts = {'eta':np.sort(dec_num), 'pt':np.sort(list(set(all_num)-set(dec_num)))}
     plot_variable(mc_samples, data_sample, 'LHValue', None, gen_cuts, mc_selections, output_dir, sig_sample)
-    for key in ['et_calo']:#input_data['scalars']:
-        plot_variable(mc_samples, data_sample, key.split('p_')[-1], 'HLVs', gen_cuts, mc_selections, output_dir)
+    #for key in ['et_calo']:#input_data['scalars']:
+    #    plot_variable(mc_samples, data_sample, key.split('p_')[-1], 'HLVs', gen_cuts, mc_selections, output_dir)
     #if 'tracks' in mc_sample:
     #    mc_samples = mc_samples['tracks']; data_sample = data_sample['tracks']
     #    for key in track_keys:
@@ -1268,8 +1422,8 @@ def plot_variable(mc_samples, data_sample, var, var_type, gen_cuts, mc_selection
     pylab.hist(data_sample[var], bins=bins, weights=data_weights, histtype='step', lw=3, stacked=False,
                  log=True if var in logs else False, label='LF (data)', color='black', ls='-')
     if sig_sample is not None:
-        #plt.xlim(None, 1.5) ; plt.ylim(0, 160)
-        plt.xlim(0, 1.5) ; plt.ylim(0, 80)
+        plt.xlim(None, 1.5) ; plt.ylim(0, 160)
+        #plt.xlim(0, 1.5) ; plt.ylim(0, 80)
         def get_LH_cut(sig_LH, sig_eff=0.7):
             values, counts = np.unique(sig_LH, return_counts=True)
             return values[np.argmin(np.abs(np.cumsum(counts)/len(sig_LH)-(1-sig_eff)))]
