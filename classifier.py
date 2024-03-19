@@ -41,7 +41,8 @@ parser.add_argument( '--scaling'        , default = 'ON'                )
 parser.add_argument( '--t_scaling'      , default = 'OFF'               )
 parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
-parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
+#parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
+parser.add_argument( '--metrics'        , default = 'loss'      )
 parser.add_argument( '--host_name'      , default = 'lps'               )
 parser.add_argument( '--input_path'     , default = ''                  )
 parser.add_argument( '--input_dir'      , default = '0.0-2.5_mc'        )
@@ -61,7 +62,7 @@ args = parser.parse_args()
 
 # VERIFYING ARGUMENTS
 for key in ['n_train', 'n_eval', 'n_valid', 'batch_size']: vars(args)[key] = int(vars(args)[key])
-if args.weight_type not in ['bkg_ratio', 'flattening', 'match2class', 'match2max', 'none']:
+if args.weight_type not in ['bkg_ratio', 'flat', 'match2class', 'match2max', 'none']:
     print('\nWeight type', args.weight_type, 'not recognized --> setting it to none')
     args.weight_type = 'none'
 if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
@@ -76,12 +77,11 @@ CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (4,1) ,
 
 
 # TRAINING VARIABLES
-scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'     , 'p_Rhad1' , 'p_Rphi'   , 'p_deltaPhiRescaled2'          ,
-           'p_ndof'  , 'p_dPOverP', 'p_deltaEta1', 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'          ,
-           'p_weta2' , 'p_d0'     , 'p_d0Sig'    , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'            ,
-           'p_eta'   , 'p_et_calo', 'p_EptRatio' , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'          ,
-           'p_TRTPID', 'p_numberOfInnermostPixelHits'                                                      ]
-scalars = scalars + ['p_charge']
+scalars = ['p_Eratio', 'p_Reta'   , 'p_Rhad'      , 'p_Rhad1' , 'p_Rphi'   , 'p_deltaPhiRescaled2'         ,
+           'p_ndof'  , 'p_dPOverP', 'p_deltaEta1' , 'p_f1'    , 'p_f3'     , 'p_sct_weight_charge'         ,
+           'p_weta2' , 'p_d0'     , 'p_d0Sig'     , 'p_qd0Sig', 'p_nTracks', 'p_numberOfSCTHits'           ,
+           'p_eta'   , 'p_TRTPID' , 'p_EptRatio'  , 'p_EoverP', 'p_wtots1' , 'p_numberOfPixelHits'         ,
+           'p_charge', 'p_et_calo', 'p_cal_energy', 'p_e'     , 'p_numberOfInnermostPixelHits'             ]
 images  = [ 'em_barrel_Lr0',   'em_barrel_Lr1',   'em_barrel_Lr2',   'em_barrel_Lr3', 'em_barrel_Lr1_fine' ,
                                 'tile_gap_Lr1',
             'em_endcap_Lr0',   'em_endcap_Lr1',   'em_endcap_Lr2',   'em_endcap_Lr3', 'em_endcap_Lr1_fine' ,
@@ -109,9 +109,9 @@ if args.train_cuts == '': args.train_cuts = gen_cuts.copy()
 else                    : args.train_cuts = gen_cuts + [args.train_cuts]
 if args.valid_cuts == '': args.valid_cuts = gen_cuts.copy()
 else                    : args.valid_cuts = gen_cuts + [args.valid_cuts]
+#args.train_cuts += ['(sample["p_LHValue"] >= -10)']
 args.valid_cuts += ['(sample["PixelHits"] >= 2)', '(sample["SCTHits"] + sample["PixelHits"] >= 7)']
 args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
-#args.train_cuts += ['(sample["p_LHValue"] >= -10)']
 #args.valid_cuts += ['(sample["p_passWVeto"] == True)', '(sample["p_passZVeto"] == True)']
 #args.valid_cuts += ['(sample["p_passPreselection"] == True)', '(sample["p_trigMatches_pTbin"] > 0)']
 #args.valid_cuts += ['(sample["p_topoetcone20"]/sample["pt"] < 0.20)']
@@ -147,7 +147,7 @@ input_data = {**train_data, 'others':others}
 
 
 # SAMPLES SIZES / AVOIDING MEMORY OVERLOAD
-if   args.images == 'ON': n_limit =   10e6
+if   args.images == 'ON': n_limit =   20e6
 elif args.tracks == 'ON': n_limit =   50e6
 else                    : n_limit = 1000e6
 if max(args.n_train, args.n_valid) > n_limit: args.generator = 'ON'
@@ -223,8 +223,8 @@ valid_t_scaler = None if args.generator=='ON' else t_scaler
 print('VALIDATION SAMPLE: loading', np.diff(args.n_valid)[0], 'electron-candidates')
 valid_sample, valid_labels, _ = merge_samples(data_files, args.n_valid, inputs, args.n_tracks,
                                               args.n_etypes, args.valid_cuts, valid_scaler, valid_t_scaler)
+#sample_composition(valid_sample); compo_matrix(valid_labels, n_etypes=args.n_etypes)         ; sys.exit()
 #sample_analysis(valid_sample, valid_labels, scalars, scaler, args.generator, args.output_dir); sys.exit()
-#sample_composition(valid_sample); compo_matrix(valid_labels, n_etypes=args.n_etypes); sys.exit()
 
 
 # EVALUATING FEATURES CORRELATIONS

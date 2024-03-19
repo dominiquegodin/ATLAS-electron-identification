@@ -80,7 +80,7 @@ def create_model(n_classes, sample, NN_type, FCN_neurons, CNN, l2, dropout, trai
         print('\nNEURAL NETWORK ARCHITECTURE'); model.summary()
         optimizer = optimizers.Adam(lr=1e-4, amsgrad=False)
         model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-        #model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy',
+        #model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy',
         #              metrics=['accuracy'], weighted_metrics=['accuracy'])
     return model
 

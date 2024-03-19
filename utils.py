@@ -48,9 +48,6 @@ def get_class_weight(labels, bkg_ratio):
 def get_sample_weights(sample, labels, weight_type=None, bkg_ratio=None, hist='2d', ref_class=0, density=False):
     if weight_type not in ['bkg_ratio', 'flat', 'match2class', 'match2max']: return None, None
     pt = sample['pt']; eta = abs(sample['eta']); n_classes = max(labels)+1
-    #n_bins   = 100; base = (np.max(pt)/np.min(pt))**(1/n_bins)
-    #pt_bins  = [np.min(pt)*base**n for n in np.arange(n_bins+1)]
-    #pt_bins[-1]  = max( pt_bins[-1], max( pt)) + 1e-3
     pt_bins = get_bins(pt, var_bins=None, max_bins=101, min_bin_count=1, logspace=True, offset=1e-3)
     for n in np.unique(labels):
         pt_bins = get_bins(pt[labels==n], var_bins=pt_bins, max_bins=101, min_bin_count=1, logspace=True)
@@ -650,26 +647,23 @@ def get_bins(var, var_bins=None, max_bins=100, min_bin_count=100, logspace=True,
         var_idx = np.clip(np.digitize(var, var_bins), 1, len(var_bins)-1) - 1
         for idx in range(1,len(var_bins)-1)[::-1]:
             if np.sum(var_idx==idx) < max(0, min_bin_count):
-                var_bins = np.delete(var_bins, idx)
-                break
+                var_bins = np.delete(var_bins, idx) ; break
         if idx == 1: return var_bins
 def cum_distribution(x):
     values, counts = np.unique(x, return_counts=True)
     if 0 not in values: values, counts = np.r_[0, values], np.r_[0, counts]
     if 1 not in values: values, counts = np.r_[values, 1], np.r_[counts, 0]
     return interpolate.interp1d(values, np.cumsum(counts)/len(x), fill_value=(0,1), bounds_error=False)
-def pt_deco(y_true, X_pt, X_loss, pt_bins=None, deco='bkg'):
-    def get_loss(X_loss, loss, pt_idx_bkg, pt_idx, idx):
-        cdf = cum_distribution(loss[pt_idx_bkg==idx])
-        X_loss[pt_idx==idx] = cdf(X_loss[pt_idx==idx])
-    class_label = 0 if deco=='sig' else 1
-    pt, loss = X_pt[y_true==class_label], X_loss[y_true==class_label]
-    if pt_bins is None: pt_bins = get_bins(pt, min_bin_count=100)
-    pt_idx_bkg = np.clip(np.digitize(  pt, pt_bins), 1, len(pt_bins)-1) - 1
-    pt_idx     = np.clip(np.digitize(X_pt, pt_bins), 1, len(pt_bins)-1) - 1
+def var_deco(y_true, X_var, X_loss, var_bins=None, deco='bkg'):
+    def get_loss(X_loss, loss, idx_bkg, idx_all, idx):
+        cdf = cum_distribution(loss[idx_bkg==idx])
+        X_loss[idx_all==idx] = cdf(X_loss[idx_all==idx])
+    var, loss = X_var[y_true==(0 if deco=='sig' else 1)], X_loss[y_true==(0 if deco=='sig' else 1)]
+    if var_bins is None: var_bins = get_bins(var, min_bin_count=100)
+    idx_bkg = np.clip(np.digitize(  var, var_bins), 1, len(var_bins)-1) - 1
+    idx_all = np.clip(np.digitize(X_var, var_bins), 1, len(var_bins)-1) - 1
     with mp.pool.ThreadPool() as pool:
-        func_args = (X_loss, loss, pt_idx_bkg, pt_idx)
-        pool.map(partial(get_loss, *func_args), np.arange(len(pt_bins)-1))
+        pool.map(partial(get_loss, X_loss, loss, idx_bkg, idx_all), np.arange(len(var_bins)-1))
     return X_loss
 
 
@@ -685,7 +679,7 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
         #for iter_tuple in itertools.product([False,True], ['CNN2LLH','CNN2CNN']):
         #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
-        #if bkg == 'bkg': probs[:,0] = pt_deco(labels, sample['pt'], probs[:,0], deco='bkg')
+        #if bkg == 'bkg': probs[:,0] = var_deco(labels, sample['pt'], probs[:,0], deco='bkg')
         arguments  = [(sample, labels, probs[:,0], output_dir, ECIDS and bkg==1, LF_cuts)]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg, bkg)
