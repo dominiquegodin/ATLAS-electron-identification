@@ -137,7 +137,7 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
             #plt.yticks(np.arange(0, 100, 10))
             axes.yaxis.set_minor_locator(AutoMinorLocator(5))
         else:
-            pylab.ylim(1e-1, 1.5e2)
+            pylab.ylim(1e-2, 1e3)
             plt.yscale('log')
     #bins[-1] = max(bins[-1], max(variable)+1e-3)
     label_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion'   ,     3:'Heavy Flavor',
@@ -187,7 +187,7 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
     #         va='center', ha=ha, transform=axes.transAxes, zorder=20)
     #plt.text(xpos, 0.91, r'$\sqrt{s}=$13$\,$TeV', {'color':'black', 'fontsize':17.5},
     #         va='center', ha=ha, transform=axes.transAxes, zorder=20)
-    plt.subplots_adjust(left=0.105, top=0.985, bottom=0.12, right=0.955)
+    plt.subplots_adjust(left=0.105, top=0.98, bottom=0.12, right=0.955)
     file_name = output_dir+'/'+str(var)+'_'+prefix+'.png'
     print('Saving', prefix, 'sample', format(var,'3s'), 'distributions to:', file_name)
     plt.savefig(file_name)
@@ -229,7 +229,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
         for n in np.unique(class_labels):
             class_probs   = y_prob[class_labels==n]
             #class_weights = len(class_probs)*[1/len(y_true)]
-            class_weights = len(class_probs)*[1/len(class_probs)]
+            class_weights = len(class_probs)*[100/len(class_probs)]
             if density:
                 indices        = np.searchsorted(bins, class_probs, side='right')
                 bin_widths     = np.diff(bins)
@@ -259,7 +259,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
             axes.spines[axis].set_linewidth(3)
             axes.spines[axis].set_color('black')
         plt.xlabel('$\mathcal{D}$'      , fontsize=30, loc='center', labelpad=-6 if logit else 2)
-        plt.ylabel('Probability Density', fontsize=26, loc='center')
+        plt.ylabel('Probability Density (%)', fontsize=26, loc='center')
         # Create new legend handles with existing colors
         handles, labels = axes.get_legend_handles_labels()
         new_handles = [Line2D([], [], lw=3, c=h.get_edgecolor()) for h in handles]
@@ -283,7 +283,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
     class_histo(y_true, y_prob, bins, color_dict, logit=False)
     plt.subplot(2, 1, 2); pylab.grid(False); axes = plt.gca()
     #x_min=-12; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-5 if n_classes>2 else 1e-5, 1e0)
-    x_min=-5; x_max=9; pylab.xlim(x_min, x_max); pylab.ylim(1e-5 if n_classes>2 else 1e-5, 1e0)
+    x_min=-5; x_max=9; pylab.xlim(x_min, x_max); pylab.ylim(1e-3 if n_classes>2 else 1e-3, 1e2)
     #x_min=-11; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-3 if n_classes>2 else 1e-3, 1e2)
     pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     pos += [0.5]           + [1-10**float(n)      for n in np.arange(-1,-x_max-1,-1)]
@@ -305,7 +305,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
     class_histo(y_true, y_prob, bins, color_dict, logit=True)
     plt.subplots_adjust(top=0.99, bottom=0.07, left=0.105, right=0.95, hspace=0.2)
     file_name = output_dir+'/discriminant.png'
-    print('Saving discriminant plot to:', file_name); plt.savefig(file_name)
+    print('Saving discriminant   plot to:', file_name); plt.savefig(file_name)
 
 
 def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
@@ -339,11 +339,11 @@ def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
         for wp in wps:
             if wp == 'Inclusive': var_cut = (var_uncut[y_true==truth])
             else                : var_cut = (var_uncut[y_true==truth])[sample[wp][y_true==truth]!=0]
-            weights = np.ones_like(var_cut)/len(var_uncut[y_true==truth])
+            weights = 100* np.ones_like(var_cut)/len(var_uncut[y_true==truth])
             #bins    = get_bins(var_cut, bins, min_bin_count=10)
             if density:
                 indices  = np.searchsorted(bins, var_cut, side='right')
-                weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+                weights  = weights / np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
             alpha = 0.15 if wp=='p_LHTight' else 0.1
             pylab.hist(var_cut, bins=bins, weights=weights, lw=3, fill=True, histtype='step', zorder=1,
                        label=wp.split('p_')[-1],
@@ -354,11 +354,11 @@ def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
             bins = get_bins(var_cut, bins, min_bin_count=10)
         for eff,cut in D_cuts.items():
             var_cut = (var_uncut[y_true==truth])[y_prob[y_true==truth]>=cut]
-            weights = np.ones_like(var_cut)/len(var_uncut[y_true==truth])
+            weights = 100 * np.ones_like(var_cut)/len(var_uncut[y_true==truth])
             #bins    = get_bins(var_cut, bins, min_bin_count=10)
             if density:
                 indices  = np.searchsorted(bins, var_cut, side='right')
-                weights /= np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
+                weights  = weights / np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
             alpha = 0.15 if eff==sig_eff[-1] else 0.1
             pylab.hist(var_cut, bins=bins, weights=weights, lw=3, fill=True, histtype='step', zorder=1,
                        label='$ϵ_{\operatorname{sig}}=$'+('' if eff==100 else '$\,\,$')+format(int(eff),'3d')+'$\,$%',
@@ -367,31 +367,27 @@ def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
         plt.xlim(0, 2.5)
         ax.xaxis.set_minor_locator(AutoMinorLocator(5))
         if truth==0:
-            #plt.ylim(0,10)
-            plt.ylim(0,0.6)
+            plt.ylim(0,60)
             ax.yaxis.set_minor_locator(AutoMinorLocator(5))
         if truth==1:
-            #plt.ylim(1e-3,1e3)
-            plt.ylim(1e-5,1e1)
+            plt.ylim(1e-4,1e3)
             plt.yscale('log')
         xlabel = '$|\eta|$'
     if var == 'pt':
         plt.xscale('log'); plt.yscale('log')
         plt.xlim(4.5, 5000)
         plt.xticks( [4.5,10,100,1000,5000], [4.5,'$10^1$','$10^2$','$10^3$',r'$5\!\times\!10^3$'] )
-        #if truth==0: plt.ylim(1e-5,1e0)
-        #if truth==1: plt.ylim(1e-8,1e2)
-        if truth==0: plt.ylim(1e-6,1e-1)
-        if truth==1: plt.ylim(1e-10,1e0)
+        if truth==0: plt.ylim(1e-4,1e1)
+        if truth==1: plt.ylim(1e-8,1e2)
         xlabel = '$E_\mathrm{T}$ (GeV)'
     plt.xlabel(xlabel               , fontsize=30, loc='center')
-    plt.ylabel('Probability Density', fontsize=26, loc='center', labelpad=-2 if plt.yticks()[0][0]<1e-9 else 0)
+    plt.ylabel('Probability Density (%)', fontsize=26, loc='center')#, labelpad=-2 if plt.yticks()[0][0]<1e-9 else 0)
     ncol = 2 if var=='eta' else 1
     plt.legend(loc='upper right', fontsize=20, facecolor=None, frameon=False, ncol=ncol)
     plt.subplots_adjust(left=0.11, top=0.97, bottom=0.12, right=0.95)
     tag = 'LLHwp' if LLH_wp else 'LLHval' if np.min(y_prob) < 0 else 'CNN'
     file_name = output_dir+'/'+var+'-'+('sig' if truth==0 else 'bkg')+'_supp-'+tag+'.png'
-    print('Saving suppression  plot to:', file_name); plt.savefig(file_name)
+    print('Saving suppression    plot to:', file_name); plt.savefig(file_name)
 
 
 def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, ROC_type=1, multiplots=False):
@@ -642,7 +638,7 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, 
     file_name = output_dir+'/ROC_'+output_dir.split('class_')[-1]+('_'+str(ROC_type) if ROC_type!=1 else '')+'.png'
     if plt.ylim()[1] >= 1e5: fig.subplots_adjust(left=0.135, top=0.98, bottom=0.12, right=0.94)
     else                   : fig.subplots_adjust(left=0.135, top=0.98, bottom=0.12, right=0.94)
-    print('Saving ROC curve    plot to:', file_name); plt.savefig(file_name)
+    print('Saving ROC curve      plot to:', file_name); plt.savefig(file_name)
     if multiplots:
         for pkl_file in [name for name in os.listdir(output_dir) if '.pkl' in name]:
             os.remove(output_dir+'/'+pkl_file)
@@ -804,7 +800,7 @@ def performance_ratio(sample, y_true, y_prob, bkg, output_dir, eta_inclusive, ou
               for wp in ['loose', 'medium', 'tight']}
     pickle_file = 'CNN2LLH_inclusive.pkl' if eta_inclusive else 'CNN2LLH.pkl'
     if output_tag == 'CNN2CNN':
-        input_dir = '6c_180m/HLV/0-5000GeV'
+        input_dir = '' #'6c_180m/HLV/0-5000GeV'
         input_dir = output_dir.split('outputs')[0]+'outputs'+'/'+input_dir
         try: input_ratios = pickle.load(open(input_dir+'/'+'class_0vs'+str(bkg).title()+'/'+pickle_file,'rb'))
         except FileNotFoundError: return
@@ -842,7 +838,7 @@ def bkg_eff_ratio(sample, y_true, y_prob, wp, bin, ECIDS, return_dict):
         warnings.simplefilter('ignore')
         try:
             fpr, tpr, thresholds = metrics.roc_curve(y_true, y_prob, pos_label=0)
-            fpr, tpr    = fpr[::-2][::-1], tpr[::-2][::-1] #for linear interpolation
+            fpr, tpr = fpr[::-2][::-1], tpr[::-2][::-1] #for linear interpolation
             LLH_fpr, LLH_tpr = LLH_rates(data, y_true, ECIDS)
             LLH_fpr, LLH_tpr = LLH_fpr[-3:], LLH_tpr[-3:]
             bkg_rej_ratio = LLH_fpr[wp]/CNN_fpr(tpr, fpr, LLH_tpr[wp])

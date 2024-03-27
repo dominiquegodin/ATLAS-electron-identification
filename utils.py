@@ -46,7 +46,6 @@ def get_class_weight(labels, bkg_ratio):
 
 
 def get_sample_weights(sample, labels, weight_type=None, bkg_ratio=None, hist='2d', ref_class=0, density=False):
-    if weight_type not in ['bkg_ratio', 'flat', 'match2class', 'match2max']: return None, None
     pt = sample['pt']; eta = abs(sample['eta']); n_classes = max(labels)+1
     pt_bins = get_bins(pt, var_bins=None, max_bins=101, min_bin_count=1, logspace=True, offset=1e-3)
     for n in np.unique(labels):
@@ -54,6 +53,8 @@ def get_sample_weights(sample, labels, weight_type=None, bkg_ratio=None, hist='2
     n_bins   = 50; step = np.max(eta)/n_bins
     eta_bins = np.arange(np.min(eta), np.max(eta)+step, step)
     eta_bins[-1] = max(eta_bins[-1], max(eta)) + 1e-3
+    if weight_type not in ['bkg_ratio', 'flat', 'match2class', 'match2max']:
+        return None, {'pt':pt_bins, 'eta':eta_bins}
     if hist == 'pt' : eta_bins = [eta_bins[0], eta_bins[-1]]
     if hist == 'eta':  pt_bins = [ pt_bins[0],  pt_bins[-1]]
     pt_ind   = np.digitize( pt,  pt_bins, right=False) -1
@@ -525,9 +526,10 @@ def validation(output_dir, results_in, plotting, n_valid, n_etypes, valid_cuts):
     sample, labels, probs = {key:sample[key][cuts] for key in sample}, labels[cuts], probs[cuts]
     if len(labels) == n_e: print('')
     else: print(' --> ('+str(len(labels))+' selected = '+format(100*len(labels)/n_e,'0.2f')+'%)')
+    _, bins = get_sample_weights(sample, labels)
+    sample_histograms(sample, labels, None, None, n_etypes, None, bins, output_dir)
     valid_results(sample, labels, probs, None, n_etypes, output_dir, plotting, ratios); print()
     #multi_cuts(sample, labels, probs, output_dir); sys.exit()
-    #sample_histograms(sample, labels, None, None, weights=None, bins=None, output_dir=output_dir)
 
 
 def class_ratios(labels, n_etypes):
@@ -677,9 +679,9 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
     if plotting == 'ON':
         output_dir += '/'+'class_'+''.join([str(n) for n in sig_list])+'vs'+str(bkg).title()
         if not os.path.isdir(output_dir): os.mkdir(output_dir)
+        #if bkg == 'bkg': probs[:,0] = var_deco(labels, sample['pt'], probs[:,0], deco='bkg')
         #for iter_tuple in itertools.product([False,True], ['CNN2LLH','CNN2CNN']):
         #    performance_ratio(sample, labels, probs[:,0], bkg, output_dir, *iter_tuple)
-        #if bkg == 'bkg': probs[:,0] = var_deco(labels, sample['pt'], probs[:,0], deco='bkg')
         arguments  = [(sample, labels, probs[:,0], output_dir, ECIDS and bkg==1, LF_cuts)]
         processes  = [mp.Process(target=plot_ROC_curves, args=arg) for arg in arguments]
         #arguments  = (sample, labels, probs[:,0], n_etypes, output_dir, sep_bkg, bkg)
