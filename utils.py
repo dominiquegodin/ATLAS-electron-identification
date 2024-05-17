@@ -8,8 +8,8 @@ from   scipy     import interpolate
 from   functools import partial
 from   tabulate  import tabulate
 from   skimage   import transform
-from   plots_DG  import var_histogram, plot_discriminant, plot_ROC_curves, plot_suppression
-from   plots_DG  import ratio_plots, performance_ratio, performance_plots, plot_classes
+from   plots_DG  import plot_history, var_histogram, plot_discriminant, plot_ROC_curves, plot_suppression
+from   plots_DG  import ratio_plots, performance_ratio, performance_plots, plot_classes, plot_heatmaps
 from   plots_KM  import plot_distributions_KM, differential_plots
 
 
@@ -595,9 +595,9 @@ def compo_matrix(valid_labels, train_labels=None, valid_probs=None, n_etypes=Non
             #pred_ratios = 100*np.mean(valid_probs, axis=0, dtype=np.float64)
             pred_ratios = [100*np.sum(valid_preds==n)/len(valid_preds) for n in range(n_etypes)]
         # Light Flavor Ratios (classes 4 and 5 combined)
-        #if n_etypes == 6:
-        #    valid_ratios[4] = valid_ratios[5] + valid_ratios[4]
-        #    valid_ratios[5] = valid_ratios[4]
+        if n_etypes == 6:
+            valid_ratios[4] = valid_ratios[5] + valid_ratios[4]
+            valid_ratios[5] = valid_ratios[4]
         return {'truth':valid_ratios, 'pred':pred_ratios, 'none':np.ones_like(valid_ratios)}
 
 
@@ -615,8 +615,8 @@ def make_discriminant(sample, labels, probs, n_etypes, sig_list, bkg, ratios=Non
         bkg = bkg_list if bkg=='bkg' else [int(n) for n in str(bkg)]
         if verbose: print_dict[1] += 'SIGNAL = '+str(set(sig_list))+' vs BACKGROUND = '+str(set(bkg))+'\n'
         #for n in list(np.arange(1, n_classes))+['bkg']: print(n, class_weights(sig_list, ratios, n))
-        weights = class_weights(sig_list, ratios, 'bkg')                              #Optimal combined background
-        #weights = class_weights(sig_list, ratios, 'bkg' if bkg==bkg_list else bkg[0]) #Optimal individual classes
+        weights = class_weights(sig_list, ratios, 'bkg')                              #optimal combined background
+        #weights = class_weights(sig_list, ratios, 'bkg' if bkg==bkg_list else bkg[0]) #optimal individual classes
         sig_cut = np.logical_or.reduce([labels==n for n in sig_list])
         bkg_cut = np.logical_or.reduce([labels==n for n in bkg     ])
         all_cut = np.logical_or(sig_cut, bkg_cut)
@@ -692,7 +692,8 @@ def print_results(sample, labels, probs, n_etypes, plotting, output_dir, sig_lis
             #arguments += [(sample, labels, sample['p_LHValue'], output_dir, var,truth)
             #              for var,truth in itertools.product(['eta','pt'],[0,1])]
             processes += [mp.Process(target=plot_suppression, args=arg) for arg in arguments]
-            #processes += [mp.Process(target=performance_plots, args=(sample, labels, probs[:,0], output_dir))]
+        if bkg == 'bkg' and False:
+            processes += [mp.Process(target=performance_plots, args=(sample, labels, probs[:,0], output_dir))]
         for job in processes: job.start()
         for job in processes: job.join()
     else:
@@ -1007,13 +1008,13 @@ def class_channels(sample, labels, output_dir, col=1, reverse=True, composition=
 
 def sample_analysis(sample, labels, scalars, scaler_file, generator, output_dir):
     if generator == 'ON': sys.exit()
+    plot_history(output_dir, hist_file='train_history.pkl'); sys.exit()
     #verify_sample(sample); sys.exit()
     #sample_histograms(sample, labels, sample, labels, None, output_dir)#; sys.exit()
     # MC CHANNELS
     #print_channels(sample, labels)
-    #class_channels(sample, labels, output_dir)
+    #class_channels(sample, labels, output_dir); sys.exit()
     # DISTRIBUTION HEATMAPS
-    #from plots_DG import plot_heatmaps
     #plot_heatmaps(sample, labels, output_dir); sys.exit()
     # CALORIMETER IMAGES
     from plots_DG import cal_images
@@ -1023,7 +1024,7 @@ def sample_analysis(sample, labels, scalars, scaler_file, generator, output_dir)
                #'lar_endcap_Lr0', 'lar_endcap_Lr1'    ,  'lar_endcap_Lr2',  'lar_endcap_Lr3',
                                  'tile_barrel_Lr1'   , 'tile_barrel_Lr2', 'tile_barrel_Lr3'
                ]
-    cal_images(sample, labels, layers, output_dir, mode='mean', scale='layer', soft=False)
+    cal_images(sample, labels, layers, output_dir, mode='mean', scale='free', soft=False)
     #for run_number in range(50):
     #    cal_images(sample, labels, layers, output_dir, run_number, mode='random', scale='layer', soft=False)
     sys.exit()

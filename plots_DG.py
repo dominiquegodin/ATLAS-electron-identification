@@ -45,24 +45,47 @@ def LLH_rates(sample, y_true, ECIDS=False, ECIDS_cut=-0.337671, old_samples=Fals
     return LLH_fpr, LLH_tpr
 
 
-def plot_history(history, output_dir, key='accuracy'):
-    if history == None or len(history.epoch) < 2: return
-    plt.figure(figsize=(12,8))
-    pylab.grid(True)
-    val = plt.plot(np.array(history.epoch)+1, 100*np.array(history.history[key]), label='Training')
-    plt.plot(np.array(history.epoch)+1, 100*np.array(history.history['val_'+key]), '--',
-             color=val[0].get_color(), label='Testing')
-    min_acc = np.floor(100*min( history.history[key]+history.history['val_'+key] ))
-    max_acc = np.ceil (100*max( history.history[key]+history.history['val_'+key] ))
-    plt.xlim([1, max(history.epoch)+1])
-    plt.xticks( np.append(1, np.arange(5, max(history.epoch)+2, step=5)) )
-    plt.xlabel('Epochs',fontsize=25)
-    plt.ylim( max(70,min_acc),max_acc )
-    plt.yticks( np.arange(max(80,min_acc), max_acc+1, step=1) )
-    plt.ylabel(key.title()+' (%)',fontsize=25)
-    plt.legend(loc='lower right', fontsize=20, numpoints=3)
-    file_name = output_dir+'/'+'train_history.png'
-    print('\nSaving training accuracy history to:', file_name); plt.savefig(file_name)
+def plot_history(output_dir, hist_file=None, history=None):
+    if hist_file is not None:
+        try   : history = pickle.load(open(output_dir+'/'+hist_file, 'rb'))
+        except: return
+    else:
+        history = history.history
+        pickle.dump(history, open(output_dir+'/'+'train_history.pkl','wb'), protocol=4)
+    for key in ['accuracy', 'val_accuracy']: history[key] = 100*np.array(history[key])
+    epochs = np.arange(len(history['loss']))+1
+    for metric in ['loss', 'accuracy']:
+        plt.figure(figsize=(12,8)); pylab.grid(False); ax = plt.gca()
+        ax.tick_params(which='minor', direction='in', length=4, width=1, colors='black',
+                       bottom=True, top=True, left=True, right=True, zorder=20)
+        ax.tick_params(which='major', direction='in', length=7, width=3, colors='black',
+                       bottom=True, top=True, left=True, right=True, zorder=20)
+        for axis in ['top', 'bottom', 'left', 'right']:
+            ax.spines[axis].set_linewidth(3)
+            ax.spines[axis].set_color('black')
+        ax.tick_params(axis='x', pad=10, labelsize=22)
+        ax.tick_params(axis='y', pad=15, labelsize=22)
+        plt.plot(epochs, history[       metric], ls='-' , lw=3, color='dimgray', label=  'Training')
+        plt.plot(epochs, history['val_'+metric], ls=(1,(5,1)), lw=3, color='dimgray', label='Validation')
+        max_epochs = 60 ; step = 10
+        max_epochs = min(max(epochs), max_epochs)
+        plt.xlim(1, max_epochs)
+        plt.xticks( np.append(1, np.arange(step, max_epochs+1, step=step)) )
+        xticks = plt.xticks()[0]
+        ax.xaxis.set_minor_locator(FixedLocator(np.arange(xticks[1]/step, xticks[-1], xticks[1]/step)))
+        values = np.append(history[metric], history['val_'+metric])
+        factor = 0.05 if metric=='loss' else 2
+        y_min = factor*np.floor(min(values)/factor)
+        y_max = factor*np.ceil (max(values)/factor)
+        plt.ylim(y_min, y_max)
+        ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        plt.xlabel('Epochs', fontsize=28)
+        plt.ylabel(metric.title()+('' if metric=='loss' else ' (%)'), fontsize=28)
+        plt.legend(loc='best', fontsize=20, facecolor=None, frameon=False)
+        plt.subplots_adjust(left=0.11, top=0.97, bottom=0.125, right=0.95)
+        file_name = output_dir+'/'+'hist_'+metric+'.png'
+        #print('Saving', format(metric,'8s'), 'history    to:', file_name); plt.savefig(file_name)
+        print('Saving history        plot to:', file_name); plt.savefig(file_name)
 
 
 def plot_heatmaps(sample, labels, output_dir):
@@ -79,7 +102,7 @@ def plot_heatmaps(sample, labels, output_dir):
         plt.imshow(heatmap.T, origin='lower', extent=extent, cmap='Blues', interpolation='bilinear', aspect="auto")
         plt.title(label_dict[n]+' ('+format(100*np.sum(labels==n)/len(labels),'.1f')+'%)', fontsize=25)
         if n//3 == 1: plt.xlabel('$|\eta|$', fontsize=25)
-        if n %3 == 0: plt.ylabel('$E_\mathrm{T}$ (GeV)', fontsize=25)
+        if n %3 == 0: plt.ylabel('$p_\mathrm{T}\,$(GeV)', fontsize=25)
     fig.subplots_adjust(left=0.05, top=0.95, bottom=0.1, right=0.95, wspace=0.15, hspace=0.25)
     file_name = output_dir+'/'+'heatmap.png'
     print('Saving heatmap plots to:', file_name)
@@ -100,7 +123,7 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
         axes.spines[axis].set_color('black')
     if var == 'pt':
         variable = sample[var]
-        plt.xlabel('$E_\mathrm{T}$ (GeV)', fontsize=30, loc='center')
+        plt.xlabel('$p_\mathrm{T}\,$(GeV)', fontsize=30, loc='center')
         if bins == None or len(bins[var]) <= 2:
             #bins = [0, 10, 20, 30, 40, 60, 80, 100, 130, 180, 250, 500]
             bins = np.arange(np.min(variable), 102)
@@ -172,7 +195,6 @@ def var_histogram(sample, labels, n_etypes, weights, bins, output_dir, prefix, v
                    label=label_dict[n], edgecolor=color_dict[n],
                    facecolor=mcolors.to_rgba(color_dict[n])[:-1]+(alpha[n],))
     plt.ylabel('Probability Density (%)' if density else 'Probability Distribution (%)', fontsize=26)
-    #plt.ylabel('Fraction of Candidates'+(' (GeV$^{-1}$)' if var=='pt' else ''), fontsize=25, loc='top')
     loc, ncol = ('upper right',2) if var=='pt' else ('upper right',2)
     # Create new legend handles with existing colors
     handles, labels = axes.get_legend_handles_labels()
@@ -228,8 +250,8 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
         else         : class_labels = y_true
         for n in np.unique(class_labels):
             class_probs   = y_prob[class_labels==n]
-            #class_weights = len(class_probs)*[1/len(y_true)]
-            class_weights = len(class_probs)*[100/len(class_probs)]
+            class_weights = len(class_probs)*[100/len(y_true)]
+            #class_weights = len(class_probs)*[100/len(class_probs)]
             if density:
                 indices        = np.searchsorted(bins, class_probs, side='right')
                 bin_widths     = np.diff(bins)
@@ -258,7 +280,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
         for axis in ['top', 'bottom', 'left', 'right']:
             axes.spines[axis].set_linewidth(3)
             axes.spines[axis].set_color('black')
-        plt.xlabel('$\mathcal{D}$'      , fontsize=30, loc='center', labelpad=-6 if logit else 2)
+        plt.xlabel('$\mathcal{D}$'          , fontsize=30, loc='center', labelpad=-10 if logit else 20)
         plt.ylabel('Probability Density (%)', fontsize=26, loc='center')
         # Create new legend handles with existing colors
         handles, labels = axes.get_legend_handles_labels()
@@ -266,24 +288,30 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
         ncol = 2 if sep_bkg else 1
         #ncol = 2
         new_handles = None
+        anchor = (0.99,1.)
         plt.legend(handles=new_handles, labels=labels, loc='upper right', fontsize=16, columnspacing=1.,
-                   frameon=False, handlelength=2, ncol=ncol, facecolor=None, framealpha=1.).set_zorder(10)
+                   bbox_to_anchor=anchor, frameon=False, handlelength=2, ncol=ncol, framealpha=1.).set_zorder(10)
         # Adding ATLAS messaging
         #plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
         #         {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV',
-        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}>$15$\,$GeV',
-        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}$ inclusive',
+        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: p_\mathrm{T}\:\leqslant\:$15 GeV',
+        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: p_\mathrm{T}>$15$\,$GeV',
+        #plt.text(0.02, 0.91, r'$\sqrt{s}=$13$\,$TeV $\:;\: p_\mathrm{T}$ inclusive',
         #         {'color':'black', 'fontsize':17.5},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-    plt.figure(figsize=(12,16))
-    plt.subplot(2, 1, 1); pylab.grid(False); axes = plt.gca()
-    pylab.xlim(0,1); pylab.ylim(1e-5 if n_classes>2 else 1e-3, 1e2)
+    plt.figure(figsize=(12,8)) ; pylab.grid(False); axes = plt.gca()
+    #pylab.xlim(0,1); pylab.ylim(1e-1 if n_classes>2 else 1e-1, 1e4)
+    pylab.xlim(0,1); pylab.ylim(1e-2 if n_classes>2 else 1e-2, 1e3)
     plt.xticks(np.arange(0,1.01,step=0.1), [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1])
     bin_step = 0.005; bins = np.arange(0, 1+bin_step, bin_step)
     class_histo(y_true, y_prob, bins, color_dict, logit=False)
-    plt.subplot(2, 1, 2); pylab.grid(False); axes = plt.gca()
-    #x_min=-12; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-5 if n_classes>2 else 1e-5, 1e0)
-    x_min=-5; x_max=9; pylab.xlim(x_min, x_max); pylab.ylim(1e-3 if n_classes>2 else 1e-3, 1e2)
+    plt.subplots_adjust(left=0.11, top=0.97, bottom=0.13, right=0.95)
+    file_name = output_dir+'/discriminant_linear.png'
+    #print('Saving discriminant   plot to:', file_name)
+    plt.savefig(file_name)
+
+    plt.figure(figsize=(12,8)) ; pylab.grid(False); axes = plt.gca()
+    x_min=-12; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-3 if n_classes>2 else 1e-3, 1e2)
+    #x_min=-6; x_max=8; pylab.xlim(x_min, x_max); pylab.ylim(1e-3 if n_classes>2 else 1e-3, 1e2)
     #x_min=-11; x_max=5; pylab.xlim(x_min, x_max); pylab.ylim(1e-3 if n_classes>2 else 1e-3, 1e2)
     pos  =                   [  10**float(n)      for n in np.arange(x_min,0)       ]
     pos += [0.5]           + [1-10**float(n)      for n in np.arange(-1,-x_max-1,-1)]
@@ -303,7 +331,7 @@ def plot_discriminant(sample, y_true, y_prob, n_etypes, output_dir, sep_bkg=Fals
     bins = np.linspace(pos[0], pos[-1], num=len(bins))
     y_prob = logit(y_prob,base)
     class_histo(y_true, y_prob, bins, color_dict, logit=True)
-    plt.subplots_adjust(top=0.99, bottom=0.07, left=0.105, right=0.95, hspace=0.2)
+    plt.subplots_adjust(left=0.11, top=0.97, bottom=0.13, right=0.95)
     file_name = output_dir+'/discriminant.png'
     print('Saving discriminant   plot to:', file_name); plt.savefig(file_name)
 
@@ -335,7 +363,7 @@ def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
         for wp in wps:
             if wp == 'Inclusive': var_cut = (var_uncut[y_true==truth])
             else                : var_cut = (var_uncut[y_true==truth])[sample[wp][y_true==truth]!=0]
-            bins = get_bins(var_cut, bins, min_bin_count=10)
+            bins = get_bins(var_cut, bins, min_bin_count=5)
         for wp in wps:
             if wp == 'Inclusive': var_cut = (var_uncut[y_true==truth])
             else                : var_cut = (var_uncut[y_true==truth])[sample[wp][y_true==truth]!=0]
@@ -351,7 +379,7 @@ def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
     else:
         for eff,cut in D_cuts.items():
             var_cut = (var_uncut[y_true==truth])[y_prob[y_true==truth]>=cut]
-            bins = get_bins(var_cut, bins, min_bin_count=10)
+            bins = get_bins(var_cut, bins, min_bin_count=5)
         for eff,cut in D_cuts.items():
             var_cut = (var_uncut[y_true==truth])[y_prob[y_true==truth]>=cut]
             weights = 100 * np.ones_like(var_cut)/len(var_uncut[y_true==truth])
@@ -379,12 +407,12 @@ def plot_suppression(sample, y_true, y_prob, output_dir, var, truth,
         plt.xticks( [4.5,10,100,1000,5000], [4.5,'$10^1$','$10^2$','$10^3$',r'$5\!\times\!10^3$'] )
         if truth==0: plt.ylim(1e-4,1e1)
         if truth==1: plt.ylim(1e-8,1e2)
-        xlabel = '$E_\mathrm{T}$ (GeV)'
-    plt.xlabel(xlabel               , fontsize=30, loc='center')
+        xlabel = '$p_\mathrm{T}\,$(GeV)'
+    plt.xlabel(xlabel                   , fontsize=30, loc='center')
     plt.ylabel('Probability Density (%)', fontsize=26, loc='center')#, labelpad=-2 if plt.yticks()[0][0]<1e-9 else 0)
     ncol = 2 if var=='eta' else 1
     plt.legend(loc='upper right', fontsize=20, facecolor=None, frameon=False, ncol=ncol)
-    plt.subplots_adjust(left=0.11, top=0.97, bottom=0.12, right=0.95)
+    plt.subplots_adjust(left=0.11, top=0.97, bottom=0.125, right=0.95)
     tag = 'LLHwp' if LLH_wp else 'LLHval' if np.min(y_prob) < 0 else 'CNN'
     file_name = output_dir+'/'+var+'-'+('sig' if truth==0 else 'bkg')+'_supp-'+tag+'.png'
     print('Saving suppression    plot to:', file_name); plt.savefig(file_name)
@@ -413,24 +441,24 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, 
     sig_eff, bkg_eff = '$'+epsilon+'_{\operatorname{sig}}$', '$'+epsilon+'_{\operatorname{bkg}}$'
     fig = plt.figure(figsize=(12,8)); pylab.grid(True); axes = plt.gca()
     axes.tick_params(which='minor', direction='in', length=4, width=1, colors='black',
-                     bottom=True, top=True, left=True, right=True, zorder=20)
+                     bottom=True, top=True, left=True, right=True, zorder=30)
     axes.tick_params(which='major', direction='in', length=7, width=3, colors='black',
-                     bottom=True, top=True, left=True, right=True, zorder=20)
+                     bottom=True, top=True, left=True, right=True, zorder=30)
     axes.tick_params(axis='x', pad=10, labelsize=22)
     axes.tick_params(axis='y', pad=7 , labelsize=22)
     for axis in ['top', 'bottom', 'left', 'right']:
         axes.spines[axis].set_linewidth(3)
         axes.spines[axis].set_color('black')
+        axes.spines[axis].set_zorder(30)
     if ROC_type == 1:
         pylab.grid(False, which="both")
         x_min = min(80, 10*np.floor(10*max(min(LLH_tpr),np.min(tpr))))
         if fpr[np.argwhere(tpr >= x_min/100)[0]] != 0:
             y_max = 10*np.ceil( 1/min(np.append(fpr[tpr >= x_min/100], min(LLH_fpr)))/10 )
             if y_max > 200: y_max = 100*(np.ceil(y_max/100))
-            y_max *= 1.
+            y_max *= 1.1
         else:
             y_max = 1000*np.ceil(max(1/fpr)/1000)
-
         '''
         x_min = 50
         y_max = 1*np.ceil( 1/np.min(fpr[tpr >= x_min/100])/1 )
@@ -438,7 +466,6 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, 
         plt.text(0.5, 0.9, 'AUC: '+format(metrics.auc(fpr,tpr),'.4f'), {'color':'black','fontsize':20},
                  va='center', ha='center', transform=axes.transAxes)
         '''
-
         plt.xlim([x_min, 100]); plt.ylim([1, y_max])
         def interpolation(tpr, fpr, value):
             try:
@@ -461,28 +488,32 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, 
             else                  : score_text = format(LLH_scores[n],'.1e').replace('e+0','e')
             plt.text(100+(100.3-100)/(100.3-50)*(100.3-x_min), LLH_scores[n], score_text,
                      {'color':colors[n], 'fontsize':15}, va="center", ha="left")
+        x_pos = np.arange(x_min, 101, 10)
+        x_lab = list(x_pos[:-1]/100) + ['1']
+        plt.xticks(x_pos, x_lab)
         axes.xaxis.set_major_locator(MultipleLocator(10))
         axes.xaxis.set_minor_locator(AutoMinorLocator(10))
         yticks = plt.yticks()[0]
         axes.yaxis.set_ticks( np.append([1], yticks[1:]) )
         axes.yaxis.set_minor_locator(FixedLocator(np.arange(yticks[1]/5, yticks[-1], yticks[1]/5 )))
-        plt.xlabel(sig_eff+' (%)', fontsize=30, loc='center')
+        plt.xlabel(sig_eff, fontsize=30, loc='center')
         plt.ylabel('1/'+bkg_eff  , fontsize=30, loc='center')
-        P, = plt.plot(100*tpr, 1/fpr, color='tab:blue', lw=3, zorder=10, clip_on=True)
+        P, = plt.plot(100*tpr, 1/fpr, color='tab:blue', lw=3, zorder=20, clip_on=True)
+        #P, = plt.plot(100*tpr, 1/fpr, color='tab:blue', lw=3, zorder=20, ls=(1,(4, 1)), clip_on=True)
         n_sig, n_bkg = np.sum(y_true==0), np.sum(y_true==1)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             lim_inf = 1/( fpr + np.sqrt(fpr/n_bkg) )
             lim_sup = 1/( fpr - np.sqrt(fpr/n_bkg) )
             lim_sup = np.nan_to_num(lim_sup)
-        plt.fill_between(100*tpr, lim_inf, lim_sup, alpha=0.2)
+        plt.fill_between(100*tpr, lim_inf, lim_sup, alpha=0.2, color='tab:blue')
         if multiplots:
             def get_legends(n_zip, output_dir):
                 file_path, color, ls = n_zip
                 file_path += '/' + output_dir.split('/')[-1] + '/pos_rates.pkl'
                 fpr, tpr = pickle.load(open(file_path, 'rb')).values()
                 fpr, tpr = fpr[fpr!=0], tpr[fpr!=0]
-                P, = plt.plot(100*tpr, 1/fpr, color=color, lw=2 if color=='dimgray' else 3,
+                P, = plt.plot(100*tpr, 1/fpr, color=color, lw=3 if color=='dimgray' else 3,
                               ls=ls, zorder=10, clip_on=True)
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore')
@@ -491,49 +522,62 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, 
                     lim_sup = np.nan_to_num(lim_sup)
                 plt.fill_between(100*tpr, lim_inf, lim_sup, color=color, alpha=0.2, edgecolor=None)
                 return P
-            color_list = ['tab:orange', 'tab:green', 'tab:red', 'dimgray']
-            #linestyles = ['--', '-.', ':']
-            linestyles = [(0,(5, 1)), (0,(3, 1, 1, 1,)), (0,(1, 1)), '-']
-            file_tag   = '0-5000GeV'
-            file_paths = ['outputs/6c_180m/HLV+tracks', 'outputs/6c_180m/HLV+images',
-                          'outputs/6c_180m/HLV', 'outputs/6c_180m/LLH_results']
-            #file_paths = ['outputs/5c_180m/HLV+tracks', 'outputs/5c_180m/HLV+images',
-            #              'outputs/5c_180m/HLV', 'outputs/5c_180m/images']
-            leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images', 'HLV$\:\!+\:\!$tracks',
-                          'HLV$\:\!+\:\!$images', 'HLV', 'LLH']#, 'Tracks$\:\!+\:\!$images']
-            #file_paths = ['outputs/6c_180m/scalars+tracks+images/pred_ratios',
-            #              'outputs/6c_180m/scalars+tracks+images/none_ratios']
-            #leg_labels = ['Truth Ratios', 'Predicted Ratios', 'Agnostic Ratios']
-            #file_paths = ['outputs/5c_180m/HLV+tracks+images_no-charge']
-            #leg_labels = ['With Charge', 'Without Charge']
-            #file_paths = ['outputs/6c_180m/HLV+tracks+images_no-coarse-Lr1']
-            #leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images', 'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images (no coarse Lr1\'s)']
+            color_list = ['tab:orange', 'tab:green', 'tab:red', 'purple', 'dimgray']
+            linestyles = [(1,(4, 1)), (1,(3, 1, 1, 1,)), (1,(1, 1)), (1,(1, 1))] #['--', '-.', ':']
+            #color_list = ['tab:blue', 'tab:green', 'tab:red', 'purple', 'dimgray']
+            #linestyles = ['-', (0,(3, 1, 1, 1,)), (0,(1, 1)), (0,(1, 1))] #['--', '-.', ':']
 
-            color_list = ['tab:blue', 'tab:orange', 'tab:orange']
-            linestyles = [(0,(5, 1)), '-', (0,(5, 1))]
-            file_paths = ['outputs/Last_results/new_images/test_match2class/bkg_deco',
-                          'outputs/Last_results/new_images/test_match2class/sig_deco']
+            #file_paths = ['outputs/Final_results/HLV+tracks/0-5000GeV',
+            #              'outputs/Final_results/HLV+images/0-5000GeV',
+            #              'outputs/Final_results/HLV/0-5000GeV'       ]
+            #leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images', 'HLV$\:\!+\:\!$tracks', 'HLV$\:\!+\:\!$images', 'HLV']
+
+            #file_paths = ['outputs/Final_results/HLV+tracks+images/0-5000GeV_pred-ratios',
+            #              'outputs/Final_results/HLV+tracks+images/0-5000GeV_none-ratios']
+            #leg_labels = ['Truth Ratios', 'Predicted Ratios', 'Agnostic Ratios']
+
+            color_list = ['tab:blue']
+            linestyles = ['-']
+            file_paths = ['outputs/Final_results/HLV+tracks+images/0-5000GeV']
+            leg_labels = ['', '']
+
+            #color_list = ['tab:blue', 'tab:blue']
+            #linestyles = [(1,(4, 1)), (0,(1, 1))]
+            #file_paths = ['outputs/Final_results/HLV+tracks+images/0-5000GeV_correlations/no_weighting/no_deco',
+            #              'outputs/Final_results/HLV+tracks+images/0-5000GeV_correlations/flat_weighting/no_deco']
+            #leg_labels = ['Match-to-Signal', 'No Weighting', 'Flat Weighting']
+            #file_paths = ['outputs/Final_results/HLV+tracks+images/0-5000GeV_correlations/match2class_weighting/bkg_deco',
+            #              'outputs/Final_results/HLV+tracks+images/0-5000GeV_correlations/match2class_weighting/sig_deco']
+            #leg_labels = ['No Correlation Mitigation', 'Background Decorrelation', 'Signal Decorrelation']
+
+            #color_list = ['tab:blue', 'tab:orange', 'tab:orange']
+            #linestyles = [(0,(5, 1)), '-', (0,(5, 1))]
+            #file_paths = ['outputs/Last_results/new_images/test_match2class/bkg_deco',
+            #              'outputs/Last_results/new_images/test_match2class/sig_deco']
             #leg_labels = [r'MC  $\,\rightarrow$Data', r'Data$\rightarrow$Data']
-            leg_labels = ['No Deco', 'Bkg Deco', 'Sig Deco']
+            #leg_labels = ['No Deco', 'Bkg Deco', 'Sig Deco']
             #leg_labels = ['Truth Ratios', 'MC Sample Ratios', 'Predicted Ratios']
             #leg_labels = ['HLV$\:\!+\:\!$tracks$\:\!+\:\!$images' + r' (MC  $\,\rightarrow$Data)'  ,
             #              'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images' + r' (Data$\rightarrow$Data)',
             #              'HLV'                                   + r' (MC  $\,\rightarrow$Data)'  ,
             #              'HLV'                                   + r' (Data$\rightarrow$Data)']
 
-            #file_paths = [path+'/'+file_tag for path in file_paths]
             Ps = [P] + [get_legends(n_zip, output_dir) for n_zip in zip(file_paths,color_list,linestyles)]
             anchor = (1.,0.59) if ECIDS else (1.,0.77)
-            L = plt.legend(Ps, leg_labels, loc='upper right', bbox_to_anchor=anchor, fontsize=19,
-                           ncol=1, frameon=False, facecolor=None, framealpha=1); L.set_zorder(10)
+            order = [0,1,2] ; spacing = None
+            #anchor = (0.635,0.56) if ECIDS else (0.635,0.74)
+            #order = [0,1] ; spacing = 1.1
+
+            Ps, leg_labels = [Ps[n] for n in order], [leg_labels[n] for n in order]
+            L = plt.legend(Ps, leg_labels, loc='upper right', bbox_to_anchor=anchor, fontsize=19, ncol=1,
+                           frameon=False, facecolor=None, framealpha=1, labelspacing=spacing); L.set_zorder(10)
         if best_fpr != 0 and False:
             plt.scatter( 100*best_tpr, 1/best_fpr, s=40, marker='D', c='tab:blue',
                          label="{0:<15s} {1:>3.2f}%".format('Best accuracy:',100*max(accuracy)), zorder=10 )
 
-        #'''
         for n in np.arange(len(LLH_scores)):
             if LLH_scores[n] is None: continue
-            plt.scatter( 100*LLH_tpr[n], 1/LLH_fpr[n], s=70, marker=markers[n], zorder=20, clip_on=False,
+            plt.scatter( 100*LLH_tpr[n], 1/LLH_fpr[n], s=70, marker=markers[n], zorder=40, clip_on=False,
                          edgecolors='black', c=colors[n], linewidth=2,
                          label='$'+epsilon+'_{\operatorname{sig}}^{\operatorname{LH}}$'
                          +'='+format(100*LLH_tpr[n],'.1f') +'%' +r'$\rightarrow$'
@@ -549,7 +593,6 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, 
                           xerr=[[xerr_inf],[xerr_sup]], yerr=[[yerr_inf],[yerr_sup]] )
         plt.legend(loc='upper right', fontsize=16.5 if ECIDS else 17, frameon=False,
                    handletextpad=0., facecolor=None, framealpha=1).set_zorder(10)
-        #'''
 
         if multiplots:
             sig, bkg = output_dir.split('/')[-1].split('vs')
@@ -559,9 +602,9 @@ def plot_ROC_curves(sample, y_true, y_prob, output_dir, ECIDS, first_cuts=None, 
             plt.gca().add_artist(L)
             #plt.text(0.02, 0.95, r'$\bf ATLAS$ Simulation Preliminary',
             #         {'color':'black', 'fontsize':18},  va='center', ha='left', transform=axes.transAxes, zorder=20)
-            if   file_tag ==  '0-5000GeV': text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}\:\leqslant\:$15 GeV'
-            elif file_tag == '15-5000GeV': text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}>$15$\,$GeV'
-            else                         : text = r'$\sqrt{s}=$13$\,$TeV $\:;\: E_\mathrm{T}$ inclusive'
+            #if   file_tag ==  '0-5000GeV': text = r'$\sqrt{s}=$13$\,$TeV $\:;\: p_\mathrm{T}\:\leqslant\:$15 GeV'
+            #elif file_tag == '15-5000GeV': text = r'$\sqrt{s}=$13$\,$TeV $\:;\: p_\mathrm{T}>$15$\,$GeV'
+            #else                         : text = r'$\sqrt{s}=$13$\,$TeV $\:;\: p_\mathrm{T}$ inclusive'
             #plt.text(0.02, 0.895, text, {'color':'black', 'fontsize':18},
             #         va='center', ha='left', transform=axes.transAxes, zorder=20)
             #plt.text(0.02, 0.84, r'Sig : '+sig_dict[sig],
@@ -659,7 +702,7 @@ def performance_plots(sample, y_true, y_prob, output_dir, ECIDS=False):
     #sample['mu'] = sample['averageInteractionsPerCrossing']
     output_dir += '/'+'performance_plots'
     if not os.path.isdir(output_dir): os.mkdir(output_dir)
-    iter_tuples = itertools.product(['eta', 'pt', 'mu'], ['loose', 'tight'])
+    iter_tuples = itertools.product(['eta', 'pt', 'mu'], ['loose', 'medium', 'tight'])
     arguments = [(sample, y_true, y_prob, output_dir, *iter_tuple, ECIDS) for iter_tuple in iter_tuples]
     processes = [mp.Process(target=CNNvsLLH, args=arg) for arg in arguments]
     for job in processes: job.start()
@@ -672,11 +715,16 @@ def get_eff(sample, y_true, y_prob, threshold, var, wp_idx, bin, ECIDS, return_d
     LLH_fpr, LLH_tpr = LLH_fpr[-3:][wp_idx], LLH_tpr[-3:][wp_idx]
     fpr, tpr, thresholds = metrics.roc_curve(y_true, y_prob, pos_label=0)
     idx = np.argmin(np.abs(threshold-thresholds))
-    CNN_eff =                     LLH_tpr  if var in ['eta','pt'] else   tpr[idx]
-    CNN_rej = 1/CNN_fpr(tpr, fpr, LLH_tpr) if var in ['eta','pt'] else 1/fpr[idx]
+
+    #CNN_eff =                     LLH_tpr  if var in ['eta','pt'] else   tpr[idx]
+    #CNN_rej = 1/CNN_fpr(tpr, fpr, LLH_tpr) if var in ['eta','pt'] else 1/fpr[idx]
+    CNN_eff =                     LLH_tpr  if var in ['eta','pt','mu'] else   tpr[idx]
+    CNN_rej = 1/CNN_fpr(tpr, fpr, LLH_tpr) if var in ['eta','pt','mu'] else 1/fpr[idx]
+
     return_dict[bin] = {'n_sig':np.sum(y_true==0), 'LLH_eff':  LLH_tpr, 'CNN_eff':CNN_eff,
                         'n_bkg':np.sum(y_true==1), 'LLH_rej':1/LLH_fpr, 'CNN_rej':CNN_rej}
 def CNNvsLLH(sample, y_true, y_prob, output_dir, var, wp, ECIDS, isolation=False):
+    font_manager._get_font.cache_clear()
     eta_bins = [0, 0.1, 0.6, 0.8, 1.15, 1.37, 1.52, 1.81, 2.01, 2.37, 2.47]
     pt_bins  = [4, 7, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 80, 100]
     mu_bins  = [0, 20, 30, 40, 50, 60, 80]
@@ -707,66 +755,90 @@ def CNNvsLLH(sample, y_true, y_prob, output_dir, var, wp, ECIDS, isolation=False
     fig1, (ax11,ax12) = plt.subplots(figsize=(8,6), ncols=1, nrows=2, sharex=True, gridspec_kw={'height_ratios':[3,1]})
     fig2, (ax21,ax22) = plt.subplots(figsize=(8,6), ncols=1, nrows=2, sharex=True, gridspec_kw={'height_ratios':[3,1]})
     ax11.errorbar(mean, LLH_rej        , xerr=bin_err, yerr=LLH_rej_err        , marker='o',
-                  elinewidth=2, linestyle='', ecolor='k',color='k', label='LLH')
+                  elinewidth=2, linestyle='', ecolor='k',color='k', label='LH')
     ax11.errorbar(mean, CNN_rej        , xerr=bin_err, yerr=CNN_rej_err        , marker='o',
                   elinewidth=2, linestyle='', ecolor='#3d84bf', color='#3d84bf', label='CNN')
     ax12.errorbar(mean, CNN_rej/LLH_rej, xerr=bin_err, yerr=CNN_rej_err/LLH_rej, marker='o',
                   elinewidth=2, linestyle='', ecolor='#3d84bf', color='#3d84bf'             )
     ax21.errorbar(mean, LLH_eff        , xerr=bin_err, yerr=LLH_eff_err        , marker='o',
-                  elinewidth=2, linestyle='', ecolor='k'      , color='k'      , label='LLH')
+                  elinewidth=2, linestyle='', ecolor='k'      , color='k'      , label='LH')
     ax21.errorbar(mean, CNN_eff        , xerr=bin_err, yerr=CNN_eff_err        , marker='o',
                   elinewidth=2, linestyle='', ecolor='#3d84bf', color='#3d84bf', label='CNN')
     ax22.errorbar(mean, CNN_eff/LLH_eff, xerr=bin_err, yerr=CNN_eff_err/LLH_eff, marker='o',
                   elinewidth=2, linestyle='', ecolor='#3d84bf', color='#3d84bf'             )
     for AX in [ax11, ax12, ax21, ax22]:
-        AX.tick_params(which='minor', direction='in', length=4, width=1.5, colors='black',
+        AX.tick_params(which='minor', direction='in', length=4, width=1, colors='black',
                          bottom=True, top=True, left=True, right=True)
-        AX.tick_params(which='major', direction='in', length=8, width=1.5, colors='black',
+        AX.tick_params(which='major', direction='in', length=7, width=2, colors='black',
                          bottom=True, top=True, left=True, right=True)
-        AX.tick_params(axis="x", pad=6, labelsize=14)
-        AX.tick_params(axis="y", pad=5, labelsize=14)
-        for axis in ['top', 'bottom', 'left', 'right']: AX.spines[axis].set_linewidth(1.5)
+        AX.tick_params(axis="x", pad=8, labelsize=15)
+        AX.tick_params(axis="y", pad=5, labelsize=15)
+        for axis in ['top', 'bottom', 'left', 'right']: AX.spines[axis].set_linewidth(2)
         if AX == ax11 or AX == ax21:
-            legend_title = r'$\bf ATLAS$ Simulation Preliminary'+'\n'+r'$\sqrt{s} = 13\,$TeV'+'\n' \
-                         + 'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images'+'\n' + wp.title()            \
-                         + (' + isolation' if isolation else '')                                \
-                         + (' ('+sig_eff+'='+format(LLH_tpr,'.3f')+')' if var=='mu' else '')
-            AX.annotate(legend_title, xy=(0.03, 0.95), xycoords='axes fraction', fontsize=15,
+            #legend_title = r'$\bf ATLAS$ Simulation Preliminary'+'\n'+r'$\sqrt{s} = 13\,$TeV'+'\n' \
+            #             + 'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images'+'\n' + wp.title()            \
+            #             + (' + isolation' if isolation else '')                                \
+            #             + (' ('+sig_eff+'='+format(LLH_tpr,'.3f')+')' if var=='mu' else '')
+            legend_title = r'HLV$\:\!+\:\!$tracks$\:\!+\:\!$images'+'\n' + wp.title()            \
+                         + (' + isolation' if isolation else '')                                 \
+                         #+ (' ('+sig_eff+'='+format(LLH_tpr,'.3f')+')' if var=='mu' else '')
+            AX.annotate(legend_title, xy=(0.04, 0.96), xycoords='axes fraction', fontsize=15,
                         horizontalalignment='left', verticalalignment='top')
             AX.legend(loc='upper right', frameon=False, fontsize=15, handletextpad=0)
-    label_dict = {'eta':'$|\eta|$', 'pt':'$E_\mathrm{T}$ (GeV)', 'mu':r'$\langle \mu \rangle$'}
+    label_dict = {'eta':'$|\eta|$', 'pt':'$p_\mathrm{T}\,$(GeV)', 'mu':r'$\langle \mu \rangle$'}
     if isolation: y11_min, y11_max = (0, 100) if wp=='loose' else (0, 3000)
-    else        : y11_min, y11_max = (0, 600) if wp=='loose' else (0, 3000)
+    else        : y11_min, y11_max = (0, 700) if wp=='loose' else (0, 3000)
     if var == 'eta':
         x_ticks   = np.arange(0, 2.6, 0.5)
         locators  = np.arange(0, 2.6, 0.1)
         n_locators = 2
-        y12_ticks = np.arange(2, 9  , 2  )
+        #y12_ticks = np.arange(2, 9  , 2  )
+        #y12_ticks = np.arange(4, 15  , 2  )
+        y12_ticks = np.arange(3, 13  , 3  )
         if isolation: y21_ticks = np.arange(0.80, 1.10, 0.05) if wp=='loose' else np.arange(0.60, 1.05, 0.05)
         else        : y21_ticks = np.arange(0.84, 1.03, 0.02) if wp=='loose' else np.arange(0.60, 1.05, 0.05)
+        #y21_ticks = np.arange(0.70, 1.06, 0.05)
+        y21_ticks = np.arange(0.85, 1.01, 0.05)
+        y22_ticks = np.arange(0.99, 1.01, 0.01)
     elif var == 'pt':
         x_ticks   = [4.5] + list(np.arange(10,110,10))
         locators  = np.arange(0, 101, 2  )
         n_locators = 2
-        y12_ticks = np.arange(0, 13 , 4  )
+        #y12_ticks = np.arange(0, 13 , 4  )
+        #y12_ticks = np.arange(0, 17 , 4  )
+        y12_ticks = np.arange(3, 13 , 3  )
         y21_ticks = np.arange(0.60, 1.20, 0.05) if wp=='loose' else np.arange(0.10, 1.30, 0.1)
         if isolation: y21_ticks = np.arange(0.80, 1.06, 0.05) if wp=='loose' else np.arange(0.10, 1.30, 0.1)
         else        : y21_ticks = np.arange(0.60, 1.20, 0.05) if wp=='loose' else np.arange(0.10, 1.30, 0.1)
+        #y21_ticks = np.arange(0.30, 1.21, 0.10)
+        y21_ticks = np.arange(0.60, 1.21, 0.10)
+        y22_ticks = np.arange(0.99, 1.01, 0.01)
     elif var == 'mu':
         x_ticks   = np.arange(0, 90, 10)
         locators  = np.arange(0, 90, 2 )
-        n_locators = 5
-        y12_ticks = np.arange(4, 8  , 1  )
+        n_locators = 2
+        #y12_ticks = np.arange(4, 8  , 1  )
+        #y12_ticks = np.arange(4, 13  , 2  )
+        y12_ticks = np.arange(3, 13  , 3  )
         if isolation: y21_ticks = np.arange(0.92, 0.99, 0.01) if wp=='loose' else np.arange(0.70, 0.95, 0.05)
         else        : y21_ticks = np.arange(0.90, 0.98, 0.01) if wp=='loose' else np.arange(0.70, 0.95, 0.05)
-    y22_ticks = np.arange(0.99, 1.01, 0.01)
-    ax11.set_ylabel(bkg_rej, loc='top', fontsize=18, labelpad=0)
+        #y21_ticks = np.arange(0.70, 1.06, 0.05)
+        y21_ticks = np.arange(0.85, 1.06, 0.05)
+        y22_ticks = np.arange(0.99, 1.01, 0.01)
+    ax11.set_ylabel(bkg_rej, loc='center', fontsize=22, labelpad=None)
     ax11.axis(ymin=y11_min, ymax=y11_max)
     ax11.yaxis.set_minor_locator(AutoMinorLocator(5))
-    ax12.set_xlabel(label_dict[var], fontsize=18, loc='right', labelpad=2)
+    ax12.set_xlabel(label_dict[var], fontsize=22, loc='center', labelpad=2)
     ax12.set_xlim(x_ticks[0], x_ticks[-1])
-    ax12.set_xticks(x_ticks) ; ax12.set_xticklabels(x_ticks)
-    ax12.set_ylabel('CNN/LLH', fontsize=15, loc='top')
+    ax12.set_xticks(x_ticks)
+    if var == 'eta': ax12.set_xticklabels(['0'] + [format(n,'.1f') for n in x_ticks[1:]])
+    else           : ax12.set_xticklabels(x_ticks)
+
+    #ax12.set_ylabel('CNN$\,/\,$LH', fontsize=15, loc='center')
+    label  = '$ϵ_{\operatorname{bkg}}^{\operatorname{LH}}\,/\,$'
+    label += '$ϵ_{\operatorname{bkg}}^{\operatorname{CNN}}$'
+    ax12.set_ylabel(label, fontsize=20, loc='center', labelpad=8)
+
     ax12.set_ylim(ymin=y12_ticks[0], ymax=y12_ticks[-1])
     ax12.set_yticks(y12_ticks)
     ax12.xaxis.set_minor_locator(FixedLocator(locators))
@@ -774,23 +846,31 @@ def CNNvsLLH(sample, y_true, y_prob, output_dir, var, wp, ECIDS, isolation=False
     #if var == 'eta' and wp == 'loose':
     #    ax12.arrow(2.42, 4.5, 0, 1.0, head_width=0.05, width=0.01, head_length=0.4,
     #               edgecolor='#3d84bf', facecolor='#3d84bf')
-    ax21.set_ylabel(sig_eff, loc='top', fontsize=18, labelpad=0)
+    ax21.set_ylabel(sig_eff, loc='center', fontsize=22, labelpad=None)
     ax21.set_ylim(y21_ticks[0], y21_ticks[-1])
     ax21.set_yticks(y21_ticks)
     ax21.yaxis.set_minor_locator(AutoMinorLocator(5))
-    ax22.set_ylabel('CNN/LLH', fontsize=14, loc='top', labelpad=5 )
-    ax22.set_xlabel(label_dict[var], fontsize=18, loc='right', labelpad=2)
+
+    #ax22.set_ylabel('CNN$\,/\,$LH', fontsize=15, loc='center', labelpad=5 )
+    label  = '$ϵ_{\operatorname{sig}}^{\operatorname{CNN}}\,/\,$'
+    label += '$ϵ_{\operatorname{sig}}^{\operatorname{LH}}$'
+    ax22.set_ylabel(label, fontsize=20, loc='center', labelpad=None)
+
+    ax22.set_xlabel(label_dict[var], fontsize=22, loc='center', labelpad=2)
     ax22.set_xlim(x_ticks[0], x_ticks[-1])
-    ax22.set_xticks(x_ticks) ; ax22.set_xticklabels(x_ticks)
+    ax22.set_xticks(x_ticks)
+    if var == 'eta': ax22.set_xticklabels(['0'] + [format(n,'.1f') for n in x_ticks[1:]])
+    else           : ax22.set_xticklabels(x_ticks)
     ax22.axis(ymin=y22_ticks[0], ymax=y22_ticks[-1])
     ax22.set_yticks(y22_ticks)
     ax22.xaxis.set_minor_locator(FixedLocator(locators))
     ax22.yaxis.set_minor_locator(AutoMinorLocator(n_locators))
     for Type, FIG in zip(['bkg-rej','sig-eff'],[fig1,fig2]):
-        FIG.align_labels()
+        #FIG.align_labels()
         file_name = output_dir+'/'+Type+'_'+var+'_'+wp+'.png'
-        FIG.subplots_adjust(left=0.11, right=0.97, bottom=0.10, top=0.98, hspace=0.1)
-        print('Saving performance  plot to:', file_name); FIG.savefig(file_name)
+        #FIG.subplots_adjust(left=0.12, right=0.97, bottom=0.115, top=0.98, hspace=0.1)
+        FIG.subplots_adjust(left=0.13, right=0.97, bottom=0.115, top=0.98, hspace=0.1)
+        print('Saving performance    plot to:', file_name); FIG.savefig(file_name)
 
 
 def performance_ratio(sample, y_true, y_prob, bkg, output_dir, eta_inclusive, output_tag='CNN2LLH'):
@@ -800,8 +880,9 @@ def performance_ratio(sample, y_true, y_prob, bkg, output_dir, eta_inclusive, ou
               for wp in ['loose', 'medium', 'tight']}
     pickle_file = 'CNN2LLH_inclusive.pkl' if eta_inclusive else 'CNN2LLH.pkl'
     if output_tag == 'CNN2CNN':
-        input_dir = '' #'6c_180m/HLV/0-5000GeV'
+        input_dir = 'Final_results/HLV/0-5000GeV'
         input_dir = output_dir.split('outputs')[0]+'outputs'+'/'+input_dir
+        #print(input_dir+'/'+'class_0vs'+str(bkg).title()+'/'+pickle_file)
         try: input_ratios = pickle.load(open(input_dir+'/'+'class_0vs'+str(bkg).title()+'/'+pickle_file,'rb'))
         except FileNotFoundError: return
         with warnings.catch_warnings():
@@ -819,7 +900,7 @@ def performance_ratio(sample, y_true, y_prob, bkg, output_dir, eta_inclusive, ou
     else:
         for wp in ratios:
             file_name = output_dir+'/'+output_tag+'_'+wp+'.png'
-            binned_meshgrid(eta_bins, pt_bins, ratios[wp], file_name, vmin=None, vmax=None)
+            binned_meshgrid(eta_bins, pt_bins, ratios[wp], file_name, output_tag, vmin=None, vmax=None)
 def ratio_meshgrid(sample, y_true, y_prob, wp, output_dir, eta_bins, pt_bins, ECIDS=False):
     bin_tuples = list(itertools.product(zip(eta_bins[:-1], eta_bins[1:]), zip(pt_bins[:-1], pt_bins[1:])))
     manager   = mp.Manager(); return_dict = manager.dict()
@@ -850,8 +931,8 @@ def bkg_eff_ratio(sample, y_true, y_prob, wp, bin, ECIDS, return_dict):
 def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vmax=None, color='black'):
     eta = np.arange(0, len(eta_bins))
     pt  = np.arange(0, len( pt_bins))
-    #plt.figure(figsize=(6 if tag=='CNN2LLH' else 5.2,7.5))
-    plt.figure(figsize=(6 if tag=='CNN2LLH' else 5.4,7.5))
+    plt.figure(figsize=(6 if tag=='CNN2LLH' else 5.1,7.5))
+    #plt.figure(figsize=(6 if tag=='CNN2LLH' else 5.4,7.5))
     def make_plot(wp, ratios, idx=None):
         if idx is None: idx = list(ratios.keys()).index(wp) + 1
         ratios = ratios[wp]
@@ -860,25 +941,30 @@ def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vma
         plt.xlabel(wp.title(), fontsize=20)
         if idx == 1 and tag == 'CNN2LLH':
             plt.yticks(np.arange(len( pt_bins)), (pt_bins[:-1]+[r'$\infty$']) if pt_bins[-1]>=1e3 else pt_bins)
-            plt.ylabel('$E_\mathrm{T}$ (GeV)', fontsize=30, loc='top')
+            plt.ylabel('$p_\mathrm{T}\,$(GeV)', fontsize=30, loc='center')
         else:
             plt.yticks(np.arange(len( pt_bins)), len(pt_bins)*[''])
         for x in range(len(eta_bins)-1):
             for y in range(len( pt_bins)-1):
                 text = 'Ind' if ratios[y,x]==0 else format(ratios[y,x],'.1f')
                 plt.text(x+0.5, y+0.5, text, {'color':color, 'fontsize':20}, ha='center', va='center')
-        plt.grid(True, color="grey", lw=1, alpha=1)
+        plt.grid(True, color="grey", lw=1, alpha=1, axis='y')
         left_axis = True if (idx==1 and tag=='CNN2LLH') else False
         plt.tick_params(axis='both', which='major', labelbottom=False, bottom=False,
-                        labelleft=left_axis, left=left_axis, labelsize=18, direction='in', length=5, width=1)
+                        labelleft=left_axis, left=left_axis, labelsize=18, direction='in', length=5, width=2)
         for axis in ['top', 'bottom', 'left', 'right']:
-            ax.spines[axis].set_linewidth(1.5)
+            ax.spines[axis].set_linewidth(2)
             ax.spines[axis].set_color('black')
         if pt_bins[-1] >= 1e3 and idx ==1:
             font_sizes = (len(pt_bins)-1)*[18]+[30]
             for tick, size in zip(plt.yticks()[-1], font_sizes): tick.set_fontsize(size)
-        if idx ==2:
-            plt.title('CNN$\,/\,$LLH' if tag=='CNN2LLH' else 'CNN$\,/\,$FCN', fontsize=25)
+        if idx == 2:
+            #plt.title('CNN$\,/\,$LLH' if tag=='CNN2LLH' else 'CNN$\,/\,$FCN', fontsize=25)
+            epsilon = 'ϵ' #'\epsilon'
+            eff_tag = 'LH' if tag=='CNN2LLH' else 'FCN'
+            title  = '$'+epsilon+'_{\operatorname{bkg}}^{\operatorname{'+eff_tag+'}}\,/\,$'
+            title += '$'+epsilon+'_{\operatorname{bkg}}^{\operatorname{CNN}}$'
+            plt.title(title, fontsize=30, pad=15)
     for wp in ratios: make_plot(wp, ratios)
     cbar = plt.colorbar(fraction=0.05, pad=0.06, aspect=100, shrink=1)
     ticks = [val for val in cbar.get_ticks() if min(abs(val-vmin),abs(val-vmax))>0.02*(vmax-vmin)
@@ -886,18 +972,21 @@ def inclusive_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vma
     ticks = [vmin] + ticks + [vmax]
     cbar.set_ticks(ticks)
     cbar.set_ticklabels([format(n,'.1f') for n in ticks])
-    cbar.ax.tick_params(labelsize=15, length=5, width=1.5)
-    cbar.outline.set_linewidth(1.5)
-    if tag=='CNN2CNN':
-        cbar.set_label('Ratio of Background Rejections', fontsize=22, labelpad=8, rotation=90, loc='top')
+    cbar.ax.tick_params(labelsize=15, length=5, width=2)
+    cbar.outline.set_linewidth(2)
+    #if tag=='CNN2CNN':
+    #    cbar.set_label('Ratio of Background Rejections', fontsize=22, labelpad=8, rotation=90, loc='top')
     plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=color)
-    plt.subplots_adjust(left=0.03 if tag=='CNN2CNN' else 0.17, right=0.84 if tag=='CNN2CNN' else None,
-                        top=0.95, bottom=0.05, wspace=0.06)
+    #plt.subplots_adjust(left=0.03 if tag=='CNN2CNN' else 0.17, right=0.84 if tag=='CNN2CNN' else None,
+    #                    top=0.95, bottom=0.05, wspace=0.06)
+    plt.subplots_adjust(left=0.03 if tag=='CNN2CNN' else 0.17, right=None if tag=='CNN2CNN' else None,
+                        top=0.915, bottom=0.05, wspace=0.06)
     print('Saving ratio meshgrid plot to:', file_name); plt.savefig(file_name)
-def binned_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, color='black'):
+def binned_meshgrid(eta_bins, pt_bins, ratios, file_name, tag, vmin=None, vmax=None, color='black'):
     eta = np.arange(0, len(eta_bins))
     pt  = np.arange(0, len( pt_bins))
-    plt.figure(figsize=(11,7.5)); ax = plt.gca()
+    #plt.figure(figsize=(11,7.5)); ax = plt.gca()
+    plt.figure(figsize=(10.5,8.)); ax = plt.gca()
     if vmin is None: vmin = np.min(ratios[ratios!=0])
     if vmax is None: vmax = np.max(ratios[ratios!=0])
     plt.pcolormesh(eta, pt, ratios, cmap="Blues", vmin=vmin, vmax=vmax)
@@ -913,22 +1002,30 @@ def binned_meshgrid(eta_bins, pt_bins, ratios, file_name, vmin=None, vmax=None, 
         font_sizes = (len(pt_bins)-1)*[18]+[30]
         for tick, size in zip(plt.yticks()[-1], font_sizes):
             tick.set_fontsize(size)
-    plt.xlabel('$|\eta|$'            , fontsize=30, loc='right')
-    plt.ylabel('$E_\mathrm{T}$ (GeV)', fontsize=30, loc='top'  )
-    ax.tick_params(which='major', direction='in', length=5, width=1, colors='black',
+    plt.xlabel('$|\eta|$'             , fontsize=30, loc='center')
+    plt.ylabel('$p_\mathrm{T}\,$(GeV)', fontsize=30, loc='center'  )
+    ax.tick_params(which='major', direction='in', length=5, width=2, colors='black',
                    bottom=True, top=True, left=True, right=True)
     for axis in ['top', 'bottom', 'left', 'right']:
-        ax.spines[axis].set_linewidth(1.5)
+        ax.spines[axis].set_linewidth(2)
         ax.spines[axis].set_color('black')
+
+    epsilon = 'ϵ' #'\epsilon'
+    eff_tag = 'LH' if tag=='CNN2LLH' else 'FCN'
+    title  = '$'+epsilon+'_{\operatorname{bkg}}^{\operatorname{'+eff_tag+'}}\,/\,$'
+    title += '$'+epsilon+'_{\operatorname{bkg}}^{\operatorname{CNN}}$'
+    plt.title(title, fontsize=30, pad=15)
+
     cbar = plt.colorbar(fraction=0.04, pad=0.02)
-    ticks = [val for val in cbar.get_ticks() if min(abs(val-vmin),abs(val-vmax))>0.02*(vmax-vmin)
+    #ticks = [val for val in cbar.get_ticks() if min(abs(val-vmin),abs(val-vmax))>0.02*(vmax-vmin)
+    ticks = [val for val in cbar.get_ticks() if min(abs(val-vmin),abs(val-vmax))>0.025*(vmax-vmin)
              and round(val,1)!=round(vmin,1) and round(val,1)!=round(vmax,1)]
     ticks = [vmin] + ticks + [vmax]
     cbar.set_ticks(ticks)
     cbar.set_ticklabels([format(n,'.1f') for n in ticks])
-    cbar.ax.tick_params(labelsize=15, length=5, width=1.5)
-    cbar.outline.set_linewidth(1.5)
-    cbar.set_label('Ratio of Background Rejections', fontsize=22, labelpad=10, rotation=90, loc='top')
+    cbar.ax.tick_params(labelsize=15, length=5, width=2)
+    cbar.outline.set_linewidth(2)
+    #cbar.set_label('Ratio of Background Rejections', fontsize=22, labelpad=10, rotation=90, loc='center')
     plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=color)
     plt.tight_layout()
     print('Saving ratio meshgrid plot to:', file_name); plt.savefig(file_name)
@@ -946,30 +1043,32 @@ def ratio_plots(valid_sample, valid_labels, valid_probs, n_etypes, output_dir):
     channels_list = ['Zee', 'Wenu', 'Ztautau', 'Wtaunu', 'ttbar', 'JF17', 'JF35', 'JF50']
     ratios  = {process:return_dict[process][0] for process in channels_list}
     bkg_rej = {process:return_dict[process][1] for process in channels_list}
+    X_val = [r'Z$\rightarrow$ee'     , r'W$\rightarrow$e$\nu$'     , r'Z$\rightarrow \tau\tau$',
+             r'W$\rightarrow \tau\nu$', r't$\bar{\operatorname{t}}$', r'JF17', r'JF35', r'JF50' ]
+    Y_val = [' Prompt \nElectron', 'Charge Flip', '   Photon   \nConversion', ' Heavy\nFlavor',
+             'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n     Hadron   '       ]
     ratios = np.vstack([ratios[process]['truth'] for process in ratios] ).T
+    #ratios = np.vstack([ratios[process]['pred'] for process in ratios] ).T
     #ratios = np.vstack([ratios[process]['pred']-ratios[process]['truth'] for process in ratios] ).T
     #ratios = np.vstack([(ratios[process]['pred']-ratios[process]['truth'])/ratios[process]['truth']
     #                    for process in ratios] ).T
+    plot_meshgrid(X_val, Y_val, ratios, output_dir, prec=1, vmax=90); sys.exit()
+    #Y_val = [' Combined \nBackground', 'Charge Flip', '   Photon   \nConversion', ' Heavy\nFlavor',
+    #         'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n     Hadron   '       ]
     #bkg_rej = np.vstack([100*(bkg_rej[process]['pred' ]-bkg_rej[process]['none'])/bkg_rej[process]['none']
     #                     for process in bkg_rej]).T
     #bkg_rej = np.vstack([100*(bkg_rej[process]['truth']-bkg_rej[process]['pred'])/bkg_rej[process]['pred']
     #                     for process in bkg_rej]).T
-    X_val = [r'Z$\rightarrow$ee'     , r'W$\rightarrow$e$\nu$'     , r'Z$\rightarrow \tau\tau$',
-             r'W$\rightarrow \tau\nu$', r't$\bar{\operatorname{t}}$', r'JF17', r'JF35', r'JF50' ]
-    #Y_val = [' Combined \nBackground', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavor',
-    #         'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n    Hadron    '       ]
-    Y_val = [' Prompt \nElectron', 'Charge Flip', '   Photon   \nConversion', ' Heavy \nFlavor',
-             'Light Flavor\n        e$/\gamma$        ', 'Light Flavor\n    Hadron    '       ]
-    #plot_meshgrid(X_val, Y_val, bkg_rej, output_dir, vmin=0, vmax=200, prec=0)
-    plot_meshgrid(X_val, Y_val, ratios, output_dir, prec=1, vmax=50); sys.exit()
+    #plot_meshgrid(X_val, Y_val, bkg_rej, output_dir, vmin=0, vmax=300, prec=0)
 def plot_meshgrid(X_val, Y_val, Z_val, output_dir, prec=2, vmin=None, vmax=None, color='black'):
     X_idx = np.arange(0, len(X_val)+1) - 0.5
     Y_idx = np.arange(0, len(Y_val)+1) - 0.5
     plt.figure(figsize=(12.5,7.5)); ax = plt.gca()
+    #plt.figure(figsize=(12.5,7.8)); ax = plt.gca()
     if vmin is None: vmin = np.min(Z_val[Z_val!=-1])
     else           : vmin = max(vmin, np.min(Z_val[Z_val!=-1]))
-    if vmax is None: vmax = np.max(Z_val[Z_val!=-1])
-    else           : vmax = min(vmax, np.max(Z_val[Z_val!=-1]))
+    if vmax is None: vmax = np.max(Z_val[(Z_val!=-1)&(np.isfinite(Z_val))])
+    else           : vmax = min(vmax, np.max(Z_val[(Z_val!=-1)&(np.isfinite(Z_val))]))
     plt.pcolormesh(X_idx, Y_idx, Z_val, cmap="Blues"  , edgecolors='grey', vmin=vmin, vmax=vmax)
     #plt.pcolormesh(X_idx, Y_idx, Z_val, cmap="Blues_r", edgecolors='black', vmin=vmin, vmax=vmax)
     plt.xticks(np.arange(len(X_val)), X_val, rotation=0)
@@ -980,28 +1079,33 @@ def plot_meshgrid(X_val, Y_val, Z_val, output_dir, prec=2, vmin=None, vmax=None,
             plt.text(x, y, text, {'color':color, 'fontsize':20}, ha='center', va='center')
     plt.grid(True, color='grey', lw=1, alpha=1, which='minor')
     plt.tick_params(axis='both', which='major', labelsize=20)
-    plt.xlabel('Process', fontsize=30, loc='right')
+    #plt.xlabel('Process', fontsize=30, loc='right')
     #plt.ylabel('Background Class', fontsize=30, loc='top'  )
-    ax.tick_params(which='major', direction='in', length=5, width=1.5, colors='black',
+    ax.tick_params(which='major', direction='in', length=5, width=2, colors='black',
                    bottom=True, top=True, left=True, right=True)
     ax.tick_params(axis="x", pad=5, labelsize=20)
     ax.tick_params(axis="y", pad=0, labelsize=20)
     for axis in ['top', 'bottom', 'left', 'right']:
-        ax.spines[axis].set_linewidth(1.5)
+        ax.spines[axis].set_linewidth(2)
         ax.spines[axis].set_color('black')
+
+    plt.title('Truth Ratio', fontsize=28, pad=14)
+    #plt.title('Predicted Ratio', fontsize=28, pad=14)
+    #plt.title('Predicted Ratio$-$Truth Ratio', fontsize=28, pad=14)
+    #plt.title('Background Rejection Improvement\n(agnostic'+r'$\rightarrow$'+'predicted ratios)', fontsize=26, pad=10)
+    #plt.title('Background Rejection Improvement\n(predicted'+r'$\rightarrow$'+'truth ratios)'   , fontsize=26, pad=10)
+
     cbar = plt.colorbar(fraction=0.04, pad=0.02)
     ticks = [val for val in cbar.get_ticks() if min(abs(val-vmin),abs(val-vmax))>0.02*(vmax-vmin)
              and round(val,1)!=round(vmin,1) and round(val,1)!=round(vmax,1)]
     ticks = [vmin] + ticks + [vmax]
     cbar.set_ticks(ticks)
     cbar.set_ticklabels([format(n,'.0f') for n in ticks])
-    cbar.ax.tick_params(labelsize=15, length=5, width=1.5)
-    cbar.outline.set_linewidth(1.5)
-    cbar.set_label('Truth Ratio (%)', fontsize=22, labelpad=10, rotation=90, loc='top')
+    cbar.ax.tick_params(labelsize=15, length=5, width=2)
+    cbar.outline.set_linewidth(2)
+    #cbar.set_label('Truth Ratio (%)', fontsize=22, labelpad=10, rotation=90, loc='top')
     #cbar.set_label('Predicted Ratio$-$Truth Ratio (%)', fontsize=22, labelpad=0, rotation=90, loc='top')
     #cbar.set_label('(Predicted Ratio$-$Truth Ratio)/Truth Ratio', fontsize=22, labelpad=10, rotation=90, loc='top')
-    #plt.title('Relative Improvement in Background Rejection\n from Agnostic to Predicted Ratios (%)', fontsize=25)
-    #plt.title('Relative Improvement in Background Rejection\n from Predicted to Truth Ratios (%)', fontsize=25)
     plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color=color)
     plt.tight_layout()
     file_name = output_dir+'/'+'class_ratios.png'
@@ -1134,11 +1238,11 @@ def cal_images(sample, labels, layers, output_dir, run_number=-1, mode='random',
     print('SAVING IMAGES TO:', file_name, '\n')
     if   len(layers) == 7: figsize = (18,13)
     elif len(layers) == 8: figsize = (18,15)
-    elif len(layers) == 9: figsize = (18,15.5)
+    elif len(layers) == 9: figsize = (18,17)
     else                 : figsize = (18,21)
     #if len(classes) == 2:  figsize = (7,14)
     if len(classes) == 2:  figsize = (9.5,11.5)
-    fig = plt.figure(figsize=figsize)
+    plt.figure(figsize=figsize)
     for e_class in classes:
         for key in layers:
             image_dict[(e_class,key)] -= min(0,np.min(image_dict[(e_class,key)])) - 1e-8
@@ -1161,12 +1265,12 @@ def cal_images(sample, labels, layers, output_dir, run_number=-1, mode='random',
                 elif key == 'em_barrel_Lr3'     : vmax =  0.2/100
             plot_image(image_dict[(e_class,key)], classes, e_class, layers, key, vmin, vmax, soft)
     wspace = -0.1; hspace = 0.4
-    #fig.subplots_adjust(left=0.02, top=0.97, bottom=0.05, right=0.98, hspace=hspace, wspace=wspace)
-    fig.subplots_adjust(left=0.02, top=0.96, bottom=0.05, right=0.99, hspace=hspace, wspace=wspace)
-    fig.savefig(file_name); plt.close()
+    #plt.subplots_adjust(left=0.02, top=0.97, bottom=0.05, right=0.98, hspace=hspace, wspace=wspace)
+    plt.subplots_adjust(left=0.02, top=0.96, bottom=0.05, right=0.99, hspace=hspace, wspace=wspace)
+    plt.savefig(file_name); plt.close()
 
 
-def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=True):
+def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=False):
     image, vmin, vmax = 100*image, 100*vmin, 100*vmax
     class_dict = {0:'Prompt Electron', 1:'Charge Flip', 2:'Photon Conversion', 3:'Heavy Flavor',
                   4:'Light Flavor e/$\gamma$', 5:'Light Flavor Hadron', 6:'KnownUnknown'}
@@ -1188,7 +1292,12 @@ def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=True)
     e_layer  = layers.index(key)
     n_layers = len(layers)
     plot_idx = n_classes*e_layer + class_idx + 1
-    plt.subplot(n_layers, n_classes, plot_idx)
+    plt.subplot(n_layers, n_classes, plot_idx); ax = plt.gca()
+    ax.tick_params(which='major', direction='out', length=4, width=1.5, colors='black',
+                   bottom=True, top=False, left=True, right=False, zorder=20)
+    for axis in ['top', 'bottom', 'left', 'right']:
+        ax.spines[axis].set_linewidth(1.5)
+        ax.spines[axis].set_color('black')
     #title   = class_dict[e_class]+'\n('+layer_dict[key]+')'
     #title   = layer_dict[key]+'\n('+class_dict[e_class]+')'
     if plot_idx-1 < n_classes: title = class_dict[e_class] + '\n' + layer_dict[key]
@@ -1209,6 +1318,7 @@ def plot_image(image, classes, e_class, layers, key, vmin, vmax, soft, log=True)
         plt.imshow(np.float32(image), cmap='viridis', interpolation='bilinear' if soft else None,
                    extent=limits, vmax=1 if np.max(image)==0 else vmax)
     cbar = plt.colorbar(pad=0.02)
+    cbar.outline.set_linewidth(1.5)
     if log:
         cbar.set_ticks([1e-4, 1e-3, 1e-2, 1e-2, 1e-1, 1, 10, 100])
 
@@ -1433,7 +1543,7 @@ def plot_variable(mc_samples, data_sample, var, var_type, gen_cuts, mc_selection
     except:
         pass
     try:
-        pt_text = gen_cuts['pt'][0]+'$<E_\mathrm{T}$[GeV]$<$'+gen_cuts['pt'][1]
+        pt_text = gen_cuts['pt'][0]+'$<p_\mathrm{T}$[GeV]$<$'+gen_cuts['pt'][1]
         plt.text(0.07, 0.89,  pt_text, {'color':'black', 'fontsize':20}, va='center', ha='left', transform=axes.transAxes)
     except:
         pass
@@ -1479,11 +1589,12 @@ def plot_class(var, class_number, sample, labels, channels, channel_dict, class_
     class_weights = [np.ones_like(sample, dtype=np.float32) for sample in class_samples]
     class_weights = [100*weights/np.sum(labels==class_number) for weights in class_weights]
     fig = plt.figure(figsize=(12,8)); axes = plt.gca()
-    axes.tick_params(which='minor', direction='in', length=5, width=1.5, colors='black',
+    axes.tick_params(which='minor', direction='in', length=4, width=1, colors='black',
                      bottom=True, top=True, left=True, right=True, zorder=20)
     axes.tick_params(which='major', direction='in', length=7, width=3, colors='black',
                      bottom=True, top=True, left=True, right=True, zorder=20)
-    axes.tick_params(axis="both", pad=8, labelsize=22)
+    axes.tick_params(axis="x", pad=10, labelsize=22)
+    axes.tick_params(axis="y", pad=6 , labelsize=22)
     for axis in ['top', 'bottom', 'left', 'right']:
         axes.spines[axis].set_linewidth(3)
         axes.spines[axis].set_color('black')
@@ -1492,24 +1603,39 @@ def plot_class(var, class_number, sample, labels, channels, channel_dict, class_
         n_bins = 100; bins = np.logspace(np.log10(4.5), np.log10(300), n_bins+1)
         plt.xlim(4.5, 300); plt.xscale('log')
         plt.xticks( [4.5,10,100,300], [4.5,'$10^1$','$10^2$',r'$3\!\times\!10^2$'] )
-        plt.xlabel('$E_\mathrm{T}$ (GeV)', fontsize=30, loc='center')
+        plt.xlabel('$p_\mathrm{T}\,$(GeV)', fontsize=30, loc='center', labelpad=1)
     if var == 'eta':
         n_bins = 100; bins = np.linspace(0, 2.5, n_bins+1)
         plt.xlim(0, 2.5)
         axes.xaxis.set_minor_locator(ticker.AutoMinorLocator(5))
-        plt.xticks(np.arange(0, 2.6, 0.5))
+        plt.xticks(np.arange(0, 2.6, 0.5), ['0']+list(np.arange(0.5, 2.6, 0.5)))
         plt.xlabel('$|\eta|$', fontsize=30, loc='center')
+    axes.yaxis.set_minor_locator(ticker.AutoMinorLocator(5))
     if density:
         def density_weights(weights, bins, variable):
             indices = np.searchsorted(bins, variable, side='right')
             return weights/np.take(np.diff(bins), np.minimum(indices, len(bins)-1)-1)
         class_weights = [density_weights(class_weights[n],bins,class_samples[n]) for n in range(len(class_samples))]
+        y_max = {'eta':{0:50,1:100,2:60,3:70,4:60,5:60}, 'pt':{0:2.5,1:8,2:4,3:12,4:30,5:20}}
+        plt.ylim([None,y_max[var][class_number]])
+        if var == 'pt':
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                yticks = axes.get_yticks().tolist()
+                if np.all(np.array([n-int(n) for n in yticks[1:]]) == 0):
+                    yticks = ['0'] + [format(n,'.0f') for n in yticks[1:]]
+                else:
+                    yticks[0] = '0'
+                axes.set_yticklabels(yticks)
         plt.ylabel('Probability Density '+('(%)' if var=='pt' else '(%)'), fontsize=26, loc='center')
     else:
         plt.ylabel('Distribution (%)', fontsize=26, loc='center')
+    channel_label = {'JF17-35-50':'JF17-35-50', 'ttbar':r't$\bar{\operatorname{t}}$',
+                     'WZ':'W,$\,$Z', 'Drell-Yan':'Drell-Yan', 'gamma+jet':r'$\gamma+$jet'}
     pylab.hist(class_samples, bins=bins, weights=class_weights, histtype='barstacked', lw=3,
-               label=class_orders[class_number]['channels'], zorder=10,
-               color=[color_dict[n] for n in class_orders[class_number]['channels']], alpha=0.4)
+    #           label=class_orders[class_number]['channels'], zorder=10,
+               label=[channel_label[label] for label in class_orders[class_number]['channels']], zorder=10,
+               color=[color_dict[n] for n in class_orders[class_number]['channels']], alpha=0.2)
     for n in range(len(class_orders[class_number]['channels'])):
         samples = np.concatenate([class_samples[m] for m in range(n+1)])
         weights = np.concatenate([class_weights[m] for m in range(n+1)])

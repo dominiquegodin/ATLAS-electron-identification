@@ -41,8 +41,7 @@ parser.add_argument( '--scaling'        , default = 'ON'                )
 parser.add_argument( '--t_scaling'      , default = 'OFF'               )
 parser.add_argument( '--plotting'       , default = 'OFF'               )
 parser.add_argument( '--generator'      , default = 'OFF'               )
-#parser.add_argument( '--metrics'        , default = 'val_accuracy'      )
-parser.add_argument( '--metrics'        , default = 'loss'      )
+parser.add_argument( '--metrics'        , default = 'val_accuracy'      ) #{loss, val_loss, accuracy, val_accuracy}
 parser.add_argument( '--host_name'      , default = 'lps'               )
 parser.add_argument( '--input_path'     , default = ''                  )
 parser.add_argument( '--input_dir'      , default = '0.0-2.5_mc'        )
@@ -70,9 +69,9 @@ if '.h5' not in args.model_in and args.n_epochs < 1 and args.n_folds==1:
 
 
 # CNN PARAMETERS
-CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (4,1) , (2,1) ]},
+CNN = {(56,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (2,1) , (2,1) ]},
         (7,11):{'maps':[100,100], 'kernels':[ (3,5) , (3,5) ], 'pools':[ (1,1) , (1,1) ]},
-       #(7,11):{'maps':[100,100], 'kernels':[(3,5,3),(3,5,3)], 'pools':[(1,1,1),(1,1,1)]},
+        #(7,11):{'maps':[100,100], 'kernels':[(3,5,3),(3,5,3)], 'pools':[(1,1,1),(1,1,1)]},
       'tracks':{'maps':[200,200], 'kernels':[ (1,1) , (1,1) ], 'pools':[ (1,1) , (1,1) ]}}
 
 
@@ -96,8 +95,8 @@ others  = ['mcChannelNumber', 'eventNumber'  , 'p_TruthType', 'p_iffTruth'   , '
 
 
 # SAMPLES CUTS
-gen_cuts  = []
-#gen_cuts += ['(abs(sample["eta"]) <= 2.47)'] #['(abs(sample["eta"]) >= 1.30) & (sample["eta"] <= 1.60)']
+gen_cuts  = ['(abs(sample["eta"]) <= 2.5)']
+#gen_cuts = ['(abs(sample["eta"]) >= 0) & (abs(sample["eta"]) <= 2.47)']
 channel_dict = {'Zee' :['361106'], 'ttbar':['410470'], 'Ztautau':['361108'], 'Wtaunu':['361102,361105'],
                 'JF17':['423300'], 'JF35' :['423302'], 'JF50'   :['423303'], 'Wenu'  :['361100,361103'],
                 'high-pt_PC': ['423107','423108','423109','423110','423111','423112']                  }
@@ -122,6 +121,7 @@ args.valid_cuts += ['(sample["p_ambiguityType"] <= 4)']
 if os.path.isfile(args.output_dir+'/'+args.results_in) or os.path.islink(args.output_dir+'/'+args.results_in):
     class_eff = validation(args.output_dir, args.results_in, args.plotting,
                            args.n_valid, args.n_etypes, args.valid_cuts)
+    plot_history(args.output_dir, hist_file='train_history.pkl')
 elif args.results_in != '':
     print('\nERROR: no valid results_in file\n')
 if args.results_in != '': sys.exit()
@@ -212,7 +212,7 @@ if os.path.isfile(args.model_in):
 # GENERATING VALIDATION SAMPLE
 scaler, t_scaler = None, None
 if args.scaling and os.path.isfile(args.scaler_in):
-    print('Loading quantile transform from', args.scaler_in, '\n')
+    print('Loading quantile transform from', args.scaler_in  , '\n')
     scaler = pickle.load(open(args.scaler_in, 'rb'))
 if args.t_scaling and os.path.isfile(args.t_scaler_in):
     print('Loading quantile transform from', args.t_scaler_in, '\n')
@@ -295,8 +295,6 @@ else:
         valid_probs = model.predict(valid_gen, verbose=args.verbose)
     else:
         valid_probs = model.predict(valid_sample, batch_size=valid_batch_size, verbose=args.verbose)
-if args.plotting == 'ON' and training is not None:
-    plot_history(training, args.output_dir)
 bkg_rej = valid_results(valid_sample, valid_labels, valid_probs, train_labels,
                         args.n_etypes, args.output_dir, args.plotting)
 if '.pkl' in args.results_out:
@@ -311,3 +309,5 @@ if '.pkl' in args.results_out:
         valid_data = ({key:valid_sample[key] for key in valid_keys}, valid_labels, valid_probs)
         pickle.dump(valid_data, open(args.results_out,'wb'), protocol=4)
     print('\nValidation results saved to:', args.results_out, '\n')
+if args.plotting == 'ON' and training is not None:
+    plot_history(args.output_dir, history=training)

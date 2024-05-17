@@ -4,7 +4,7 @@
 # SLURM OPTIONS (LPS or BELUGA)
 #---------------------------------------------------------------------
 #SBATCH --account=def-arguinj
-#SBATCH --time=07-00:00         #time limit (DD-HH:MM)
+#SBATCH --time=10-00:00         #time limit (DD-HH:MM)
 #SBATCH --nodes=1               #number of nodes
 ##SBATCH --mem=128G              #memory per node (on Beluga)
 #SBATCH --cpus-per-task=4       #number of CPU threads per node
@@ -36,7 +36,7 @@ then
     fi
 else
     # TRAINING ON BELUGA
-    module load apptainer/1.1
+    module load apptainer-suid/1.1
     PATHS=/project/def-arguinj,$INPUT_PATH
     SIF=/project/def-arguinj/shared/sing_images/tf-2.1.0-gpu-py3_sing-3.5.sif
     if  [ -z ${PRESAMPLER+x} ] || [ $PRESAMPLER != True ]
@@ -44,7 +44,8 @@ else
         if [[ -n "$INPUT_PATH" ]]
         then
             echo "COPYING DATA FILES TO LOCAL NODE"
-            cp -r /project/def-arguinj/shared/e-ID_data/{0.0-2.5_mc,0.0-2.5_LFdata17-18} $INPUT_PATH
+            #cp -r /project/def-arguinj/shared/e-ID_data/{0.0-2.5_mc,0.0-2.5_LFdata17-18} $INPUT_PATH
+            cp -r /project/def-arguinj/shared/e-ID_data/0.0-2.5_mc $INPUT_PATH
         fi
         singularity shell --nv --bind $PATHS $SIF < classifier.sh $SBATCH_VAR $HOST_NAME $INPUT_PATH
     else
