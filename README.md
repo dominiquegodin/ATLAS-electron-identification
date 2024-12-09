@@ -57,7 +57,7 @@ This is a TensorFlow framework for the identification of ATLAS electrons by usin
    ```
 5) enter framework directory
    ```
-   cd el_classifier
+   cd cd ATLAS-e-ID
    ```
 6) File sharing is usually not possible on beluga. So you might need to secure copy the data files and singularity image files from lps to your own directories. Here's a nice tutorial on secure copy:
     ```
